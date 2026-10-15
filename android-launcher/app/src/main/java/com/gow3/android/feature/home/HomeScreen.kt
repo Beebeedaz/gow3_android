@@ -45,6 +45,8 @@ import com.gow3.android.data.LosslessDllManager
 import com.gow3.android.data.RemoveResult
 import com.gow3.android.data.PatchCatalog
 import com.gow3.android.data.LaunchParams
+import com.gow3.android.data.MobilePreset
+import com.gow3.android.data.MobilePresets
 import com.gow3.android.ui.components.LauncherColors
 import com.gow3.android.ui.components.ScreenColumn
 import com.gow3.android.ui.components.formatBytes
@@ -120,16 +122,25 @@ internal fun HomeScreen(
         catalogLoading = false
     }
 
-    fun save(key: String, value: String) {
-        val param = LaunchParams.forCatalog(catalog).firstOrNull { it.key == key } ?: return
-        if (!param.enabled || param.options.none { it.value == value }) return
-        val updates = if (LaunchParams.isPatchSetting(key)) mapOf(key to value, "restart_unconfirmed" to "0")
-                      else mapOf(key to value)
+    fun saveUpdates(updates: Map<String, String>) {
         if (Gow3Ini.write(gow3IniFile(context), updates)) {
             iniValues = loadIni(context)
         } else {
             Toast.makeText(context, context.getString(R.string.settings_save_failed), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    fun save(key: String, value: String) {
+        val param = LaunchParams.forCatalog(catalog).firstOrNull { it.key == key } ?: return
+        if (!param.enabled || param.options.none { it.value == value }) return
+        saveUpdates(if (LaunchParams.isPatchSetting(key)) mapOf(key to value, "restart_unconfirmed" to "0")
+                    else mapOf(key to value))
+    }
+
+    fun applyPreset(preset: MobilePreset) {
+        val currentCatalog = catalog ?: return
+        if (preset !in MobilePresets.available(currentCatalog)) return
+        saveUpdates(MobilePresets.updates(preset, currentCatalog, loadIni(context)))
     }
 
     ScreenColumn(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -140,7 +151,7 @@ internal fun HomeScreen(
         LaunchButton(onStartGame)
         Spacer(Modifier.height(20.dp))
         LaunchParameters(gameDir, updateDir, iniValues, ::save, onChooseGameFolder, onChooseUpdateFolder,
-            catalog, catalogLoading)
+            catalog, catalogLoading, ::applyPreset)
         Spacer(Modifier.height(16.dp))
         FrameGenerationCard(
             state = dllState,

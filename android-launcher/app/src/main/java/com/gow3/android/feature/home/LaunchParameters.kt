@@ -36,6 +36,8 @@ import com.gow3.android.R
 import com.gow3.android.data.LaunchParam
 import com.gow3.android.data.LaunchParams
 import com.gow3.android.data.PatchCatalog
+import com.gow3.android.data.MobilePreset
+import com.gow3.android.data.MobilePresets
 import com.gow3.android.ui.components.LauncherColors
 
 @Composable
@@ -48,6 +50,7 @@ internal fun LaunchParameters(
     onChooseUpdateFolder: () -> Unit,
     catalog: PatchCatalog?,
     catalogLoading: Boolean,
+    applyPreset: (MobilePreset) -> Unit,
 ) {
     val context = LocalContext.current
     val groups = LaunchParams.forCatalog(catalog).groupBy { it.groupRes }
@@ -113,6 +116,7 @@ internal fun LaunchParameters(
             else stringResource(if (catalogLoading) R.string.mods_loading else R.string.home_patch_unavailable),
             color = LauncherColors.textMuted, fontSize = 11.sp, lineHeight = 16.sp,
         )
+        MobilePresetSelector(catalog, ini, applyPreset)
         groups.forEach { (titleRes, params) ->
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 Text(context.getString(titleRes), color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
@@ -120,6 +124,43 @@ internal fun LaunchParameters(
             }
         }
         Text(stringResource(R.string.launch_parameters_footer), color = LauncherColors.textMuted, fontSize = 11.sp, lineHeight = 16.sp)
+    }
+}
+
+@Composable
+private fun MobilePresetSelector(catalog: PatchCatalog?, ini: Map<String, String>, apply: (MobilePreset) -> Unit) {
+    val presets = MobilePresets.available(catalog)
+    val selected = MobilePresets.matching(catalog, ini)
+    var expanded by remember(catalog) { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.mobile_preset_title), color = LauncherColors.gold,
+            fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Box {
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                    .background(LauncherColors.navSurface)
+                    .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)), RoundedCornerShape(8.dp))
+                    .clickable(enabled = presets.isNotEmpty()) { expanded = true }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(selected?.labelRes ?: if (presets.isEmpty()) R.string.mobile_preset_unavailable
+                    else R.string.mobile_preset_custom), modifier = Modifier.weight(1f),
+                    color = if (presets.isEmpty()) LauncherColors.textMuted else LauncherColors.textPrimary,
+                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text("▾", color = LauncherColors.textMuted)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                presets.forEach { preset ->
+                    DropdownMenuItem(text = { Text(stringResource(preset.labelRes)) }, onClick = {
+                        expanded = false
+                        apply(preset)
+                    })
+                }
+            }
+        }
+        Text(stringResource(R.string.mobile_preset_description), color = LauncherColors.textMuted,
+            fontSize = 11.sp, lineHeight = 16.sp)
     }
 }
 

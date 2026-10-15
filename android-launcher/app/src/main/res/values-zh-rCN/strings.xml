@@ -76,6 +76,14 @@
     <string name="home_patch_identity">补丁选项：%1$s · %2$s · 更多开关在补丁页</string>
     <string name="home_patch_unavailable">未匹配到补丁目录。请检查游戏与升级目录后再调整分辨率和引擎帧率，具体原因可在补丁页查看。</string>
     <string name="home_patch_unavailable_value">%1$s（当前版本不可用）</string>
+    <string name="mobile_preset_title">默认配置</string>
+    <string name="mobile_preset_light">540p · 轻量省资源</string>
+    <string name="mobile_preset_balanced">720p · 均衡</string>
+    <string name="mobile_preset_clear">900p · 清晰优先</string>
+    <string name="mobile_preset_hd">1080p · 高性能手机尝试</string>
+    <string name="mobile_preset_custom">自定义</string>
+    <string name="mobile_preset_unavailable">暂无兼容配置</string>
+    <string name="mobile_preset_description">点击后同步设置分辨率、60 帧目标和移动端图形默认值，关闭环境光遮蔽、运动模糊、景深、泛光、柔和粒子和动态阴影，并开启跳过开场与按 X 跳过视频。之后仍可在此处或补丁页单独调整。预设为实验性组合，实际效果取决于手机，下次启动生效。</string>
     <string name="param_desc_vsync">将游戏帧与屏幕刷新率同步，避免画面撕裂。除非出现撕裂或卡顿，否则保持开启。</string>
     <string name="param_desc_frames_queued">游戏在屏幕上显示之前预先准备多少帧。数值越低越能降低输入延迟；数值越高在较弱的硬件上可能更流畅。</string>
     <string name="param_desc_free_camera">允许你自由移动视角环游世界，用于探索或测试，而不是跟随游戏视角。仅供实验，不适合正常游玩。</string>

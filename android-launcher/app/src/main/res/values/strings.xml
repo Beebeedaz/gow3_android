@@ -87,6 +87,14 @@
     <string name="home_patch_identity">Patch options for %1$s · %2$s · More switches in Patches</string>
     <string name="home_patch_unavailable">No matching patch catalog. Check the game and update folders to enable resolution and engine frame rate settings. See Patches for details.</string>
     <string name="home_patch_unavailable_value">%1$s (unavailable for this version)</string>
+    <string name="mobile_preset_title">DEFAULT PROFILE</string>
+    <string name="mobile_preset_light">540p · Lower GPU load</string>
+    <string name="mobile_preset_balanced">720p · Balanced</string>
+    <string name="mobile_preset_clear">900p · Sharper image</string>
+    <string name="mobile_preset_hd">1080p · Higher GPU load</string>
+    <string name="mobile_preset_custom">Custom</string>
+    <string name="mobile_preset_unavailable">No compatible profile</string>
+    <string name="mobile_preset_description">Tap a profile to apply its resolution, a 60 FPS target, and mobile graphics defaults. Disables SSAO, motion blur, depth of field, bloom, soft particles and dynamic shadows; enables intro skipping and X to skip videos. You can then adjust each setting here or in Patches. Experimental profiles: results depend on your phone. Changes take effect on the next launch.</string>
     <string name="param_desc_vsync">Syncs the game\'s frames with your screen\'s refresh rate to stop visual tearing. Leave it ON unless you see tearing or stutter.</string>
     <string name="param_desc_frames_queued">How many frames the game prepares ahead of what the screen shows. Lower numbers cut input lag; higher numbers can improve smoothness on weaker hardware.</string>
     <string name="param_desc_free_camera">Lets you move the camera freely around the world for exploring or testing, instead of following the gameplay camera. Meant for experimentation, not normal play.</string>
