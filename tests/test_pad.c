@@ -47,10 +47,39 @@ int main(void) {
     assert(pad_read_state(1,&data)==0 && data.l2==128 && data.r2==200);
     inject(path,"l2=999 r2=-5");
     assert(pad_read_state(1,&data)==0 && data.l2==255 && data.r2==0);
-    inject(path,"cross l2 r2");
+    /* 数值扳机越过 30 阈值时与物理手柄一致:模拟量与数字按键位同时有效。 */
+    inject(path,"l2=255 r2=255");
     assert(pad_read_state(1,&data)==0 && data.l2==255 && data.r2==255);
+    assert((data.buttons & (BTN_L2|BTN_R2))==(BTN_L2|BTN_R2));
+    /* 阈值边界:30 不置位、31 置位,保护与 sample_host() 一致的 >30 判定。 */
+    inject(path,"l2=30 r2=30");
+    assert(pad_read_state(1,&data)==0 && data.l2==30 && data.r2==30);
+    assert((data.buttons & (BTN_L2|BTN_R2))==0);
+    inject(path,"l2=31 r2=31");
+    assert(pad_read_state(1,&data)==0 && data.l2==31 && data.r2==31);
+    assert((data.buttons & (BTN_L2|BTN_R2))==(BTN_L2|BTN_R2));
+    /* 释放:注入源自身值归零(空文件或 l2=0),注入贡献的模拟量与按键位都被清除。 */
+    inject(path,"l2=255");
+    assert(pad_read_state(1,&data)==0 && data.l2==255 && (data.buttons & BTN_L2));
+    inject(path,"l2=0");
+    assert(pad_read_state(1,&data)==0 && data.l2==0 && !(data.buttons & BTN_L2));
     inject(path,"");
     assert(pad_read_state(1,&data)==0 && data.l2==0 && data.r2==0);
+    assert((data.buttons & (BTN_L2|BTN_R2))==0);
+    /* 二进制 token 仍置位按键位并拉满模拟量(既有路径不回归)。 */
+    inject(path,"cross l2 r2");
+    assert(pad_read_state(1,&data)==0 && data.l2==255 && data.r2==255);
+    assert((data.buttons & BTN_CROSS) && (data.buttons & (BTN_L2|BTN_R2))==(BTN_L2|BTN_R2));
+    inject(path,"l2 r2");
+    assert(pad_read_state(1,&data)==0 && data.l2==255 && data.r2==255);
+    assert((data.buttons & (BTN_L2|BTN_R2))==(BTN_L2|BTN_R2));
+    /* overlay 发布只基于 token 按键位:数值注入不进发布,二进制 token 进发布。 */
+    inject(path,"l2=255");
+    assert(pad_read_state(1,&data)==0 && (published & (BTN_L2|BTN_R2))==0);
+    inject(path,"l2");
+    assert(pad_read_state(1,&data)==0 && (published & BTN_L2));
+    inject(path,"");
+    assert(pad_read_state(1,&data)==0 && published==0);
 
     /* While the overlay holds the input the game stays neutral, but the file is still read and
      * published: on Android that file is the only thing the save list can hear. */

@@ -374,6 +374,11 @@ static void sample(PadData *d) {
     /* 二值 token 已被上面的 255 覆盖,数值解析填其余的模拟量。 */
     if (injected.trigger[0]>0 && d->l2<injected.trigger[0]) d->l2=(uint8_t)injected.trigger[0];
     if (injected.trigger[1]>0 && d->r2<injected.trigger[1]) d->r2=(uint8_t)injected.trigger[1];
+    /* 与 sample_host() 的物理手柄路径一致:模拟扳机越过阈值时同时置位数字按键位,
+     * 否则 GOW3_PAD_FILE 注入(Android 触屏手柄只写 l2=/r2= 数值、省略 token)的游戏
+     * 侧 PadData.buttons 里永远没有 BTN_L2/BTN_R2,游戏按数字位响应的动作无响应。 */
+    if (d->l2>30) d->buttons|=BTN_L2;
+    if (d->r2>30) d->buttons|=BTN_R2;
     uint8_t *axes[4]={&d->left_x,&d->left_y,&d->right_x,&d->right_y};
     for (int i=0;i<4;++i) if (injected.stick[i]>=0) *axes[i]=(uint8_t)injected.stick[i];
     if (hold_after_capture) {
