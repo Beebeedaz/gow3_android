@@ -223,6 +223,10 @@ static void StartProfileWriter() {
 #endif
 
 extern "C" int gow3gpu_init(const Gow3GpuConfig* config) {
+    // native 移植标志：用于确认设备运行的是包含 081df6f 修复的 GPU 库。
+    std::printf("GOW3_NATIVE_FIX_081DF6F=active\n");
+    // native 移植标志：用于确认设备运行的是包含 195c7ab 修复的 GPU 库。
+    std::printf("GOW3_NATIVE_FIX_195C7AB=active\n");
     Gow3Settings::Load();
 #ifdef GOW3_PGO_GENERATE
     StartProfileWriter();
