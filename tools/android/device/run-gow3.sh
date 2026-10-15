@@ -241,21 +241,17 @@ PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/content_profile.py" "$
 # GOW3_DEVICE_MEM_MB lets launch_env.py gate the patches by the device's RAM (insufficient-memory-budget).
 mem_kb=$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || true)
 [ -n "$mem_kb" ] && [ "$mem_kb" -gt 0 ] && export GOW3_DEVICE_MEM_MB=${GOW3_DEVICE_MEM_MB:-$((mem_kb/1024))}
-eval "$(PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/launch_env.py" --game "$game" --config "$GOW3_CONFIG" --state "$out/graphics_state.json" --shell)"
-# The retail pool is 5056 MiB; the resolution/texture patches ask for more (7104+ for the default
-# set). On a phone RAM is the binding constraint: lower the patch set / resolution if the app is
-# killed. See docs/ANDROID_PORT.md.
-export GOW3_DMEM_MB=${GOW3_DMEM_MB:-0}; [ "${GOW3_DMEM_MB:-0}" -ge 5056 ] 2>/dev/null || export GOW3_DMEM_MB=7104
-export GOW3_VBLANK_HZ=${GOW3_VBLANK_HZ:-0}; [ "${GOW3_VBLANK_HZ:-0}" -ge 1 ] 2>/dev/null || export GOW3_VBLANK_HZ=60
+export GOW3_PATCHES_DIR=${GOW3_PATCHES_DIR:-$base/patches}
+export GOW3_PATCHES_CONFIG=${GOW3_PATCHES_CONFIG:-$base/patches.json}
+# 补丁编译、报告发布和最终参数来自同一计划；失败时绝不继续执行旧产物。
+if ! patch_env=$(PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/launch_env.py" --game "$game" --config "$GOW3_CONFIG" --state "$out/graphics_state.json" --out "$out" --base-dmem 7104 --shell); then
+    echo "Patch preparation failed; game was not started." >&2
+    exit 2
+fi
+eval "$patch_env"
 echo "Texture integrity: title=${GOW3_GAME_TITLE:-unknown} version=${GOW3_GAME_VERSION:-unknown} patch=${GOW3_PATCH_STATUS:-unknown} upscaler=${GOW3_UPSCALER:-none}(${GOW3_UPSCALER_SOURCE:-unknown}) readback_linear=${GOW3_READBACK_LINEAR:-1}(${GOW3_READBACK_LINEAR_SOURCE:-unknown}) deferred=${GOW3_DEFERRED_READBACK:-unknown} stale=${GOW3_STALE_READBACK:-unknown} dmem=${GOW3_DMEM_MB}MiB vblank=${GOW3_VBLANK_HZ}Hz turnip=${turnip}"
-profile_file="$out/texture-profile.json"
-profile_supported=false
-[ "${GOW3_PATCH_STATUS:-}" = validated ] && profile_supported=true
-printf '%s\n' "{\"title_id\":\"${GOW3_GAME_TITLE:-unknown}\",\"app_version\":\"${GOW3_GAME_VERSION:-unknown}\",\"eboot_sha256\":\"${GOW3_EBOOT_SHA256:-unavailable}\",\"supported\":${profile_supported},\"reason\":\"${GOW3_PATCH_STATUS:-unknown}\"}" > "$profile_file"
+profile_file="$out/patch_status.json"
 PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/texture_diagnostics.py" --out "$out/texture_integrity.json" --profile "$profile_file" --turnip "${turnip}" --dmem "${GOW3_DMEM_MB}" --vblank "${GOW3_VBLANK_HZ}" --vulkan-status "${vulkan_status}"
-PYTHONHOME="$host/usr" "$loader" "$python" "$base/scripts/patches.py" --out "$out" --extra "${GOW3_PATCHES:-}" \
-    --game-dir "$game" --patches-dir "${GOW3_PATCHES_DIR:-$base/patches}" \
-    --patches-config "${GOW3_PATCHES_CONFIG:-$base/patches.json}"
 
 cd "$base"
 echo "God of War III: starting (DMEM ${GOW3_DMEM_MB} MiB, vblank ${GOW3_VBLANK_HZ} Hz)"

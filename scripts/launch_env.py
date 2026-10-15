@@ -14,64 +14,69 @@ from pathlib import Path
 PORT = Path(__file__).resolve().parent.parent
 
 
-def derive(game, config, state_path, env):
-    """Plan one launch.
-
-    game:       the game folder (eboot.bin)
-    config:     gow3.ini path
-    state_path: graphics_state.json path (restart confirmation)
-    env:        the current environment (GOW3_PATCHES, GOW3_PATCHES_ONLY, explicit overrides)
-
-    Returns:
-      updates:     environment variables the graphics options become (GOW3_DEFERRED_READBACK,
-                   GOW3_STALE_READBACK, GOW3_ASYNC_SHADERS, GOW3_UPSCALER, GOW3_READBACK_LINEAR)
-      patch_names: the selected patch names, resolution and frame rate included
-      dmem, vblank: MiB / Hz the selected patches need, or None
-      reverted:    a restart never reached the game; the last good options were restored
-    """
-    sys.path.insert(0, str(PORT / 'scripts'))
+def derive(game, config, state_path, env, *, out=None, base_dmem=5056):
+    """生成并发布本轮补丁，再从编译成功集导出 native 环境。"""
+    import json
     import graphics_options
-    from patches import game_profile, game_title_id, patch_profile_status, patch_requirements, selected_patches
+    from patches import (checked_output, compile_plan, game_profile, patch_profile_status,
+                         publish_plan, selected_patches)
 
+    env = dict(env)
+    # 重启继承了上轮派生参数时，恢复原始输入，不把派生结果当成用户覆盖。
+    previous = env.pop('GOW3_PATCH_INPUTS', None)
+    if previous is not None:
+        inputs = json.loads(previous)
+        for key in PATCH_INPUT_KEYS:
+            env.pop(key, None)
+        env.update(inputs)
+    inputs = {key: env[key] for key in PATCH_INPUT_KEYS if key in env}
+    out = checked_output(game, out if out is not None else Path(state_path).parent)
+    out.mkdir(parents=True, exist_ok=True)
     graphics, reverted = graphics_options.prepare(config, state_path)
     updates = dict(graphics_options.environment(graphics))
-    # The temporal upscalers and motion vectors are not calibrated for this game yet; linear
-    # image readbacks fix its corrupted textures. Defaults only: an explicit value wins.
     for key, default in (('GOW3_UPSCALER', 'none'), ('GOW3_READBACK_LINEAR', '1')):
         if key not in env:
             updates[key] = default
         updates[f'{key}_SOURCE'] = 'override' if key in env else 'android-safe-default'
 
-    names, dmem, vblank = [], None, None
     identity = patch_profile_status(game)
     profile = game_profile(identity['title_id'])
-    reason = identity['reason'] or 'unknown'
-    if identity['reason'] != 'validated':
-        # An unknown Android build must never inherit desktop patch names through an env override.
-        if profile is None or identity['eboot_matches'] is False:
-            updates['GOW3_PATCH_STATUS'] = identity['reason']
-    if profile and identity['reason'] == 'validated':
+    extra = env.get('GOW3_PATCHES', '')
+    requested = [n.strip() for n in extra.split(';') if n.strip()]
+    names, disabled = [], None
+    if profile and identity['reason'] == 'eligible':
         try:
-            names = selected_patches(profile[1], profile[2], env.get('GOW3_PATCHES', ''),
+            names = selected_patches(profile[1], profile[2], extra,
                                      env.get('GOW3_PATCHES_ONLY') == '1')
-        except ValueError:
-            # Two resolution patches (or another exclusivity violation) cannot both apply.
-            names, reason = [], 'patch-conflict'
-        if names:
-            # gow3.ini decides the resolution and frame rate patches (in-game menu, launcher).
             names = graphics_options.patch_names(names, graphics)
-            dmem, vblank = patch_requirements(profile[1], names, profile[2])
-            # The retail pool plus the patches' extra DMEM must fit the device (design: gate
-            # values by device/runtime capability and fail with a clear log, not an OOM kill).
-            device_mem = env.get('GOW3_DEVICE_MEM_MB')
-            if dmem and device_mem and str(device_mem).isdigit() and dmem > int(device_mem):
-                names, dmem, vblank, reason = [], None, None, 'insufficient-memory-budget'
-    updates.update({'GOW3_GAME_TITLE': identity['title_id'] or 'unknown',
-                    'GOW3_GAME_VERSION': identity['app_version'] or 'unknown',
-                    'GOW3_EBOOT_SHA256': identity['eboot_sha256'] or 'unavailable',
-                    'GOW3_PATCH_STATUS': reason})
-    return {'updates': updates, 'patch_names': names, 'dmem': dmem, 'vblank': vblank,
-            'reverted': reverted, 'identity': identity}
+            requested = list(dict.fromkeys(requested + names))
+        except ValueError:
+            disabled = 'patch-conflict'
+    report, writes = compile_plan(
+        game, out, names, requested=requested, disabled_reason=disabled, env=env,
+        base_dmem=base_dmem, patches_dir=env.get('GOW3_PATCHES_DIR'),
+        patches_config=env.get('GOW3_PATCHES_CONFIG'))
+    report['requested_graphics'] = graphics
+    publish_plan(out, report, writes)
+    effective = report['effective']
+    updates.update({
+        'GOW3_GAME_TITLE': identity['title_id'] or 'unknown',
+        'GOW3_GAME_VERSION': identity['app_version'] or 'unknown',
+        'GOW3_EBOOT_SHA256': identity['eboot_sha256'] or 'unavailable',
+        'GOW3_PATCH_STATUS': report['reason'],
+        'GOW3_PATCHES': ';'.join(report['applied']),
+        'GOW3_PATCHES_ONLY': '1',
+        'GOW3_ENGINE_FPS': str(effective['engine_fps']),
+        'GOW3_DMEM_MB': str(effective['dmem_mb']),
+        'GOW3_VBLANK_HZ': str(effective['vblank_hz']),
+        'GOW3_PATCH_INPUTS': json.dumps(inputs),
+    })
+    return {'updates': updates, 'patch_names': report['applied'],
+            'dmem': effective['dmem_mb'], 'vblank': effective['vblank_hz'],
+            'reverted': reverted, 'identity': report['identity'], 'patch_report': report}
+
+
+PATCH_INPUT_KEYS = ('GOW3_PATCHES', 'GOW3_PATCHES_ONLY', 'GOW3_DMEM_MB', 'GOW3_VBLANK_HZ')
 
 
 def _quote(value):
@@ -84,22 +89,20 @@ def main(argv):
     p.add_argument('--game', required=True, type=Path)
     p.add_argument('--config', required=True, type=Path)
     p.add_argument('--state', required=True, type=Path)
+    p.add_argument('--out', type=Path, help='prepared image and patch output directory')
+    p.add_argument('--base-dmem', type=int, default=5056)
     p.add_argument('--shell', action='store_true',
                    help='print export KEY=VALUE lines (for run.sh) instead of JSON')
     a = p.parse_args(argv)
-    plan = derive(a.game, a.config, a.state, dict(os.environ))
+    try:
+        plan = derive(a.game, a.config, a.state, dict(os.environ), out=a.out, base_dmem=a.base_dmem)
+    except (OSError, ValueError) as error:
+        p.exit(1, f'Patch preparation failed: {error}\n')
     if not a.shell:
         import json
         print(json.dumps(plan))
         return 0
     exports = dict(plan['updates'])
-    if plan['patch_names']:
-        exports['GOW3_PATCHES'] = ';'.join(plan['patch_names'])
-        exports['GOW3_PATCHES_ONLY'] = '1'
-    if plan['dmem']:
-        exports['GOW3_DMEM_MB'] = str(plan['dmem'])
-    if plan['vblank']:
-        exports['GOW3_VBLANK_HZ'] = str(plan['vblank'])
     for key, value in exports.items():
         print(f'export {key}={_quote(str(value))}')
     return 0

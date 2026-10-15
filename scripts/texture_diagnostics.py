@@ -27,6 +27,12 @@ def record(path, profile, env=None, turnip=None, dmem=None, vblank=None, vulkan_
         'eboot_sha256': profile.get('eboot_sha256'),
         'patch_profile_supported': profile.get('supported'),
         'patch_profile_status': profile.get('reason'),
+        'patch_phase': profile.get('phase'),
+        'compiled_patches': profile.get('applied', []),
+        'skipped_patches': profile.get('skipped', {}),
+        'effective_patch_parameters': profile.get('effective', {}),
+        'patch_write_count': profile.get('write_count'),
+        'patches_sha256': profile.get('patches_sha256'),
         'vulkan_status': vulkan_status if vulkan_status is not None
                          else env.get('GOW3_VULKAN_STATUS', 'unknown'),
         'upscaler': env.get('GOW3_UPSCALER', 'none'),

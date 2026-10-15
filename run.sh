@@ -55,11 +55,14 @@ fi
 # Graphics options, patch selection and the direct memory (DMEM) / VBlank the selected patches
 # need: one source, shared with run.py (scripts/launch_env.py). The retail pool is 5056 MiB;
 # resolution/texture patches ask for more, and without it the game faults building its heaps.
-eval "$("$PYTHON" scripts/launch_env.py --game "$game" --config "$GOW3_CONFIG" --state "$out/graphics_state.json" --shell)"
-export GOW3_DMEM_MB=${GOW3_DMEM_MB:-0}; (( GOW3_DMEM_MB >= 5056 )) || export GOW3_DMEM_MB=5056
-export GOW3_VBLANK_HZ=${GOW3_VBLANK_HZ:-0}; (( GOW3_VBLANK_HZ >= 1 )) || export GOW3_VBLANK_HZ=60
-# GOW3_PATCHES (set above) adds patch names ("a;b") to the game's built-in patch file.
-"$PYTHON" scripts/patches.py --out "$out" --extra "${GOW3_PATCHES:-}" --game-dir "$game"     --patches-dir "${GOW3_PATCHES_DIR:-$data/patches}" --patches-config "${GOW3_PATCHES_CONFIG:-$data/patches.json}"
+export GOW3_PATCHES_DIR=${GOW3_PATCHES_DIR:-$data/patches}
+export GOW3_PATCHES_CONFIG=${GOW3_PATCHES_CONFIG:-$data/patches.json}
+# 先检查编译/发布是否成功，再导出环境；eval 不能掩盖子命令失败。
+if ! patch_env=$("$PYTHON" scripts/launch_env.py --game "$game" --config "$GOW3_CONFIG" --state "$out/graphics_state.json" --out "$out" --shell); then
+    echo 'Patch preparation failed; game was not started.' >&2
+    exit 1
+fi
+eval "$patch_env"
 # FSR 4: faster post passes next to the downloaded ones (incremental; tools/fsr4_optimize.sh).
 if [[ -z ${GOW3_PREBUILT:-} && -d fsr4_shaders ]] && command -v spirv-cross >/dev/null; then
     bash tools/fsr4_optimize.sh || echo 'FSR 4: optimized post passes not built' >&2

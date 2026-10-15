@@ -1,12 +1,16 @@
 from paths import ROOT
 import tempfile
+import json
+import struct
+from unittest import mock
+import patches
+from patch_fixtures import make_game, make_xml, profiles, TEXTURE, STARTUP, FPS120, RES4K
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from patches import (compile_patches, external_patches, external_selection, compile_external,
-                     game_profile, selected_patches, patch_profile_status, patch_requirements,
-                     patch_sites_bytes_match)
+                     game_profile, selected_patches, patch_profile_status, patch_requirements, compile_plan, publish_plan)
 
 GOW3 = ROOT / 'patches/God_of_War_III_Remastered.xml'
 GOW3_IDS = {'CUSA01623'}
@@ -61,38 +65,31 @@ class GameProfileTests(unittest.TestCase):
 
     def test_gow3_defaults_and_extras(self):
         self.assertEqual(selected_patches(GOW3, '01.02', ''),
-                         ['Bug Fix - Texture Corruption Fix', 'Skip Any Video With X Button'])
+                         ['Bug Fix - Texture Corruption Fix', 'Skip Any Video With X Button', STARTUP])
         self.assertEqual(selected_patches(GOW3, '01.02', 'Resolution Patch - 720p; Skip Any Video With X Button'),
-                         ['Skip Any Video With X Button', 'Resolution Patch - 720p'])
+                         ['Skip Any Video With X Button', STARTUP, 'Resolution Patch - 720p'])
         self.assertEqual(selected_patches(GOW3, '01.00', ''), [])
         # The launcher's selection is exact: unchecked defaults stay off.
-        self.assertEqual(selected_patches(GOW3, '01.02', 'Skip Any Video With X Button', only=True), ['Skip Any Video With X Button'])
-        self.assertEqual(selected_patches(GOW3, '01.02', '', only=True), [])
+        self.assertEqual(selected_patches(GOW3, '01.02', 'Skip Any Video With X Button', only=True), ['Skip Any Video With X Button', STARTUP])
+        self.assertEqual(selected_patches(GOW3, '01.02', '', only=True), [STARTUP])
 
     def test_gow3_resolution_patch_replaces_texture_fix(self):
         self.assertEqual(selected_patches(GOW3, '01.02', 'Resolution Patch - 4K'),
-                         ['Skip Any Video With X Button', 'Resolution Patch - 4K'])
+                         ['Skip Any Video With X Button', STARTUP, 'Resolution Patch - 4K'])
         with self.assertRaises(ValueError):
             selected_patches(GOW3, '01.02', 'Resolution Patch - 4K;Resolution Patch - 720p')
 
-    def test_eboot_build_check(self):
-        from patches import eboot_matches
-        with tempfile.TemporaryDirectory() as folder:
-            (Path(folder) / 'eboot.bin').write_bytes(b'another build')
-            self.assertFalse(eboot_matches(folder, game_profile('CUSA01623')))
-            self.assertTrue(eboot_matches(folder, None))  # no profile: nothing to check
-
-    def test_patch_site_bytes_gate(self):
-        # An Android-style profile without a reusable whole-eboot hash: the per-patch-site
-        # original bytes gate the patch. Any mismatch selects no patch.
-        profile = ({'CUSA01740'}, None, '01.02', None, {4: b'AB', 8: b'CD'})
-        with tempfile.TemporaryDirectory() as folder:
-            path = Path(folder)
-            (path / 'eboot.bin').write_bytes(b'\x00\x01\x02\x03AB\x06\x07CD')
-            self.assertTrue(patch_sites_bytes_match(path, profile))
-            (path / 'eboot.bin').write_bytes(b'\x00\x01\x02\x03AB\x06\x07EF')
-            self.assertFalse(patch_sites_bytes_match(path, profile))
-        self.assertTrue(patch_sites_bytes_match('no-game-dir', ({}, None, '01.02', None, None)))
+    def test_eligible_identity_does_not_claim_site_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for title in ('CUSA01623', 'CUSA01715', 'CUSA01720'):
+                game, _ = make_game(directory, title)
+                status = patch_profile_status(game)
+                self.assertEqual(status['reason'], 'eligible')
+                self.assertIsNone(status['patch_sites_match'])
+                self.assertIsNone(status['eboot_matches'])
+            game, _ = make_game(directory, version='01.00')
+            self.assertEqual(patch_profile_status(game)['reason'], 'unsupported-app-version')
+            self.assertIsNone(game_profile('CUSA01740', 'God of War III'))
 
     def test_android_cusa01740_selects_no_patch(self):
         # The Android test build CUSA01740 is not a validated profile: no patch is selected,
@@ -129,6 +126,106 @@ class GameProfileTests(unittest.TestCase):
                          (5056 + 6144, None))
         self.assertEqual(patch_requirements(GOW3, ['Frame Rate Patch - 120 FPS'], '01.02'), (None, 120))
         self.assertEqual(patch_requirements(GOW3, [], '01.02'), (None, None))
+
+
+class PatchPlanTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.game, self.out = make_game(self.root)
+        self.xml = make_xml(self.root)
+        override = mock.patch.object(patches, 'GAMES', profiles(self.xml))
+        override.start()
+        self.addCleanup(override.stop)
+
+    def test_plan_compiles_and_publishes_current_identity(self):
+        report, writes = compile_plan(self.game, self.out, [FPS120])
+        publish_plan(self.out, report, writes)
+        self.assertEqual(writes, [(4, b'\x90')])
+        self.assertEqual(report['effective']['engine_fps'], 120)
+        self.assertEqual(report['effective']['vblank_hz'], 120)
+        self.assertEqual(json.loads((self.out / 'patch_status.json').read_text()), report)
+        self.assertEqual(struct.unpack_from('<Q', (self.out / 'patches.bin').read_bytes(), 16)[0], 1)
+
+    def test_same_eboot_with_unsupported_identity_replaces_old_success(self):
+        report, writes = compile_plan(self.game, self.out)
+        publish_plan(self.out, report, writes)
+        for title, version, reason in [('CUSA01740', '01.02', 'unsupported-title'),
+                                       ('CUSA99999', '01.02', 'unsupported-title'),
+                                       ('CUSA01715', '01.00', 'unsupported-app-version')]:
+            make_game(self.root, title, version)
+            report, writes = compile_plan(self.game, self.out, extra=FPS120)
+            publish_plan(self.out, report, writes)
+            self.assertEqual(writes, [])
+            self.assertEqual(report['reason'], reason)
+            self.assertEqual(report['applied'], [])
+            self.assertEqual(len((self.out / 'patches.bin').read_bytes()), 24)
+            self.assertEqual(json.loads((self.out / 'patch_status.json').read_text())['reason'], reason)
+
+    def test_global_rejection_does_not_readd_always_on(self):
+        for kwargs, reason in [({'extra': RES4K, 'env': {'GOW3_DEVICE_MEM_MB': '4096'}},
+                                'insufficient-memory-budget'),
+                               ({'extra': FPS120 + ';Frame Rate Patch - 240 FPS'}, 'patch-conflict'),
+                               ({'disabled_reason': 'patch-conflict'}, 'patch-conflict')]:
+            report, writes = compile_plan(self.game, self.out, **kwargs)
+            self.assertEqual(writes, [])
+            self.assertEqual(report['disabled_reason'], reason)
+            self.assertEqual(report['applied'], [])
+
+    def test_stale_or_missing_prepared_elf_is_rejected(self):
+        (self.out / 'eboot.elf').write_bytes(b'old image')
+        with self.assertRaisesRegex(ValueError, 'does not match'):
+            compile_plan(self.game, self.out)
+        (self.game / 'eboot.bin').unlink()
+        with self.assertRaisesRegex(ValueError, 'missing-or-unreadable-eboot'):
+            compile_plan(self.game, self.out)
+
+    def test_non_reference_external_patches_are_not_written(self):
+        report, writes = compile_plan(self.game, self.out, [], patches_dir=self.root)
+        self.assertEqual(writes, [])
+        self.assertEqual(report['external']['reason'], 'non-reference-eboot')
+
+    def test_output_in_game_or_failed_publish_is_not_silently_accepted(self):
+        with self.assertRaisesRegex(ValueError, 'outside the game'):
+            compile_plan(self.game, self.game / 'out')
+        report, writes = compile_plan(self.game, self.out)
+        with mock.patch.object(patches.os, 'replace', side_effect=PermissionError('read-only')):
+            with self.assertRaises(PermissionError):
+                publish_plan(self.out, report, writes)
+        self.assertFalse(list(self.out.glob('.patch*')))
+
+    def test_whole_patch_is_dropped_for_bad_later_write_or_target(self):
+        cases = [
+            ('<Line Type="bytes" Pattern="ee ff" Value="90"/>', 'signature not found'),
+            ('<Line Type="bytes" Pattern="00" Value="90"/>', 'signature found more than once'),
+            ('<Line Type="bytes" Pattern="07 08" At="64" Value="90"/>', 'outside'),
+            ('<Line Type="bytes" Address="0x400001" Value="90"/>', 'missing signature'),
+            ('<Target Name="bad" Pattern="07 08" At="64"/>', 'target outside'),
+            ('<Target Name="bad" Pattern="07 08" At="-64" Ref="1"/>', 'reference operand'),
+            ('<Target Name="bad" Line="-1"/>', 'invalid target line'),
+        ]
+        image = bytes(range(16)) + bytes(16)
+        for tail, reason in cases:
+            with self.subTest(reason=reason):
+                self.xml.write_text('<Patch><Metadata Name="Bad" AppVer="01.02"><PatchList>'
+                                    '<Line Type="bytes" Pattern="01 02" Value="90"/>' + tail +
+                                    '</PatchList></Metadata><Metadata Name="Good" AppVer="01.02">'
+                                    '<Line Type="bytes" Pattern="04 05" Value="ff"/></Metadata></Patch>')
+                skipped = {}
+                writes = compile_patches(self.xml, ['Bad', 'Good'], '01.02', [(0, 32)], image, skipped)
+                self.assertEqual(writes, [(4, b'\xff')])
+                self.assertIn(reason, skipped['Bad'])
+
+    def test_bss_write_uses_verified_target_without_absolute_address_fallback(self):
+        self.xml.write_text('<Patch><Metadata Name="BSS" AppVer="01.02">'
+                            '<Line Type="bytes32" Target="index" Value="2" Address="0xdeadbeef"/>'
+                            '<Target Name="index" Pattern="01 02 03" At="8"/>'
+                            '</Metadata></Patch>')
+        skipped = {}
+        writes = compile_patches(self.xml, ['BSS'], '01.02', [(0, 32)], bytes(range(16)), skipped)
+        self.assertEqual(skipped, {})
+        self.assertEqual(writes, [(9, struct.pack('<I', 2))])
 
 
 if __name__ == '__main__':

@@ -12,6 +12,7 @@ import os
 import re
 import struct
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -70,9 +71,11 @@ def find_pattern(image, pattern, limit=2):
 
 
 def locate(image, element, prefix=''):
-    """Image offset of a Line's or Target's site: its Pattern (unique) plus At, else Address."""
+    """实际映像必须唯一匹配特征码；无映像的参考编译才允许 Address。"""
     pattern=element.get(prefix+'Pattern')
     if not pattern:
+        if image is not None:
+            raise ValueError('missing signature')
         return int(element.get('Address'),0)-EBOOT_BASE
     found=find_pattern(image,parse_pattern(pattern))
     if len(found)!=1:
@@ -88,10 +91,15 @@ def resolve_targets(image, meta, sites):
     for target in meta.iter('Target'):
         name=target.get('Name')
         if target.get('Line'):
-            targets[name]=sites[int(target.get('Line'))]
+            index=int(target.get('Line'))
+            if not 0 <= index < len(sites) or sites[index] is None:
+                raise ValueError('invalid target line reference')
+            targets[name]=sites[index]
             continue
         at=locate(image,target)
         if target.get('Ref'):
+            if at < 0 or at + 4 > len(image):
+                raise ValueError('reference operand outside the image')
             disp,=struct.unpack_from('<i',image,at)
             at=at+4+int(target.get('Tail','0'))+disp
         targets[name]=at
@@ -133,33 +141,39 @@ def compile_patches(xml, names, app_version, segments, image=None, skipped=None)
     for meta in ET.parse(xml).getroot().iter('Metadata'):
         if meta.get('Name') in names and app_version in (None,meta.get('AppVer')) and meta.get('AppElf','eboot.bin')=='eboot.bin':
             found[meta.get('Name')]=meta
-    missing=[n for n in names if n not in found]
-    if missing: raise ValueError(f'patches not found for app version {app_version}: {missing}')
     writes=[]
-    for name in names:
-        lines=list(found[name].iter('Line'))
+    for name in dict.fromkeys(names):
         try:
-            sites=[locate(image,line) if image is not None else int(line.get('Address'),0)-EBOOT_BASE
+            if name not in found:
+                raise ValueError(f'patch not found for app version {app_version}')
+            lines=list(found[name].iter('Line'))
+            if not lines:
+                raise ValueError('empty patch')
+            sites=[(None if line.get('Target') else locate(image,line)) if image is not None else int(line.get('Address'),0)-EBOOT_BASE
                    for line in lines]
             targets=(resolve_targets(image,found[name],sites) if image is not None else
                      {t.get('Name'):int(t.get('Address'),0)-EBOOT_BASE for t in found[name].iter('Target')})
+            if any(not any(start <= target < end for start,end in segments)
+                   for target in targets.values()):
+                raise ValueError('target outside the eboot')
             sites=[targets[line.get('Target')] if line.get('Target') else site for line,site in zip(lines,sites)]
-        except LookupError as error:
+            ours=[]
+            for line,offset in zip(lines,sites):
+                data=fill(line.get('Value'),offset,targets) if '{' in line.get('Value','') else encode(line)
+                if not 0 < len(data) <= 4096 or not any(start<=offset and offset+len(data)<=end for start,end in segments):
+                    raise ValueError(f'address {offset+EBOOT_BASE:#x} or write length is outside the eboot')
+                ours.append((offset,data))
+        except (LookupError, ValueError, TypeError, struct.error, OverflowError) as error:
             if skipped is None: raise ValueError(f'{name}: {error}')
             skipped[name]=str(error)
             continue
-        for line,offset in zip(lines,sites):
-            data=fill(line.get('Value'),offset,targets) if '{' in line.get('Value','') else encode(line)
-            if not any(start<=offset and offset+len(data)<=end for start,end in segments):
-                raise ValueError(f'{name}: address {offset+EBOOT_BASE:#x} is outside the eboot')
-            writes.append((offset,data))
+        # 整项验证完成后才提交，避免后续行失败时留下部分写入。
+        writes.extend(ours)
     return writes
 
 
 PATCHES_DIR=Path(__file__).resolve().parent.parent/'patches'
-# Built-in patch file per game: its title IDs, the AppVer its metadata is tagged with and the
-# title that also recognizes a release under an ID not listed. The signatures find the sites in
-# any region or version whose code matches, so the eboot.bin build is not checked.
+# Title ID 与 APP_VER 决定候选资格；每项特征码决定实际适用性。
 GAMES=[({'CUSA01623','CUSA01715','CUSA01720'},PATCHES_DIR/'God_of_War_III_Remastered.xml','01.02',
         'God of War III')]
 # The build the built-in Address values and third-party patch files are written for.
@@ -183,50 +197,35 @@ def game_title_id(game):
 
 
 def game_profile(title_id, title=None):
-    """(title IDs, built-in XML, metadata AppVer, title) for a known game, else None."""
-    title=(title or '').replace('®','').replace('™','')
-    return next((g for g in GAMES if title_id in g[0] or (title and g[3] in title)),None)
+    """只按明确的 Title ID 识别；保留 title 参数兼容已有调用方。"""
+    return next((g for g in GAMES if title_id in g[0]),None)
 
 
 def game_profile_for(game):
-    """The profile of a game folder, by title ID or by the title in its param.sfo."""
+    """读取 SFO 的明确 Title ID，不根据目录名或标题文本猜测。"""
     values=game_sfo(game) if game else {}
     return game_profile(values.get('TITLE_ID'),values.get('TITLE'))
-_SHA_CACHE={}
 
 
 def eboot_sha256(game):
     try:
         path=Path(game)/'eboot.bin'
-        stat=path.stat()
-        key=(str(path),stat.st_mtime_ns,stat.st_size)
-        if key not in _SHA_CACHE:
-            _SHA_CACHE[key]=hashlib.sha256(path.read_bytes()).hexdigest()
-        return _SHA_CACHE[key]
+        return hashlib.sha256(path.read_bytes()).hexdigest()
     except (OSError, TypeError):
         return None
 
 
 def game_patchable(game):
-    """Whether the built-in patches are tried on this game folder (any region and version)."""
-    return bool(game) and bool(game_profile_for(game))
+    """仅表示可尝试逐项验证，不能当作补丁已经生效。"""
+    return patch_profile_status(game)['reason']=='eligible'
 
 
 def patch_profile_status(game):
-    """Safe, non-mutating evidence for the built-in patch profile: title, version, the eboot digest
-    and why the patches would be skipped. Never treats an unknown title or an unreadable eboot as
-    patchable, so launch_env.py can gate on it.
-
-    The patch sites are located by signature (Pattern/At) in any build whose code matches, so
-    unlike the pre-signature design this does not compare eboot.bin against a reference hash:
-    'validated' means "a known title at the version the built-in XML is tagged with, and the
-    eboot is readable". compile_patches() proves each individual site when it builds patches.bin
-    and reports the ones it could not find through 'skipped'.
-    """
+    """只读身份预检查；位点尚未扫描，eligible 不等于 validated。"""
     title=game_title_id(game)
     version=game_app_version(game)
     profile=game_profile(title)
-    result={'title_id':title,'app_version':version,'supported':bool(profile),
+    result={'title_id':title,'app_version':version,'supported':bool(profile and version==profile[2]),
             'eboot_sha256':None,'eboot_matches':None,'patch_sites_match':None,'reason':None}
     result['eboot_sha256']=eboot_sha256(game)
     if result['eboot_sha256'] is None:
@@ -237,9 +236,7 @@ def patch_profile_status(game):
     elif version!=profile[2]:
         result['reason']='unsupported-app-version'
     else:
-        result['eboot_matches']=True
-        result['patch_sites_match']=True
-        result['reason']='validated'
+        result['reason']='eligible'
     return result
 
 
@@ -276,6 +273,9 @@ def selected_patches(xml, app_version, extra, only=False):
     exclusive=[n for n in names if n.startswith(EXCLUSIVE_PREFIX)]
     if len(exclusive)>1:
         raise ValueError(f'choose one resolution patch, not {exclusive}')
+    fps=[n for n in names if n.startswith('Frame Rate Patch')]
+    if len(fps)>1:
+        raise ValueError(f'choose one frame rate patch, not {fps}')
     return [n for n in names if not (exclusive and n in REPLACED_BY_EXCLUSIVE)]
 
 
@@ -324,7 +324,7 @@ def external_selection(found, config):
             if key in enabled or (key not in disabled and meta.get('isEnabled','false').lower()=='true')]
 
 
-def compile_external(selected, segments):
+def compile_external(selected, segments, skipped=None, applied=None):
     """Writes of the selected external patches; a patch with unsupported lines is skipped whole."""
     writes=[]
     for key,_,meta in selected:
@@ -333,23 +333,146 @@ def compile_external(selected, segments):
             for line in meta.iter('Line'):
                 offset=int(line.get('Address') or '',0)-EBOOT_BASE
                 data=encode(line)
-                if not any(start<=offset and offset+len(data)<=end for start,end in segments):
+                if not 0 < len(data) <= 4096 or not any(start<=offset and offset+len(data)<=end for start,end in segments):
                     raise ValueError(f'address {line.get("Address")} is outside the eboot')
                 ours.append((offset,data))
-        except ValueError as error:
+        except (ValueError, TypeError, OverflowError, struct.error) as error:
+            if skipped is not None: skipped[key]=str(error)
             print(f'Patches: skipped {key}: {error}',file=sys.stderr)
             continue
         writes+=ours
-        print(f'Patches: external {key} ({len(ours)} writes)')
+        if applied is not None: applied.append(key)
+        print(f'Patches: external {key} ({len(ours)} writes)',file=sys.stderr)
     return writes
 
 
-def write_patches(out, writes):
-    # G3PATCH2: the patch base, so the loader can rebase pointers the patches write into
-    # relocated slots.
+def patch_blob(writes):
+    # 保留 loader 协议及完整指针槽的重定位规则。
     blob=struct.pack('<8sQQ',b'G3PATCH2',EBOOT_BASE,len(writes))
     for offset,data in writes: blob+=struct.pack('<QQ',offset,len(data))+data
-    (out/'patches.bin').write_bytes(blob)
+    return blob
+
+
+def atomic_write(path, data):
+    """临时文件完整写出后替换；调用方必须在所有产物发布成功后才启动游戏。"""
+    path=Path(path)
+    path.parent.mkdir(parents=True,exist_ok=True)
+    temporary=None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix='.'+path.name+'.', delete=False) as f:
+            temporary=Path(f.name)
+            f.write(data)
+        os.replace(temporary,path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def write_patches(out, writes):
+    atomic_write(Path(out)/'patches.bin',patch_blob(writes))
+
+
+def checked_output(game, out):
+    """派生目录不能位于玩家游戏目录内，包括符号链接别名。"""
+    game,out=Path(game).resolve(),Path(out).resolve()
+    if out==game or game in out.parents:
+        raise ValueError('output directory must be outside the game directory')
+    return out
+
+
+def prepared_elf(game, out, expected_sha):
+    """从当前 SELF 核对派生 ELF，避免把旧映像与本轮身份拼在一起。"""
+    from prepare import parse_self
+    source=(Path(game)/'eboot.bin').read_bytes()
+    if hashlib.sha256(source).hexdigest()!=expected_sha:
+        raise ValueError('game source changed during patch preparation')
+    elf=parse_self(source)[0]
+    if (Path(out)/'eboot.elf').read_bytes()!=elf:
+        raise ValueError('prepared eboot does not match current game; prepare it again')
+    return bytes(elf)
+
+
+def positive_env(env, key):
+    value=str(env.get(key,''))
+    return int(value) if value.isdigit() and int(value)>0 else None
+
+
+def compile_plan(game, out, names=None, *, extra='', only=False, requested=None,
+                 disabled_reason=None, env=None, base_dmem=DMEM_RETAIL_MB,
+                 patches_dir=None, patches_config=None):
+    """统一启动和独立 CLI 的门禁，返回本轮报告与字节写入，不执行游戏。"""
+    out=checked_output(game,out)
+    env={} if env is None else env
+    identity=patch_profile_status(game)
+    reason=identity['reason']
+    if reason=='missing-or-unreadable-eboot':
+        raise ValueError(reason)
+    profile=game_profile(identity['title_id'])
+    disabled=reason if reason!='eligible' else disabled_reason
+    requested=list(requested if requested is not None else
+                   (names if names is not None else filter(None,(n.strip() for n in extra.split(';')))))
+    selected=list(dict.fromkeys(names or []))
+    skipped={}
+    writes=[]
+    applied=[]
+    external={'applied':[], 'skipped':{}, 'reason':None}
+    budget=positive_env(env,'GOW3_DEVICE_MEM_MB')
+    if not disabled:
+        try:
+            if names is None:
+                selected=selected_patches(profile[1],profile[2],extra,only)
+            # 即使调用方提供了已解析列表，也必须在最终编译门禁核对互斥。
+            for prefix in ('Resolution Patch','Frame Rate Patch'):
+                if sum(n.startswith(prefix) for n in selected)>1:
+                    raise ValueError('patch-conflict')
+            if any(n.startswith('Resolution Patch') for n in selected):
+                selected=[n for n in selected if n not in REPLACED_BY_EXCLUSIVE]
+        except ValueError:
+            disabled='patch-conflict'
+        required,_=patch_requirements(profile[1],selected,profile[2])
+        if not disabled and required and budget and required>budget:
+            disabled='insufficient-memory-budget'
+    if not disabled:
+        elf=prepared_elf(game,out,identity['eboot_sha256'])
+        segments=eboot_segments(elf)
+        writes=compile_patches(profile[1],selected,profile[2],segments,eboot_image(elf),skipped)
+        applied=[n for n in selected if n not in skipped]
+        identity['patch_sites_match']=not skipped if selected else None
+        if patches_dir:
+            if identity['eboot_sha256']!=REFERENCE_SHA256:
+                external['reason']='non-reference-eboot'
+            else:
+                found=external_patches(patches_dir,profile[2],profile[1],{identity['title_id']})
+                writes+=compile_external(external_selection(found,patches_config),segments,
+                                         external['skipped'],external['applied'])
+    else:
+        skipped={n:disabled for n in dict.fromkeys(requested+selected)}
+        external['reason']=disabled
+    minimum,fps=patch_requirements(profile[1],applied,profile[2]) if profile else (None,None)
+    explicit_dmem=positive_env(env,'GOW3_DMEM_MB')
+    explicit_vblank=positive_env(env,'GOW3_VBLANK_HZ')
+    dmem=max(base_dmem,minimum or 0,explicit_dmem or 0)
+    effective={'engine_fps':fps or 60, 'vblank_hz':explicit_vblank or fps or 60,
+               'vblank_source':'override' if explicit_vblank else 'compiled-patches',
+               'dmem_mb':dmem, 'minimum_dmem_mb':minimum,
+               'dmem_source':('override' if explicit_dmem and dmem==explicit_dmem else
+                              'compiled-patches' if minimum and dmem==minimum else 'platform-default'),
+               'device_mem_mb':budget, 'budget_checked':budget is not None}
+    reason=disabled or ('partially-compiled' if skipped and applied else
+                        'no-applicable-patches' if skipped else 'compiled' if writes else 'no-patches')
+    report={'schema':'gow3.patch-status.v1', **identity, 'identity':identity,
+            'sha256':identity['eboot_sha256'], 'reason':reason, 'phase':'compiled',
+            'requested':requested, 'selected':selected, 'applied':applied, 'skipped':skipped,
+            'disabled_reason':disabled, 'external':external, 'effective':effective,
+            'write_count':len(writes), 'write_bytes':sum(len(data) for _,data in writes)}
+    return report,writes
+
+
+def publish_plan(out, report, writes):
+    blob=patch_blob(writes)
+    report['patches_sha256']=hashlib.sha256(blob).hexdigest()
+    atomic_write(Path(out)/'patches.bin',blob)
+    atomic_write(Path(out)/'patch_status.json',(json.dumps(report,indent=2)+'\n').encode())
 
 
 def main():
@@ -360,31 +483,14 @@ def main():
     p.add_argument('--out',type=Path,default=Path(__file__).resolve().parent.parent/'out')
     p.add_argument('--game-dir',type=Path,default=Path(os.environ.get('GOW3_GAME_DIR','../CUSA01623')))
     a=p.parse_args()
-    title=game_title_id(a.game_dir)
-    profile=game_profile_for(a.game_dir)
-    if not profile:
-        write_patches(a.out,[])
-        print(f'Patches: no patch profile for {title}: none applied')
-        return
-    ids,xml,tag,_name=profile
-    sha=eboot_sha256(a.game_dir)
-    print(f'Patches: {title} {game_app_version(a.game_dir)}, eboot.bin sha256 {sha}')
-    names=selected_patches(xml,tag,a.extra,os.environ.get('GOW3_PATCHES_ONLY')=='1')
-    elf=(a.out/'eboot.elf').read_bytes()
-    segments=eboot_segments(elf)
-    skipped={}
-    writes=compile_patches(xml,names,None,segments,eboot_image(elf),skipped)
-    for name,reason in skipped.items():
-        print(f'Patches: {name} skipped ({reason} in this eboot.bin)')
-    if a.patches_dir and sha==REFERENCE_SHA256:
-        # Third-party files use the absolute addresses of the reference build, so they are only
-        # applied there. After the built-in ones: an external patch of the same bytes wins.
-        writes+=compile_external(external_selection(external_patches(a.patches_dir,tag,xml,ids),
-                                                    a.patches_config),segments)
-    write_patches(a.out,writes)
-    applied=[n for n in names if n not in skipped]
-    (a.out/'patch_status.json').write_text(json.dumps({'sha256':sha,'applied':applied,'skipped':skipped}))
-    print(f'Patches: {title}; {len(writes)} writes from {applied or "none"}')
+    try:
+        report,writes=compile_plan(a.game_dir,a.out,extra=a.extra,
+                                  only=os.environ.get('GOW3_PATCHES_ONLY')=='1',env=os.environ,
+                                  patches_dir=a.patches_dir,patches_config=a.patches_config)
+        publish_plan(a.out,report,writes)
+    except (OSError, ValueError, struct.error) as error:
+        p.exit(1,f'Patches: {error}\n')
+    print(f'Patches: {report["title_id"]}; {report["reason"]}; {len(writes)} writes')
 
 if __name__=='__main__':
     main()
