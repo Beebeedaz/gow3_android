@@ -35,6 +35,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.gow3.android.R
+import com.gow3.android.data.Gow3Data
 import com.gow3.android.data.Gow3Ini
 import com.gow3.android.data.ImportResult
 import com.gow3.android.data.LosslessDllManager
@@ -143,7 +144,7 @@ internal fun HomeScreen(
 }
 
 /** launcher 的 gow3.ini 路径，即游戏、run-gow3.sh 和 GameActivity 读取的同一个文件。 */
-private fun gow3IniFile(context: Context): File = File(context.filesDir, "gow3port/gow3.ini")
+private fun gow3IniFile(context: Context): File = Gow3Data.config(context)
 
 private fun loadIni(context: Context): Map<String, String> = Gow3Ini.read(gow3IniFile(context))
 

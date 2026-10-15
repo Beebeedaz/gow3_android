@@ -34,7 +34,7 @@ internal sealed class RemoveResult {
  * 并告知 UI 当前生效的是哪份副本。
  *
  * 查找顺序是与游戏运行时共享的单一事实来源：游戏目录旁的同名副本优先，
- * `filesDir/gow3port/Lossless.dll` 是 Steam 下载和手动导入都会写入的回退位置。
+ * `filesDir/gow3data/Lossless.dll` 是 Steam 下载和手动导入都会写入的回退位置。
  * 不查询第三个位置，也不会写入或删除应用私有目录之外的任何内容——对本类而言，
  * 玩家的游戏目录是只读的。
  */
@@ -52,7 +52,7 @@ internal class LosslessDllManager(private val activity: Activity) {
     private var pending: ((ImportResult) -> Unit)? = null
 
     /** Steam 下载和手动导入都会落地的位置：运行时的回退位置。 */
-    fun appCopy(): File = File(activity.filesDir, "gow3port/$FILE_NAME")
+    fun appCopy(): File = Gow3Data.lossless(activity)
 
     /** 游戏目录旁的同名副本；未选择游戏目录或它没有父目录时返回 null。 */
     fun besideGameFolder(): File? {

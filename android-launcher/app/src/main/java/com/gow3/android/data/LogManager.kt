@@ -18,7 +18,7 @@ internal sealed class LogResult {
 /**
  * 负责 God of War III 运行时日志：将 `logs/` 目录树（例如 GameActivity 写入的
  * `android-game.log`）导出为玩家通过 Storage Access Framework 选择的 `.zip`。
- * 只读取 `filesDir/gow3port/logs`；运行时、gow3.ini、运行时安装、存档和游戏文件
+ * 只读取 `filesDir/gow3data/logs`；运行时、gow3.ini、运行时安装、存档和游戏文件
  * 绝不被修改。导出是只读快照，因此导出期间运行游戏只会捕获当时已刷盘的字节。
  */
 internal class LogManager(private val activity: Activity) {
@@ -33,7 +33,7 @@ internal class LogManager(private val activity: Activity) {
     private var pending: ((LogResult) -> Unit)? = null
 
     /** launcher 的运行时日志目录，即 GameActivity 写入 `android-game.log` 的目录。 */
-    fun logsDir(): File = File(activity.filesDir, "gow3port/logs")
+    fun logsDir(): File = Gow3Data.logs(activity)
 
     /**
      * 打开系统“另存为”选择器。当没有日志时，立即以失败调用 [onResult]，且不显示
@@ -83,7 +83,7 @@ internal class LogManager(private val activity: Activity) {
     private fun exportTo(uri: Uri): LogResult {
         val logs = logsDir()
         if (!LogArchive.hasLogs(logs)) return LogResult.Failed(activity.getString(R.string.log_no_logs))
-        val temporary = File(activity.filesDir, "gow3port/.export-logs.tmp")
+        val temporary = File(Gow3Data.root(activity), ".export-logs.tmp")
         temporary.delete()
         return try {
             LogArchive.pack(logs, temporary)

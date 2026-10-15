@@ -307,7 +307,9 @@ def main():
             tar.add(ROOT / source, arcname='gow3port/' + name)
         tar.add(manifest_path, arcname='runtime-manifest.json',
                 filter=owned_by_root)
-        for name in ('gow3port/data', 'gow3port/logs', 'gow3port/user', 'home', 'home/gow3port'):
+        # 用户存档、配置、日志和 Lossless.dll 位于 Android 的 gow3data，不能随 runtime
+        # payload 发布；这里只保留 runtime 自己的可重建工作目录。
+        for name in ('gow3port/data', 'home', 'home/gow3port'):
             info = tarfile.TarInfo(name)
             info.type = tarfile.DIRTYPE
             info.mode = 0o755

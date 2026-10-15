@@ -57,17 +57,17 @@ class LsfgPreflightTests(unittest.TestCase):
     def test_shell_and_launcher_check_both_dll_locations_in_the_same_order(self):
         script = _read(SCRIPT)
         activity = _read(GAME_ACTIVITY)
-        # run-gow3.sh: next to the game folder first, then the app-private gow3port copy.
+        # run-gow3.sh: next to the game folder first, then the persistent app-private copy.
         dll_loop = re.search(r'for dll in "(.*?)"; do', script)
         self.assertIsNotNone(dll_loop, 'run-gow3.sh must probe both DLL locations')
         shell_locations = dll_loop.group(1)
         self.assertIn('${GOW3_GAME_DIR%/*}/Lossless.dll', shell_locations)
-        self.assertIn('$base/Lossless.dll', shell_locations)
-        # The launcher mirrors the same order: game-dir parent first, then BASE.
+        self.assertIn('$GOW3_LOSSLESS_DLL', shell_locations)
+        # The launcher mirrors the same order: game-dir parent first, then gow3data.
         self.assertIn('new File(parent,"Lossless.dll")', activity)
-        self.assertIn('new File(BASE,"Lossless.dll")', activity)
+        self.assertIn('new File(DATA,"Lossless.dll")', activity)
         self.assertLess(activity.index('new File(parent,"Lossless.dll")'),
-                        activity.index('new File(BASE,"Lossless.dll")'),
+                        activity.index('new File(DATA,"Lossless.dll")'),
                         'the game-folder DLL must be preferred, matching the script')
 
     def test_launcher_only_accepts_the_multipliers_the_script_accepts(self):

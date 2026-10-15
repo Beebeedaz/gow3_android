@@ -42,7 +42,7 @@ public final class GameActivity extends Activity {
     /** The app's files (application id com.gow3.android), its Linux rootfs and gow3port runtime.
      *  Rootfs programs are launched through the in-tree loader when their PT_INTERP slot cannot
      *  hold the app-private path. */
-    private String FILES, ROOT, BASE;
+    private String FILES, ROOT, BASE, DATA;
     /** The game (e.g. CUSA01740, with eboot.bin) in shared storage, chosen by the player. */
     private String gameDir;
     /** An optional update folder (e.g. CUSA01740-patch): laid over the game at start. */
@@ -78,7 +78,7 @@ public final class GameActivity extends Activity {
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
         FILES=getFilesDir().getAbsolutePath();
-        ROOT=FILES+"/rootfs"; BASE=FILES+"/gow3port";
+        ROOT=FILES+"/rootfs"; BASE=FILES+"/gow3port"; DATA=FILES+"/gow3data";
         gameDir=getSharedPreferences("gow3",MODE_PRIVATE).getString("game_dir",null);
         updateDir=getSharedPreferences("gow3",MODE_PRIVATE).getString("update_dir",null);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -189,11 +189,11 @@ public final class GameActivity extends Activity {
          * 留着入口只会让玩家以为改了有用。接通后把下面两段取消注释即可。
         gameSettingsItem=menuItem("ic_settings","Game settings","",() -> {
             closeDrawer();
-            new SettingsDialog(this,new File(BASE,"gow3.ini"),this::restartGame).showGame();
+            new SettingsDialog(this,new File(DATA,"gow3.ini"),this::restartGame).showGame();
         });
         cheatsItem=menuItem("ic_cheats","Cheats","",() -> {
             closeDrawer();
-            new SettingsDialog(this,new File(BASE,"gow3.ini"),this::restartGame).showCheats();
+            new SettingsDialog(this,new File(DATA,"gow3.ini"),this::restartGame).showCheats();
         });
          */
         menuItem("ic_refresh","Restart game","Unsaved progress is lost",() -> new AlertDialog.Builder(this)
@@ -208,14 +208,14 @@ public final class GameActivity extends Activity {
         // （30/60/120/240/0）对齐。
         graphicsItem=menuItem("ic_tune","Graphics settings","",() -> {
             closeDrawer();
-            new SettingsDialog(this,new File(BASE,"gow3.ini"),this::restartGame).show();
+            new SettingsDialog(this,new File(DATA,"gow3.ini"),this::restartGame).show();
         });
         // Tuning only. Supplying Lossless.dll is the launcher Home page's job (com.gow3.android);
         // the drawer's row reports the multiplier, never where the DLL came from. LSFG 是唯一帧生成
         // 路径，FSR 3.1 帧生成未接通，不要在这里再加 FSR 帧生成入口。
         losslessItem=menuItem("ic_frames","Lossless Scaling","",() -> {
             closeDrawer();
-            new SettingsDialog(this,new File(BASE,"gow3.ini"),this::restartGame)
+            new SettingsDialog(this,new File(DATA,"gow3.ini"),this::restartGame)
                 // 运行中改倍率时 layer 会热更新 toml，但设备显示模式不会自动跟着变：让对话框在
                 // 生效后回调这里重选 display mode（4.3 复评）。
                 .showLossless(() -> { Process p=game; return p!=null && p.isAlive(); }, this::pickRefreshRate);
@@ -470,6 +470,11 @@ public final class GameActivity extends Activity {
         env.put("LD_LIBRARY_PATH",BASE+"/arm64/lib:"+ROOT+"/usr/lib/aarch64-linux-gnu:"+ROOT+"/usr/lib");
         // Its libc emulates SysV shared memory through fxshmd (started below).
         env.put("FXD_SHM_SOCKET",ROOT+"/tmp/.fxshm/sock");
+        env.put("GOW3_DATA_DIR",DATA);
+        env.put("GOW3_CONFIG",DATA+"/gow3.ini");
+        env.put("GOW3_USER_DIR",DATA+"/user");
+        env.put("GOW3_LOG_DIR",DATA+"/logs");
+        env.put("GOW3_LOSSLESS_DLL",DATA+"/Lossless.dll");
         if (gameDir!=null) env.put("GOW3_GAME_DIR",gameDir);
         if (updateDir!=null) env.put("GOW3_PATCH_DIR",updateDir);
         if (target.endsWith("/Xvfb")) env.put("LD_PRELOAD",ROOT+"/usr/lib/fexdroid/libfxpath.so");
@@ -686,7 +691,7 @@ public final class GameActivity extends Activity {
     /** The last value of a gow3.ini setting (as run-gow3.sh reads it), or null. */
     private String setting(String key) {
         String value=null;
-        try (BufferedReader r=new BufferedReader(new java.io.FileReader(new File(BASE,"gow3.ini")))) {
+        try (BufferedReader r=new BufferedReader(new java.io.FileReader(new File(DATA,"gow3.ini")))) {
             for (String line; (line=r.readLine())!=null;)
                 if (line.startsWith(key+"=")) value=line.substring(key.length()+1).trim();
         } catch (Exception ignored) {}
@@ -716,7 +721,7 @@ public final class GameActivity extends Activity {
     private boolean hasFrameGenDll() {
         File parent=gameDir!=null ? new File(gameDir).getParentFile() : null;
         if (parent!=null && new File(parent,"Lossless.dll").isFile()) return true;
-        return new File(BASE,"Lossless.dll").isFile();
+        return new File(DATA,"Lossless.dll").isFile();
     }
     private void pickRefreshRate() {
         String lsfg=setting("lsfg_multiplier");
@@ -753,7 +758,7 @@ public final class GameActivity extends Activity {
                 ROOT+"/bin/sh",BASE+"/run-gow3.sh","game"); game=launched;
             Thread log=new Thread(() -> {
                 try (BufferedReader r=new BufferedReader(new InputStreamReader(launched.getInputStream()));
-                     PrintWriter out=new PrintWriter(new File(BASE,"logs/android-game.log"))) {
+                     PrintWriter out=new PrintWriter(new File(DATA,"logs/android-game.log"))) {
                     String line; while ((line=r.readLine())!=null) { out.println(line); out.flush(); }
                     int code=launched.waitFor();
                     if (game==launched) {

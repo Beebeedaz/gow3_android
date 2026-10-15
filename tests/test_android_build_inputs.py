@@ -103,7 +103,7 @@ class AndroidBuildInputTests(unittest.TestCase):
         self.assertIn('IMPORT .DLL', resources)
         self.assertIn('GET FROM STEAM', resources)
         # The runtime's fallback location, quoted verbatim: drifting it breaks run-gow3.sh.
-        self.assertIn('"gow3port/$FILE_NAME"', manager)
+        self.assertIn('Gow3Data.lossless(activity)', manager)
         self.assertIn('Lossless.dll', manager)
         # Cross-package access from com.gow3.android needs the class to be public in both source sets.
         for steam in (

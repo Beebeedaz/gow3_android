@@ -11,6 +11,7 @@ set -eu
 files=${FXD_FILES:-/data/user/0/com.gow3.android/files}
 host="$files/rootfs"
 base="$files/gow3port"
+data_root=${GOW3_DATA_DIR:-$files/gow3data}
 arch="$base/arm64"
 loader="$host/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"
 probe="$arch/bin/gow3-probe"
@@ -40,7 +41,12 @@ export VK_ICD_FILENAMES="$VK_DRIVER_FILES"
 # the desktop uses too.
 export GLIBC_TUNABLES='glibc.cpu.hwcaps=-AVX2,-AVX,-AVX_Fast_Unaligned_Load,-AVX2_Usable,-AVX_Usable'
 
-export GOW3_CONFIG="$base/gow3.ini"
+export GOW3_DATA_DIR="$data_root"
+export GOW3_CONFIG="${GOW3_CONFIG:-$data_root/gow3.ini}"
+export GOW3_USER_DIR="${GOW3_USER_DIR:-$data_root/user}"
+export GOW3_LOG_DIR="${GOW3_LOG_DIR:-$data_root/logs}"
+export GOW3_LOSSLESS_DLL="${GOW3_LOSSLESS_DLL:-$data_root/Lossless.dll}"
+mkdir -p "$data_root" "$GOW3_USER_DIR" "$GOW3_LOG_DIR"
 [ -f "$GOW3_CONFIG" ] || cp "$base/gow3.default.ini" "$GOW3_CONFIG"
 # One setting from gow3.ini, last value wins (the launcher writes whole-file on changes).
 setting() { sed -n "s/^$1=//p" "$GOW3_CONFIG" 2>/dev/null | tail -n 1; }
@@ -65,7 +71,7 @@ lsfg_layer="$base/arm64/lsfg"
 if [ -n "$lsfg" ] && [ -f "$lsfg_layer/VkLayer_LS_frame_generation.json" ] && \
    [ -f "$lsfg_layer/liblsfg-vk.so" ]; then
     lsfg_dll=
-    for dll in "${GOW3_GAME_DIR:+${GOW3_GAME_DIR%/*}/Lossless.dll}" "$base/Lossless.dll"; do
+    for dll in "${GOW3_GAME_DIR:+${GOW3_GAME_DIR%/*}/Lossless.dll}" "$GOW3_LOSSLESS_DLL"; do
         [ -n "$dll" ] && [ -f "$dll" ] && { lsfg_dll=$dll; break; }
     done
     if [ -n "$lsfg_dll" ]; then
@@ -97,7 +103,7 @@ EOF
         echo "LSFG: enabled (x$lsfg, flow $flow, $lsfg_dll); toml=$LSFG_CONFIG; layer=$lsfg_layer"
     else
         echo "LSFG: requested (lsfg_multiplier=$lsfg) but Lossless.dll was not found at either"
-        echo "      ${GOW3_GAME_DIR:+${GOW3_GAME_DIR%/*}/Lossless.dll}${GOW3_GAME_DIR:+\\n      }$base/Lossless.dll"
+        echo "      ${GOW3_GAME_DIR:+${GOW3_GAME_DIR%/*}/Lossless.dll}${GOW3_GAME_DIR:+\\n      }$GOW3_LOSSLESS_DLL"
         echo "      Drop the player's Lossless.dll into the launcher Home's FRAME GENERATION card,"
         echo "      or next to the game folder, then restart the game."
         lsfg=
@@ -144,7 +150,7 @@ python="$host/usr/bin/python3.13"
 [ -x "$loader" ] || { echo "No rootfs loader in the runtime" >&2; exit 2; }
 [ -x "$python" ] || { echo "No Python in the runtime; cannot prepare the game files" >&2; exit 2; }
 out="$base/out"
-mkdir -p "$out" "$base/user"
+mkdir -p "$out" "$GOW3_USER_DIR"
 export PYTHONPATH="$base/scripts"
 
 case ${1:-game} in
@@ -222,7 +228,7 @@ export GOW3_VULKAN_STATUS="$vulkan_status"
 if [ "$vulkan_status" != ok ]; then
     mkdir -p "$out"
     printf '%s\n' "{\"title_id\":\"${GOW3_GAME_TITLE:-unknown}\",\"app_version\":\"${GOW3_GAME_VERSION:-unknown}\",\"eboot_sha256\":\"${GOW3_EBOOT_SHA256:-unavailable}\",\"supported\":false,\"reason\":\"${GOW3_PATCH_STATUS:-unknown}\",\"vulkan_status\":\"failed\"}" > "$out/texture_integrity.json"
-    echo "Graphics: aborting launch; see the runtime log for the driver error (log: $base/logs/android-game.log)" >&2
+    echo "Graphics: aborting launch; see the runtime log for the driver error (log: $GOW3_LOG_DIR/android-game.log)" >&2
     exit 4
 fi
 
@@ -262,7 +268,7 @@ while :; do
     rc=0
     "$loader" "$probe" "$out/boot-linked.bin" \
         --content-profile "$out/content.bin" --patches "$out/patches.bin" \
-        --app0 "$game" --user "$base/user" --timeout "${GOW3_TIMEOUT:-0}" || rc=$?
+        --app0 "$game" --user "$GOW3_USER_DIR" --timeout "${GOW3_TIMEOUT:-0}" || rc=$?
     if [ "$rc" = "$lsfg_failure_code" ] && [ -n "${GOW3_LSFG:-}" ] && [ "$lsfg_retry" = 0 ]; then
         lsfg_retry=1
         echo "Lossless Scaling: frame generation failed (exit $lsfg_failure_code); retrying once without it" >&2

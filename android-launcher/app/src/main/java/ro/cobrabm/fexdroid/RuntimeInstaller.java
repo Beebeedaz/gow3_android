@@ -1,6 +1,7 @@
 package ro.cobrabm.fexdroid;
 
 import android.content.Context;
+import com.gow3.android.data.Gow3Data;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -149,7 +150,11 @@ final class RuntimeInstaller {
         try (InputStream in = context.getAssets().open("runtime.sha256")) {
             expected = new String(readAll(in), StandardCharsets.US_ASCII).trim();
         } catch (java.io.FileNotFoundException missing) {
-            try { validateRuntime(files); return false; }
+            try {
+                validateRuntime(files);
+                Gow3Data.prepare(files, path(files, "gow3port/gow3.default.ini"));
+                return false;
+            }
             catch (Exception incomplete) {
                 throw new IllegalStateException("This APK does not contain a complete runtime", missing);
             }
@@ -157,7 +162,11 @@ final class RuntimeInstaller {
         if (!expected.matches("[0-9a-f]{64}")) throw new IllegalStateException("Invalid runtime digest");
         File marker = new File(files, ".runtime.sha256");
         if (marker.isFile() && expected.equals(new String(Files.readAllBytes(marker.toPath()), StandardCharsets.US_ASCII).trim())) {
-            try { validateRuntime(files); return false; }
+            try {
+                validateRuntime(files);
+                Gow3Data.prepare(files, path(files, "gow3port/gow3.default.ini"));
+                return false;
+            }
             catch (Exception ignored) { /* stale marker: reinstall from the signed asset */ }
         }
 
@@ -185,6 +194,7 @@ final class RuntimeInstaller {
                 throw new IllegalStateException("Runtime extraction failed: " +
                         new String(log, 0, Math.min(log.length, 2048), StandardCharsets.UTF_8));
             validateRuntime(stage);
+            Gow3Data.prepare(files, path(stage, "gow3port/gow3.default.ini"));
             promote(files, stage, expected);
             return true;
         } finally {

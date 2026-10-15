@@ -18,7 +18,7 @@ internal sealed class SaveResult {
 /**
  * 负责 God of War III 存档：将 `savedata/` 目录树导出为玩家通过 Storage Access
  * Framework 选择的 `.zip`，并在校验、安全备份和原子替换后导入此类归档。
- * 只触及 `filesDir/gow3port/user/savedata` 及其 `savedata_backups`；
+ * 只触及 `filesDir/gow3data/user/savedata` 及其 `savedata_backups`；
  * 运行时、gow3.ini、运行时安装和游戏文件绝不被修改。
  */
 internal class SaveManager(private val activity: Activity) {
@@ -34,10 +34,10 @@ internal class SaveManager(private val activity: Activity) {
     private var pending: ((SaveResult) -> Unit)? = null
 
     /** 游戏的 savedata，即 run-gow3.sh 以 `--user .../user/savedata` 传给游戏的目录。 */
-    fun savedataDir(): File = File(activity.filesDir, "gow3port/user/savedata")
+    fun savedataDir(): File = File(Gow3Data.user(activity), "savedata")
 
     /** 每次导入前创建的安全备份，与 Linux 侧 savedata_backups 布局一致。 */
-    fun savedataBackupsDir(): File = File(activity.filesDir, "gow3port/user/savedata_backups")
+    fun savedataBackupsDir(): File = File(Gow3Data.user(activity), "savedata_backups")
 
     /**
      * 打开系统“另存为”选择器。当没有存档时，立即以失败调用 [onResult]，且不显示
@@ -107,7 +107,7 @@ internal class SaveManager(private val activity: Activity) {
     private fun exportTo(uri: Uri): SaveResult {
         val savedata = savedataDir()
         if (!SaveArchive.hasSaves(savedata)) return SaveResult.Failed(activity.getString(R.string.save_no_saves))
-        val temporary = File(activity.filesDir, "gow3port/.export-saves.tmp")
+        val temporary = File(Gow3Data.root(activity), ".export-saves.tmp")
         temporary.delete()
         return try {
             SaveArchive.pack(savedata, temporary)
@@ -126,7 +126,7 @@ internal class SaveManager(private val activity: Activity) {
 
     /** 校验、解压到暂存目录、备份当前存档并替换生效。 */
     private fun importFrom(uri: Uri): SaveResult {
-        val user = File(activity.filesDir, "gow3port/user")
+        val user = Gow3Data.user(activity)
         val staging = File(user, "savedata.restoring")
         return try {
             val first = activity.contentResolver.openInputStream(uri)
