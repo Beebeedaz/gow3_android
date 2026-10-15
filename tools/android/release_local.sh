@@ -18,6 +18,7 @@ repo=''
 upstream_remote=upstream-rvl
 dry_run=0
 allow_dev_signing=0
+skip_build=0
 
 # 本次发布实际使用的签名方式，写入 release notes
 signing_mode='unset'
@@ -39,6 +40,7 @@ options:
   --repo <owner/name>       发布目标仓库；也可用 GOW3_RELEASE_REPO
   --upstream-remote <name>  读取 PC 上游 tag 的 git remote，默认 upstream-rvl
   --allow-dev-signing       允许用本地开发 keystore 签名发布
+  --skip-build              跳过打包与签名，直接发布已存在的 APK 产物
   --dry-run                 只打印将要发布的版本、tag、仓库与产物，不改动工作树
   -h, --help                显示本帮助
 
@@ -87,6 +89,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --allow-dev-signing)
             allow_dev_signing=1
+            shift
+            ;;
+        --skip-build)
+            skip_build=1
             shift
             ;;
         --dry-run)
@@ -260,8 +266,12 @@ apk_name="God of War III-$version.apk"
 apk_path="$release_dir/$apk_name"
 checksum_path="$apk_path.sha256"
 
-check_inputs
-check_version_file_clean
+if ((skip_build == 1)); then
+    log 'release_local: build inputs are not checked in --skip-build mode'
+else
+    check_inputs
+    check_version_file_clean
+fi
 check_no_tag_conflict
 
 log "release_local: PC upstream version   : $pc_version"
@@ -314,9 +324,6 @@ prepare_signing() {
     signing_mode='local development keystore (NOT a release signature)'
 }
 
-prepare_signing
-log "release_local: signing source          : $signing_mode"
-
 # ---------- 版本同步 ----------
 
 apply_version() {
@@ -337,12 +344,29 @@ apply_version() {
     log "release_local: versionCode            : $new_code"
 }
 
-apply_version
+if ((skip_build == 1)); then
+    [[ -f $apk_path ]] ||
+        die "--skip-build was given but the APK is missing: $apk_path (run without --skip-build first)"
+    [[ -f $checksum_path ]] || die "checksum file is missing: $checksum_path"
+    signing_mode="prebuilt artifact, not signed by this run"
+    bt=${GOW3_ANDROID_SDK:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}
+    if [[ -x $bt/build-tools/35.0.0/apksigner ]]; then
+        dn=$("$bt/build-tools/35.0.0/apksigner" verify --print-certs "$apk_path" 2>/dev/null |
+            sed -n 's/.*certificate DN: //p' | head -1)
+        [[ -n $dn ]] && signing_mode="prebuilt artifact signed by $dn"
+    fi
+    log "release_local: signing source          : $signing_mode"
+else
+    prepare_signing
+    log "release_local: signing source          : $signing_mode"
 
-bash tools/android/apk/build_release_apk.sh
+    apply_version
 
-[[ -f $apk_path ]] || die "release APK was not produced: $apk_path"
-[[ -f $checksum_path ]] || die "release checksum was not produced: $checksum_path"
+    bash tools/android/apk/build_release_apk.sh
+
+    [[ -f $apk_path ]] || die "release APK was not produced: $apk_path"
+    [[ -f $checksum_path ]] || die "release checksum was not produced: $checksum_path"
+fi
 
 notes=$(cat <<EOF
 God of War III Android release \`$android_tag\`

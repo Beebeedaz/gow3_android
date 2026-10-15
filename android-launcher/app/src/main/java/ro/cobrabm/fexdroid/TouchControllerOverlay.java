@@ -108,8 +108,8 @@ final class TouchControllerOverlay extends View {
                 right=true; PointF c=center(control);
                 rx=axis(Math.max(-1f,Math.min(1f,(p.x-c.x)/56f)));
                 ry=axis(Math.max(-1f,Math.min(1f,(p.y-c.y)/56f)));
-            } else if (control.equals("l2")) l2=255;
-            else if (control.equals("r2")) r2=255;
+            } else if (control.equals("l2")) { l2=255; pressed.add(control); }
+            else if (control.equals("r2")) { r2=255; pressed.add(control); }
             else if (control.equals("mouse")) {
                 if (!mouse) XInput.moveTo(Math.max(0,Math.min(1279,Math.round(p.x))),
                                           Math.max(0,Math.min(719,Math.round(p.y))));

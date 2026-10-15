@@ -4,7 +4,9 @@
 #include "../src/runtime_pad.c"
 
 static int capture;
+static uint32_t published;
 int gow3gpu_overlay_captures_input(void) { return capture; }
+void gow3gpu_pad_publish(uint32_t buttons) { published=buttons; }
 uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *name) {
     (void)table; (void)count; (void)name;
     return 0;
@@ -38,6 +40,37 @@ int main(void) {
     assert(pad_read_state(1,&data)==0 && data.touch_count==1 && data.touches[0].x==1440);
     inject(path,"");
     assert(pad_read_state(1,&data)==0 && data.buttons==0 && data.touch_count==0);
+
+    /* The pad file carries the triggers as numbers: PadBridge omits the l2/r2 tokens whenever the
+     * value is above 0, so a file with only l2=/r2= still has to move the analogue axes. */
+    inject(path,"l2=128 r2=200");
+    assert(pad_read_state(1,&data)==0 && data.l2==128 && data.r2==200);
+    inject(path,"l2=999 r2=-5");
+    assert(pad_read_state(1,&data)==0 && data.l2==255 && data.r2==0);
+    inject(path,"cross l2 r2");
+    assert(pad_read_state(1,&data)==0 && data.l2==255 && data.r2==255);
+    inject(path,"");
+    assert(pad_read_state(1,&data)==0 && data.l2==0 && data.r2==0);
+
+    /* While the overlay holds the input the game stays neutral, but the file is still read and
+     * published: on Android that file is the only thing the save list can hear. */
+    capture=1;
+    inject(path,"cross circle");
+    assert(pad_read_state(1,&data)==0);
+    assert(data.buttons==0 && data.left_x==128 && data.left_y==128);
+    assert(published==(BTN_CROSS|BTN_CIRCLE));
+    inject(path,"");
+    assert(pad_read_state(1,&data)==0 && published==0);
+
+    /* Cross accepted the dialog and is still held: the game must not see it until it is released. */
+    inject(path,"cross");
+    assert(pad_read_state(1,&data)==0 && data.buttons==0);
+    capture=0;
+    assert(pad_read_state(1,&data)==0 && data.buttons==0);
+    inject(path,"");
+    assert(pad_read_state(1,&data)==0 && data.buttons==0);
+    inject(path,"cross");
+    assert(pad_read_state(1,&data)==0 && (data.buttons & BTN_CROSS));
 
     SDL_VirtualJoystickTouchpadDesc touch={.nfingers=2};
     SDL_VirtualJoystickDesc desc;
@@ -79,5 +112,6 @@ int main(void) {
     assert(SDL_DetachVirtualJoystick(id));
     SDL_Quit();
     unlink(path);
-    puts("PASS: pad ABI, debug camera chord, left/right clicks, SDL touch coordinates, overlay capture");
+    puts("PASS: pad ABI, debug camera chord, left/right clicks, SDL touch coordinates, overlay capture, "
+         "pad-file triggers, publish while the overlay holds input, hold-after-capture release");
 }

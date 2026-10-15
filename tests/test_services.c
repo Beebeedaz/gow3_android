@@ -2,6 +2,7 @@
 #undef NDEBUG /* the checks are asserts; release builds define NDEBUG */
 #include "../src/runtime_services.c"
 #include <assert.h>
+#include <unistd.h>
 
 uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *nid) { (void)table; (void)count; (void)nid; return 0; }
 int gow3gpu_text_input_begin(const char *text, const char *prompt) { (void)text; (void)prompt; return 0; }
@@ -10,8 +11,10 @@ int64_t runtime_file_open(const char *path, int flags, int mode) { (void)path; (
 int64_t runtime_file_read(int fd, void *buffer, uint64_t size) { (void)fd; (void)buffer; (void)size; return -1; }
 int64_t runtime_file_close(int fd) { (void)fd; return 0; }
 static int choice_next=-1;
+static int choice_cancelled=0;
 int gow3gpu_choice_begin(const char *title, const char *const *items, const char *const *images, int count, int focus) { (void)title; (void)items; (void)images; (void)focus; return count>0; }
 int gow3gpu_choice_poll(void) { return choice_next; }
+void gow3gpu_choice_cancel(void) { choice_cancelled=1; }
 int runtime_savedata_param(int32_t user, const char *dir, void *param) { (void)user; (void)dir; (void)param; return -1; }
 int runtime_savedata_icon(int32_t user, const char *dir, char *out, size_t size) { (void)user; (void)dir; (void)out; (void)size; return -1; }
 
@@ -65,6 +68,25 @@ int main(void) {
     choice_next=-2;
     assert(save_status()==DIALOG_FINISHED && save_result(out)==0);
     memcpy(&value,out+4,4); assert(value==SAVE_RESULT_CANCELED);
+
+    /* Nobody answered the list: the game must get its dialog back instead of waiting forever, and
+     * the list must really close (otherwise it keeps drawing and keeps holding the game's input).
+     * The deadline is a second here so the test does not have to wait for the real one. */
+    setenv("GOW3_SAVE_LIST_TIMEOUT","1",1);
+    choice_cancelled=0; choice_next=-1; /* still on screen, nobody has pressed anything */
+    assert(save_open(list)==0 && save_status()==DIALOG_RUNNING && !choice_cancelled);
+    assert(save_status()==DIALOG_RUNNING && !choice_cancelled); /* still inside the second */
+    sleep(2);
+    assert(save_status()==DIALOG_FINISHED && choice_cancelled);
+    assert(save_result(out)==0);
+    memcpy(&value,out+4,4); assert(value==SAVE_RESULT_CANCELED);
+    unsetenv("GOW3_SAVE_LIST_TIMEOUT");
+
+    /* A choice that arrives in time is not overridden by the deadline. */
+    choice_cancelled=0; choice_next=1;
+    assert(save_open(list)==0);
+    assert(save_status()==DIALOG_FINISHED && !choice_cancelled);
+    assert(save_result(out)==0 && !strcmp(chosen,"SAVE0001"));
     assert(save_term()==0);
 
     /* PlayGo: installed, full speed, progress never divides by zero. */

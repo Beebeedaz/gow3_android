@@ -72,6 +72,8 @@ public final class GameActivity extends Activity {
     private float touchX, touchY;
     private boolean edgeGesture, imeOpen, imePolling;
     private final AtomicBoolean imeAnswered=new AtomicBoolean();
+    /** 文本框打开期间手柄的 Cross/Circle 要当作 OK/Cancel,需要拿到当前输入内容。 */
+    private EditText imeField;
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
@@ -425,6 +427,9 @@ public final class GameActivity extends Activity {
             }
             return super.dispatchKeyEvent(e);
         }
+        // 文本框开着时手柄要当作 OK/Cancel,必须在 pad.key 之前:它对 cross/circle 返回 true,
+        // 放到后面就永远轮不到这里。按下确认名字的那个键也不该同时进游戏。
+        if (imeGamepad(e)) return true;
         if (pad.key(e)) return true;
         if (shmid>=0 && e.getScanCode()>0 && e.getScanCode()+8<=255) {
             XInput.key(e.getScanCode()+8,e.getAction()==KeyEvent.ACTION_DOWN); return true;
@@ -649,8 +654,26 @@ public final class GameActivity extends Activity {
             dialog.dismiss(); answerIme(true,field.getText().toString()); return true;
         });
         dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
-        dialog.setOnDismissListener(d -> { imeOpen=false; immersive(); surface.requestFocus(); });
+        dialog.setOnDismissListener(d -> { imeOpen=false; imeField=null; immersive(); surface.requestFocus(); });
         dialog.show(); field.requestFocus();
+        imeField=field;
+    }
+    /**
+     * 文本框开着时,屏幕手柄的 Cross 当 OK、Circle 当 Cancel:AlertDialog 不会因为
+     * android-pad.state 变化而自己点按钮,所以在这里翻译一次。只在 ACTION_UP 触发,
+     * answerIme 里的 compareAndSet 再挡一次重复提交。框已关闭(imeOpen=false)时不处理,
+     * 否则关闭瞬间残留的一次 key-up 会去动下一个界面。
+     */
+    private boolean imeGamepad(KeyEvent e) {
+        if (!imeOpen || e.getAction()!=KeyEvent.ACTION_UP) return false;
+        int code=e.getKeyCode(), scan=e.getScanCode();
+        boolean cross=code==KeyEvent.KEYCODE_BUTTON_A || scan==304;
+        boolean circle=code==KeyEvent.KEYCODE_BUTTON_B || scan==305;
+        if (!cross && !circle) return false;
+        EditText field=imeField;
+        answerIme(cross, cross && field!=null ? field.getText().toString() : "");
+        imeOpen=false; imeField=null;
+        return true;
     }
     private void answerIme(boolean ok,String value) {
         if (!imeAnswered.compareAndSet(false,true)) return;
