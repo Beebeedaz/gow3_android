@@ -16,6 +16,7 @@ internal data class LaunchParam(
     val options: List<LaunchOption>,
     val defaultValue: String,
     val descriptionRes: Int? = null,
+    val enabled: Boolean = true,
 )
 
 internal data class LaunchOption(val value: String, val labelRes: Int)
@@ -37,7 +38,7 @@ internal object LaunchParams {
         LaunchParam(
             key = "upscaler", labelRes = R.string.param_upscaler, groupRes = R.string.param_group_display,
             options = listOf(
-                LaunchOption("off", R.string.param_option_off_720p),
+                LaunchOption("off", R.string.param_option_off),
                 LaunchOption("fsr3", R.string.param_option_fsr31),
             ),
             defaultValue = "fsr3",
@@ -48,8 +49,11 @@ internal object LaunchParams {
             options = listOf(
                 LaunchOption("native", R.string.param_option_native),
                 LaunchOption("480p", R.string.param_option_480p),
+                LaunchOption("540p", R.string.param_option_540p),
                 LaunchOption("720p", R.string.param_option_720p),
                 LaunchOption("800p", R.string.param_option_800p),
+                LaunchOption("900p", R.string.param_option_900p),
+                LaunchOption("1080p", R.string.param_option_1080p),
                 LaunchOption("1440p", R.string.param_option_1440p),
                 LaunchOption("1800p", R.string.param_option_1800p),
                 LaunchOption("4K", R.string.param_option_4k),
@@ -57,6 +61,7 @@ internal object LaunchParams {
             // 移动端优化默认值：720p 内部分辨率 + FSR 升采样，手机/平板上更流畅省电。
             // 与 tools/android/config/gow3-default.ini 保持一致。
             defaultValue = "720p",
+            descriptionRes = R.string.param_desc_render_patch,
         ),
         LaunchParam(
             key = "anisotropy", labelRes = R.string.param_anisotropy, groupRes = R.string.param_group_display,
@@ -126,32 +131,28 @@ internal object LaunchParams {
             defaultValue = "1",
             descriptionRes = R.string.param_desc_frames_queued,
         ),
-        LaunchParam(
-            key = "skip_network_choice", labelRes = R.string.param_offline_start, groupRes = R.string.param_group_startup,
-            options = listOf(
-                LaunchOption("0", R.string.param_option_off),
-                LaunchOption("1", R.string.param_option_on),
-            ),
-            defaultValue = "1",
-        ),
-        LaunchParam(
-            key = "skip_intro", labelRes = R.string.param_skip_intros, groupRes = R.string.param_group_startup,
-            options = listOf(
-                LaunchOption("0", R.string.param_option_off),
-                LaunchOption("1", R.string.param_option_on),
-            ),
-            defaultValue = "1",
-        ),
-        LaunchParam(
-            key = "debug_camera", labelRes = R.string.param_free_camera, groupRes = R.string.param_group_startup,
-            options = listOf(
-                LaunchOption("0", R.string.param_option_off),
-                LaunchOption("1", R.string.param_option_on),
-            ),
-            defaultValue = "0",
-            descriptionRes = R.string.param_desc_free_camera,
-        ),
     )
+
+    /** 补丁类快捷入口只展示当前目录真正提供的档位；无目录时禁止修改。 */
+    fun forCatalog(catalog: PatchCatalog?): List<LaunchParam> = all.map { param ->
+        when (param.key) {
+            "render_resolution" -> param.copy(
+                options = param.options.filter { option ->
+                    option.value == "native" || catalog?.patches?.any { it.resolution == option.value } == true
+                },
+                enabled = catalog != null,
+            )
+            "engine_fps" -> param.copy(
+                options = param.options.filter { option ->
+                    option.value == "60" || catalog?.patches?.any { it.fps == option.value } == true
+                },
+                enabled = catalog != null,
+            )
+            else -> param
+        }
+    }
+
+    fun isPatchSetting(key: String): Boolean = key == "render_resolution" || key == "engine_fps"
 
     /** 参数的当前原始值；缺失或为空时返回其默认值。 */
     fun valueOf(ini: Map<String, String>, param: LaunchParam): String {

@@ -50,8 +50,11 @@
     <string name="param_option_fsr31">FSR 3.1</string>
     <string name="param_option_native">原生</string>
     <string name="param_option_480p">480p</string>
+    <string name="param_option_540p">540p</string>
     <string name="param_option_720p">720p</string>
     <string name="param_option_800p">800p</string>
+    <string name="param_option_900p">900p</string>
+    <string name="param_option_1080p">1080p</string>
     <string name="param_option_1440p">1440p</string>
     <string name="param_option_1800p">1800p</string>
     <string name="param_option_4k">4K</string>
@@ -67,8 +70,12 @@
     <string name="param_option_frames_2">2</string>
 
     <!-- 启动参数：说明 -->
-    <string name="param_desc_upscaler">以较低的内部分辨率渲染游戏，再用 FSR 3.1 把画面放大到你的屏幕，在保持清晰画面的同时获得更高性能。关闭时以固定 1280×720 渲染。</string>
-    <string name="param_desc_engine_fps">游戏引擎自身更新游戏世界的速度，与显示无关。60 是游戏原生速度；更高数值让动作更流畅，但更耗电。</string>
+    <string name="param_desc_upscaler">使用 FSR 3.1 重建画面。游戏分辨率由「分辨率」选项单独控制；关闭 FSR 不会关闭分辨率补丁。</string>
+    <string name="param_desc_render_patch">通过补丁调整游戏分辨率。可选档位随当前游戏及版本变化，与补丁页同步。「原生」表示关闭分辨率补丁。下次启动生效。</string>
+    <string name="param_desc_engine_fps">60 是游戏原生引擎帧率。更高档位需要对应的游戏补丁，仅在当前版本有补丁时显示。与补丁页同步，下次启动生效。</string>
+    <string name="home_patch_identity">补丁选项：%1$s · %2$s · 更多开关在补丁页</string>
+    <string name="home_patch_unavailable">未匹配到补丁目录。请检查游戏与升级目录后再调整分辨率和引擎帧率，具体原因可在补丁页查看。</string>
+    <string name="home_patch_unavailable_value">%1$s（当前版本不可用）</string>
     <string name="param_desc_vsync">将游戏帧与屏幕刷新率同步，避免画面撕裂。除非出现撕裂或卡顿，否则保持开启。</string>
     <string name="param_desc_frames_queued">游戏在屏幕上显示之前预先准备多少帧。数值越低越能降低输入延迟；数值越高在较弱的硬件上可能更流畅。</string>
     <string name="param_desc_free_camera">允许你自由移动视角环游世界，用于探索或测试，而不是跟随游戏视角。仅供实验，不适合正常游玩。</string>
@@ -132,7 +139,7 @@
 
     <!-- Mods 页 -->
     <string name="mods_title">MOD 与补丁</string>
-    <string name="mods_description">管理《战神 III》的游戏文件 MOD 与第三方 shadPS4 补丁。</string>
+    <string name="mods_description">按当前游戏选择补丁，修改会在下次启动游戏时生效。</string>
     <string name="mods_empty_title">未安装任何 MOD</string>
     <string name="mods_empty_description">你的 MOD 与补丁列表将显示在这里。</string>
 
@@ -183,4 +190,30 @@
     <string name="folder_choose_update">选择升级补丁目录</string>
     <string name="folder_choose_game">选择游戏目录</string>
     <string name="no_folder_picker_fmt">没有目录选择器：%1$s</string>
+    <string name="nav_mods">补丁</string>
+    <string name="mods_loading">正在读取游戏和补丁目录…</string>
+    <string name="mods_saved">已保存，下次启动生效。</string>
+    <string name="mods_no_game">请先在首页选择游戏目录。</string>
+    <string name="mods_invalid_game">无法读取游戏程序或版本信息，请检查目录和存储权限。</string>
+    <string name="mods_invalid_update">升级目录无效或不属于同一游戏，请在首页检查升级目录。</string>
+    <string name="mods_unsupported">尚无对应此游戏 ID 的补丁目录。</string>
+    <string name="mods_version">当前游戏版本没有对应的补丁目录，请检查游戏和升级目录。</string>
+    <string name="mods_read_failed">无法读取补丁目录，请重试。</string>
+    <string name="mods_unavailable">暂时无法显示补丁</string>
+    <string name="mods_retry">重新读取</string>
+    <string name="mods_count">共 %1$d 项补丁 · 已选择 %2$d 项</string>
+    <string name="mods_next_launch">选择不会立即修改正在运行的游戏。启动时会逐项校验补丁；分辨率和帧率与首页设置同步。</string>
+    <string name="mods_group_resolution">分辨率</string>
+    <string name="mods_group_fps">引擎帧率</string>
+    <string name="mods_group_video">视频跳过</string>
+    <string name="mods_group_fixes">修复</string>
+    <string name="mods_group_effects">关闭画面特效</string>
+    <string name="mods_exclusive">同组只能开启一项，关闭后恢复原生档位。</string>
+    <string name="mods_verified_device">已有实机输出验证</string>
+    <string name="mods_verified_offline">离线校验通过 · 实机待测</string>
+    <string name="mods_pending_sample">对应版本样本待验证</string>
+    <string name="mods_legacy">既有补丁 · 启动时再次校验</string>
+    <string name="mods_details">查看说明</string>
+    <string name="mods_hide_details">收起说明</string>
+    <string name="mods_author">作者：%1$s</string>
 </resources>

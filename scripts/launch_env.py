@@ -46,11 +46,17 @@ def derive(game, config, state_path, env, *, out=None, base_dmem=5056):
     names, disabled = [], None
     if profile and identity['reason'] == 'eligible':
         try:
-            names = selected_patches(profile[1], profile[2], extra,
-                                     env.get('GOW3_PATCHES_ONLY') == '1')
+            # 页面按身份保存完整选择；空字符串是明确全部关闭，不能恢复默认或常开项。
+            key = f'patches_{identity["title_id"]}_{identity["app_version"].replace(".", "_")}'
+            ini = graphics_options.read_ini(config)
+            saved = key in ini and 'GOW3_PATCHES' not in env
+            names = ([n.strip() for n in ini[key].split(';') if n.strip()] if saved else
+                     selected_patches(profile[1], profile[2], extra,
+                                      env.get('GOW3_PATCHES_ONLY') == '1'))
             names = graphics_options.patch_names(
                 names, graphics, texture_fix_available=graphics_options.TEXTURE_FIX in
-                available_patches(profile[1], profile[2]))
+                available_patches(profile[1], profile[2]) and
+                (not saved or graphics_options.TEXTURE_FIX in names))
             requested = list(dict.fromkeys(requested + names))
         except ValueError:
             disabled = 'patch-conflict'

@@ -35,6 +35,7 @@ import androidx.compose.ui.window.Dialog
 import com.gow3.android.R
 import com.gow3.android.data.LaunchParam
 import com.gow3.android.data.LaunchParams
+import com.gow3.android.data.PatchCatalog
 import com.gow3.android.ui.components.LauncherColors
 
 @Composable
@@ -45,9 +46,11 @@ internal fun LaunchParameters(
     save: (String, String) -> Unit,
     onChooseGameFolder: () -> Unit,
     onChooseUpdateFolder: () -> Unit,
+    catalog: PatchCatalog?,
+    catalogLoading: Boolean,
 ) {
     val context = LocalContext.current
-    val groups = LaunchParams.all.groupBy { it.groupRes }
+    val groups = LaunchParams.forCatalog(catalog).groupBy { it.groupRes }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -105,6 +108,11 @@ internal fun LaunchParameters(
             )
             Text(stringResource(R.string.update_folder_description), color = LauncherColors.textMuted, fontSize = 10.sp)
         }
+        Text(
+            if (catalog != null) stringResource(R.string.home_patch_identity, catalog.titleId, catalog.appVersion)
+            else stringResource(if (catalogLoading) R.string.mods_loading else R.string.home_patch_unavailable),
+            color = LauncherColors.textMuted, fontSize = 11.sp, lineHeight = 16.sp,
+        )
         groups.forEach { (titleRes, params) ->
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 Text(context.getString(titleRes), color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
@@ -148,20 +156,21 @@ private fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (Str
             Switch(
                 checked = LaunchParams.valueOf(values, param) == "1",
                 onCheckedChange = { save(param.key, if (it) "1" else "0") },
+                enabled = param.enabled,
             )
         } else {
-            var expanded by remember { mutableStateOf(false) }
+            var expanded by remember(param.options, param.enabled) { mutableStateOf(false) }
             Box {
                 Text(
                     selectedLabel(context, values, param) + "  ▾",
-                    color = LauncherColors.textPrimary,
+                    color = if (param.enabled) LauncherColors.textPrimary else LauncherColors.textMuted,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(LauncherColors.navSurface)
                         .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)), RoundedCornerShape(8.dp))
-                        .clickable { expanded = true }
+                        .clickable(enabled = param.enabled) { expanded = true }
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 )
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -190,6 +199,9 @@ private fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (Str
 /** 当前值对应的本地化展示名；未知值回退到原始值。 */
 private fun selectedLabel(context: android.content.Context, values: Map<String, String>, param: LaunchParam): String {
     val option = LaunchParams.selectedOption(values, param)
+    if (option == null && param.enabled && LaunchParams.isPatchSetting(param.key)) {
+        return context.getString(R.string.home_patch_unavailable_value, LaunchParams.valueOf(values, param))
+    }
     return option?.let { context.getString(it.labelRes) } ?: LaunchParams.valueOf(values, param)
 }
 

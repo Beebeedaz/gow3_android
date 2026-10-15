@@ -52,8 +52,11 @@
     <string name="param_option_fsr31">FSR 3.1</string>
     <string name="param_option_native">Native</string>
     <string name="param_option_480p">480p</string>
+    <string name="param_option_540p">540p</string>
     <string name="param_option_720p">720p</string>
     <string name="param_option_800p">800p</string>
+    <string name="param_option_900p">900p</string>
+    <string name="param_option_1080p">1080p</string>
     <string name="param_option_1440p">1440p</string>
     <string name="param_option_1800p">1800p</string>
     <string name="param_option_4k">4K</string>
@@ -78,8 +81,12 @@
     <string name="param_option_frames_2">2</string>
 
     <!-- 启动参数：说明 -->
-    <string name="param_desc_upscaler">Renders the game at a lower internal resolution and then uses FSR 3.1 to scale the image up to your screen, so you get more performance while keeping a sharp picture. Off renders at a fixed 1280×720.</string>
-    <string name="param_desc_engine_fps">How fast the game engine itself updates the game world, separate from the display. 60 is the game\'s original speed; higher values make motion smoother but use more power.</string>
+    <string name="param_desc_upscaler">Uses FSR 3.1 to reconstruct the image. The game resolution is controlled separately by the resolution setting; turning FSR off does not disable the resolution patch.</string>
+    <string name="param_desc_render_patch">Changes the game resolution through a patch. Available options follow the selected game and version and stay in sync with Patches. Native disables the resolution patch. Takes effect on the next launch.</string>
+    <string name="param_desc_engine_fps">60 is the game\'s original engine frame rate. Higher values require a matching game patch and only appear when available. This setting stays in sync with Patches and takes effect on the next launch.</string>
+    <string name="home_patch_identity">Patch options for %1$s · %2$s · More switches in Patches</string>
+    <string name="home_patch_unavailable">No matching patch catalog. Check the game and update folders to enable resolution and engine frame rate settings. See Patches for details.</string>
+    <string name="home_patch_unavailable_value">%1$s (unavailable for this version)</string>
     <string name="param_desc_vsync">Syncs the game\'s frames with your screen\'s refresh rate to stop visual tearing. Leave it ON unless you see tearing or stutter.</string>
     <string name="param_desc_frames_queued">How many frames the game prepares ahead of what the screen shows. Lower numbers cut input lag; higher numbers can improve smoothness on weaker hardware.</string>
     <string name="param_desc_free_camera">Lets you move the camera freely around the world for exploring or testing, instead of following the gameplay camera. Meant for experimentation, not normal play.</string>
@@ -145,7 +152,7 @@
 
     <!-- Mods 页 -->
     <string name="mods_title">MOD &amp; PATCH</string>
-    <string name="mods_description">Manage game file mods and third-party shadPS4 patches for God of War III.</string>
+    <string name="mods_description">Choose patches for the selected game. Changes apply the next time you start the game.</string>
     <string name="mods_empty_title">NO MODS INSTALLED</string>
     <string name="mods_empty_description">Your mod and patch list will appear here.</string>
 
@@ -196,4 +203,30 @@
     <string name="folder_choose_update">CHOOSE UPDATE FOLDER</string>
     <string name="folder_choose_game">CHOOSE GAME FOLDER</string>
     <string name="no_folder_picker_fmt">No folder picker: %1$s</string>
+    <string name="nav_mods">PATCHES</string>
+    <string name="mods_loading">Reading the game and patch catalog…</string>
+    <string name="mods_saved">Saved. Applies on next launch.</string>
+    <string name="mods_no_game">Choose a game folder on Home first.</string>
+    <string name="mods_invalid_game">The game executable or version information could not be read. Check the folder and storage permission.</string>
+    <string name="mods_invalid_update">The update folder is invalid or belongs to another game. Check the update folder on Home.</string>
+    <string name="mods_unsupported">There is no patch catalog for this game ID.</string>
+    <string name="mods_version">This game version has no matching patch catalog. Check the selected game and update folders.</string>
+    <string name="mods_read_failed">The patch catalog could not be read. Please retry.</string>
+    <string name="mods_unavailable">PATCHES UNAVAILABLE</string>
+    <string name="mods_retry">RETRY</string>
+    <string name="mods_count">%1$d patches · %2$d selected</string>
+    <string name="mods_next_launch">Selection is saved, not applied to the running game. Each patch is checked against your game when it starts. Resolution and frame rate are shared with Home settings.</string>
+    <string name="mods_group_resolution">RESOLUTION</string>
+    <string name="mods_group_fps">FRAME RATE</string>
+    <string name="mods_group_video">VIDEO SKIPPING</string>
+    <string name="mods_group_fixes">FIXES</string>
+    <string name="mods_group_effects">DISABLE EFFECTS</string>
+    <string name="mods_exclusive">Choose one option. Turning it off returns to the native setting.</string>
+    <string name="mods_verified_device">Device output verified</string>
+    <string name="mods_verified_offline">Offline checked · device test pending</string>
+    <string name="mods_pending_sample">Matching game sample not yet verified</string>
+    <string name="mods_legacy">Existing patch · checked again at launch</string>
+    <string name="mods_details">Details</string>
+    <string name="mods_hide_details">Hide details</string>
+    <string name="mods_author">Author: %1$s</string>
 </resources>

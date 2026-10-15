@@ -1,6 +1,7 @@
 package com.gow3.android.feature.home
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -16,8 +17,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,10 +43,14 @@ import com.gow3.android.data.Gow3Ini
 import com.gow3.android.data.ImportResult
 import com.gow3.android.data.LosslessDllManager
 import com.gow3.android.data.RemoveResult
+import com.gow3.android.data.PatchCatalog
+import com.gow3.android.data.LaunchParams
 import com.gow3.android.ui.components.LauncherColors
 import com.gow3.android.ui.components.ScreenColumn
 import com.gow3.android.ui.components.formatBytes
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun HomeScreen(
@@ -59,6 +66,10 @@ internal fun HomeScreen(
     var gameDir by remember { mutableStateOf(currentGameDir(context)) }
     var updateDir by remember { mutableStateOf(currentUpdateDir(context)) }
     var notice by remember { mutableStateOf<String?>(null) }
+    var catalog by remember { mutableStateOf<PatchCatalog?>(null) }
+    var catalogLoading by remember { mutableStateOf(true) }
+    var catalogRevision by remember { mutableIntStateOf(0) }
+    val prefs = remember(context) { context.getSharedPreferences("gow3", Context.MODE_PRIVATE) }
 
     fun refreshDll() {
         dllState = losslessDlls.resolve()
@@ -72,21 +83,50 @@ internal fun HomeScreen(
     // 玩家可能在游戏运行期间把 Lossless.dll 放到游戏目录旁，因此每次 Home 回到前台
     // 时都会从磁盘重新读取状态。
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, prefs) {
+        fun refreshSettings() {
+            gameDir = currentGameDir(context)
+            updateDir = currentUpdateDir(context)
+            iniValues = loadIni(context)
+            catalog = null
+            catalogLoading = true
+            catalogRevision++
+        }
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "game_dir" || key == "update_dir") refreshSettings()
+        }
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 refreshDll()
-                gameDir = currentGameDir(context)
-                updateDir = currentUpdateDir(context)
+                refreshSettings()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
+    LaunchedEffect(gameDir, updateDir, catalogRevision) {
+        catalog = null
+        catalogLoading = true
+        val game = gameDir?.let(::File)
+        val update = updateDir?.takeIf { it.isNotBlank() }?.let(::File)
+        catalog = withContext(Dispatchers.IO) {
+            runCatching { PatchCatalog.load(game, update, context.assets::open) }.getOrNull()
+        }
+        catalogLoading = false
     }
 
     fun save(key: String, value: String) {
-        if (Gow3Ini.write(gow3IniFile(context), mapOf(key to value))) {
-            iniValues = iniValues + (key to value)
+        val param = LaunchParams.forCatalog(catalog).firstOrNull { it.key == key } ?: return
+        if (!param.enabled || param.options.none { it.value == value }) return
+        val updates = if (LaunchParams.isPatchSetting(key)) mapOf(key to value, "restart_unconfirmed" to "0")
+                      else mapOf(key to value)
+        if (Gow3Ini.write(gow3IniFile(context), updates)) {
+            iniValues = loadIni(context)
         } else {
             Toast.makeText(context, context.getString(R.string.settings_save_failed), Toast.LENGTH_SHORT).show()
         }
@@ -99,7 +139,8 @@ internal fun HomeScreen(
         Spacer(Modifier.height(28.dp))
         LaunchButton(onStartGame)
         Spacer(Modifier.height(20.dp))
-        LaunchParameters(gameDir, updateDir, iniValues, ::save, onChooseGameFolder, onChooseUpdateFolder)
+        LaunchParameters(gameDir, updateDir, iniValues, ::save, onChooseGameFolder, onChooseUpdateFolder,
+            catalog, catalogLoading)
         Spacer(Modifier.height(16.dp))
         FrameGenerationCard(
             state = dllState,

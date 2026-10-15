@@ -55,8 +55,11 @@ def verify(game, out):
             result['patches'].append({'name': name, 'reason': report['reason'],
                                       'write_count': report['write_count'], 'skipped': report['skipped']})
         defaults = patches.selected_patches(profile[1], profile[2], '')
-        for resolution, fps in (('native', '60'), ('native', '120'), ('native', '240'),
-                                ('720p', '60'), ('720p', '120'), ('4K', '60')):
+        combinations = [('native', str(fps)) for fps in graphics_options.ENGINE_FPS]
+        combinations += [(resolution, '60') for resolution in graphics_options.RESOLUTIONS
+                         if resolution != 'native']
+        combinations += [('720p', '120')]
+        for resolution, fps in combinations:
             # 按此身份实际提供的档位审计，不把其他版本的选项当作必选项。
             if resolution != 'native' and f'Resolution Patch - {resolution}' not in available:
                 continue

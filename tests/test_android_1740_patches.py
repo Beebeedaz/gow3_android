@@ -1,4 +1,4 @@
-"""Android 1740 的真实 XML 配合人工 SELF，覆盖 720p 及拒绝边界。"""
+"""Android 1740 的真实 XML 配合人工 SELF，覆盖逐项编译及拒绝边界。"""
 import json
 import struct
 import tempfile
@@ -24,11 +24,20 @@ class Android1740Tests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.game, self.out = make_game(self.root, 'CUSA01740', '01.00')
         self.xml = patches.game_profile('CUSA01740')[1]
+        catalog = ET.parse(self.xml).getroot()
         self.patterns = list(dict.fromkeys(
-            line.get('Pattern') for line in ET.parse(self.xml).getroot().iter('Line')))
+            element.get('Pattern') for element in catalog.iter() if element.get('Pattern')))
         self.payloads = [bytes(0xcc if x == '??' else int(x, 16) for x in p.split())
                          for p in self.patterns]
-        self.image = b'\xcc' * 32 + b''.join(p + b'\xcc' * 32 for p in self.payloads)
+        image = bytearray(b'\xcc' * 256 + b''.join(p + b'\xcc' * 32 for p in self.payloads))
+        # 人工相对引用指向预留区域，验证重定位逻辑，不携带真实游戏内容。
+        for index, target in enumerate(catalog.iter('Target')):
+            if target.get('Ref'):
+                at = patches.locate(bytes(image), target)
+                struct.pack_into('<i', image, at, 16 + index * 16 - at - 4 - int(target.get('Tail', '0')))
+        self.image = bytes(image)
+        resolution = next(m for m in catalog.iter('Metadata') if m.get('Name') == RES720)
+        self.arena = bytes.fromhex(list(resolution.iter('Line'))[-1].get('Pattern'))
         self.write_image(self.image)
         self.config = self.root / 'gow3.ini'
 
@@ -49,7 +58,7 @@ class Android1740Tests(unittest.TestCase):
         before = verify.input_digests(self.game)
         result = self.launch(env={'GOW3_DEVICE_MEM_MB': '15146'})
         report = result['patch_report']
-        self.assertEqual(patches.available_patches(self.xml, '01.00'), {RES720})
+        self.assertEqual(len(patches.available_patches(self.xml, '01.00')), 14)
         self.assertEqual(report['applied'], [RES720])
         self.assertEqual(report['skipped'], {})
         self.assertEqual((report['write_count'], report['write_bytes']), (9, 32))
@@ -70,10 +79,10 @@ class Android1740Tests(unittest.TestCase):
         self.assertEqual(json.loads((self.out / 'patch_status.json').read_text())['write_count'], 0)
 
     def test_unavailable_options_do_not_become_applied_or_raise_fps(self):
-        result = self.launch(fps='120', env={'GOW3_PATCHES': ';'.join([TEXTURE, STARTUP])})
+        result = self.launch(fps='120', env={'GOW3_PATCHES': 'Unknown Patch'})
         self.assertEqual(result['patch_names'], [RES720])
         self.assertIn(FPS120, result['patch_report']['skipped'])
-        self.assertIn(STARTUP, result['patch_report']['skipped'])
+        self.assertIn('Unknown Patch', result['patch_report']['skipped'])
         self.assertEqual(result['updates']['GOW3_ENGINE_FPS'], '60')
         self.assertIn('engine_fps=120', self.config.read_text())
         self.assertEqual(self.launch('4K')['patch_names'], [])
@@ -84,9 +93,9 @@ class Android1740Tests(unittest.TestCase):
         self.assertEqual(result['patch_report']['reason'], 'insufficient-memory-budget')
         self.assertEqual(result['patch_report']['write_count'], 0)
         for image, error in [
-            (self.image.replace(self.payloads[-1], b'\xdd' * len(self.payloads[-1])),
+            (self.image.replace(self.arena, b'\xdd' * len(self.arena)),
              'signature not found'),
-            (self.image + self.payloads[-1], 'signature found more than once'),
+            (self.image + self.arena, 'signature found more than once'),
         ]:
             with self.subTest(error=error):
                 self.write_image(image)
@@ -119,8 +128,49 @@ class Android1740Tests(unittest.TestCase):
              mock.patch.object(verify.content_profile, 'prepare'):
             result = verify.verify(self.game, self.out)
         self.assertEqual(result['status'], 'verified')
-        self.assertEqual([p['name'] for p in result['patches']], [RES720])
-        self.assertEqual(set(result['combinations']), {'native-60', '720p-60'})
+        self.assertEqual({p['name'] for p in result['patches']},
+                         patches.available_patches(self.xml, '01.00'))
+        self.assertEqual(set(result['combinations']),
+                         {'native-60', '480p-60', '540p-60', '720p-60', '900p-60', '1080p-60'})
+
+    def test_all_added_resolutions_follow_launch_settings_and_memory_budget(self):
+        for resolution in ('480p', '540p', '900p', '1080p'):
+            with self.subTest(resolution=resolution):
+                result = self.launch(resolution)
+                self.assertEqual(result['patch_names'], [f'Resolution Patch - {resolution}'])
+                self.assertEqual(result['patch_report']['write_count'], 9)
+                self.assertEqual(result['patch_report']['effective']['render_resolution'], resolution)
+                self.assertEqual(result['dmem'], 7104)
+                rejected = self.launch(resolution, env={'GOW3_DEVICE_MEM_MB': '4096'})
+                self.assertEqual(rejected['patch_report']['reason'], 'insufficient-memory-budget')
+                self.assertEqual(rejected['patch_report']['write_count'], 0)
+
+    def test_startup_fix_and_effects_require_selection_and_do_not_survive_restart(self):
+        self.assertEqual(patches.selected_patches(self.xml, '01.00', ''), [])
+        names = [STARTUP, 'Skip Intro', 'Skip Any Video With X Button', 'Disable SSAO',
+                 'Disable Motion Blur', 'Disable Depth of Field', 'Disable Bloom',
+                 'Disable Soft Particles', 'Disable Dynamic Shadows']
+        result = self.launch(env={'GOW3_PATCHES': ';'.join(names)})
+        self.assertEqual(set(result['patch_names']), set(names + [RES720]))
+        self.assertEqual(result['patch_report']['skipped'], {})
+        # 撤销显式选择后，新增项不能由默认值或常开规则重新加入。
+        self.assertEqual(self.launch()['patch_names'], [RES720])
+
+    def test_android_page_saved_selection_reaches_compiler_and_can_be_cleared(self):
+        self.config.write_text('render_resolution=540p\nengine_fps=60\n'
+                               'patches_CUSA01740_01_00=Skip Intro;Disable Bloom\n')
+        first = derive(self.game, self.config, self.out / 'state.json', {}, out=self.out, base_dmem=7104)
+        self.assertEqual(set(first['patch_names']), {'Resolution Patch - 540p', 'Skip Intro', 'Disable Bloom'})
+        self.assertEqual(first['patch_report']['skipped'], {})
+        self.config.write_text('render_resolution=native\nengine_fps=60\npatches_CUSA01740_01_00=\n')
+        second = derive(self.game, self.config, self.out / 'state.json', first['updates'], out=self.out, base_dmem=7104)
+        self.assertEqual(second['patch_report']['write_count'], 0)
+
+    def test_resolution_conflict_rejects_the_entire_plan(self):
+        report, writes = patches.compile_plan(self.game, self.out,
+                                              [RES720, 'Resolution Patch - 540p'])
+        self.assertEqual(report['reason'], 'patch-conflict')
+        self.assertEqual(writes, [])
 
     def test_android_manifests_require_the_1740_xml(self):
         expected = 'gow3port/patches/' + self.xml.name

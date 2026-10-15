@@ -36,6 +36,27 @@ class LaunchEnvTests(unittest.TestCase):
         self.assertEqual(plan['dmem'], 7104)
         self.assertEqual(json.loads((self.out / 'patch_status.json').read_text()), plan['patch_report'])
 
+    def test_saved_empty_selection_disables_defaults_and_always_on(self):
+        plan = self.plan(config='render_resolution=native\nengine_fps=60\npatches_CUSA01715_01_02=\n')
+        self.assertEqual(plan['patch_names'], [])
+        self.assertEqual(plan['patch_report']['write_count'], 0)
+
+    def test_saved_selection_is_scoped_and_graphics_still_follow_ini(self):
+        key = 'patches_CUSA01715_01_02'
+        plan = self.plan(config=f'{key}={STARTUP};{RES4K}\nrender_resolution=720p\nengine_fps=60\n')
+        self.assertEqual(set(plan['patch_names']), {STARTUP, RES720})
+        for other in ('patches_CUSA01623_01_02', 'patches_CUSA01715_01_00'):
+            plan = self.plan(config=f'{other}=\nrender_resolution=native\nengine_fps=60\n')
+            self.assertEqual(set(plan['patch_names']), {STARTUP, TEXTURE})
+
+    def test_saved_selection_is_reread_on_restart_and_environment_can_override(self):
+        first = self.plan(config=f'patches_CUSA01715_01_02={STARTUP}\nengine_fps=60\n')
+        config = 'patches_CUSA01715_01_02=\nengine_fps=60\n'
+        second = self.plan(first['updates'], config=config)
+        self.assertEqual(second['patch_names'], [])
+        explicit = self.plan({'GOW3_PATCHES': STARTUP, 'GOW3_PATCHES_ONLY': '1'}, config=config)
+        self.assertIn(STARTUP, explicit['patch_names'])
+
     def test_resolution_and_high_frame_rate_follow_config(self):
         plan = self.plan(config='render_resolution=720p\nengine_fps=240\n')
         self.assertEqual(set(plan['patch_names']), {RES720, FPS240, STARTUP})

@@ -12,7 +12,7 @@ from pathlib import Path
 from patches import (compile_patches, external_patches, external_selection, compile_external,
                      game_profile, selected_patches, patch_profile_status, patch_requirements, compile_plan, publish_plan)
 
-GOW3 = ROOT / 'patches/God_of_War_III_Remastered.xml'
+GOW3 = ROOT / 'patches/God_of_War_III_Remastered_CUSA01623.xml'
 GOW3_IDS = {'CUSA01623'}
 SEGMENTS = [(0, 0x6000000)]
 
@@ -56,8 +56,39 @@ class ExternalPatchTests(unittest.TestCase):
     def test_built_in_file_is_not_external(self):
         self.assertEqual(external_patches(GOW3.parent, '01.02', GOW3, GOW3_IDS), [])
 
+    def test_retired_shared_file_is_not_reloaded_as_external(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / 'God_of_War_III_Remastered.xml').write_text(EXTERNAL)
+            self.assertEqual(external_patches(directory, '01.02', GOW3, GOW3_IDS), [])
+
 
 class GameProfileTests(unittest.TestCase):
+    def test_each_title_has_its_own_catalog_and_runtime_manifest_entry(self):
+        files = set()
+        for ids, xml, version, _ in patches.GAMES:
+            self.assertEqual(len(ids), 1)
+            title = next(iter(ids))
+            self.assertEqual(xml.name, f'God_of_War_III_Remastered_{title}.xml')
+            root = ET.parse(xml).getroot()
+            self.assertEqual({e.text for e in root.iter('ID')}, ids)
+            self.assertEqual({m.get('AppVer') for m in root.iter('Metadata')}, {version})
+            names = [m.get('Name') for m in root.iter('Metadata')]
+            self.assertEqual(len(names), len(set(names)))
+            self.assertEqual(len(names), 14 if title == 'CUSA01740' else 20)
+            for m in root.iter('Metadata'):
+                self.assertIsNotNone(m.get('Validation'))
+                if m.get('Name').startswith('Disable ') or m.get('Name') in {
+                        'Resolution Patch - 540p', 'Resolution Patch - 900p', 'Resolution Patch - 1080p'}:
+                    self.assertEqual(m.get('isEnabled'), 'false')
+                for line in m.iter('Line'):
+                    self.assertTrue(line.get('Pattern') or line.get('Target'))
+            for profile in ('runtime', 'debug'):
+                manifest = json.loads((ROOT / 'tools/android' / profile / 'runtime-manifest.json').read_text())
+                self.assertIn('gow3port/patches/' + xml.name,
+                              [item['path'] for item in manifest['required_paths']])
+            files.add(xml)
+        self.assertEqual(len(files), 4)
+
     def test_profiles_by_title_id(self):
         self.assertEqual(game_profile('CUSA01623')[1:3], (GOW3, '01.02'))
         self.assertIsNone(game_profile('CUSA99999'))
@@ -92,7 +123,7 @@ class GameProfileTests(unittest.TestCase):
             self.assertEqual(game_profile('CUSA01740', 'God of War III')[2], '01.00')
 
     def test_android_cusa01740_requires_metadata_and_explicit_720p(self):
-        # 1740 只提供经单独核对的 01.00/720p，不凭目录名猜测身份或默认开启补丁。
+        # 1740 仅开放 01.00 的明确选择，不凭目录名猜测身份或默认开启补丁。
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)
             status = patch_profile_status(path)

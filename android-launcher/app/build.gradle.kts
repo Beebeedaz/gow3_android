@@ -62,6 +62,8 @@ android {
     }
     sourceSets {
         getByName("main") {
+            // 页面与运行时共用按 ID 的 XML 目录，不维护第二份补丁名单。
+            assets.srcDir("../../patches")
             jniLibs.srcDir("../../tools/android/bridges")
             // Steam real implementation vs. no-Steam fallback, gated on the fetched libraries.
             java.srcDir(if (steamAvailable) "src/steam/java" else "src/steamStub/java")
@@ -76,6 +78,10 @@ android {
             assets.srcDir("../../out/android-release/assets")
         }
     }
+}
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    systemProperty("gow3.patchCatalogDir", rootProject.file("../patches").absolutePath)
 }
 
 // 调试运行时 payload 不是源文件：它由仓库工具生成。
