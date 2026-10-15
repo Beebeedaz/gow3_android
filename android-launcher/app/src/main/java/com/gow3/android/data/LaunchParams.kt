@@ -71,6 +71,18 @@ internal object LaunchParams {
             descriptionRes = R.string.param_desc_anisotropy,
         ),
         LaunchParam(
+            key = "vibration", labelRes = R.string.param_vibration, groupRes = R.string.launch_parameters_group_game,
+            options = listOf(
+                LaunchOption("0", R.string.param_option_off),
+                LaunchOption("25", R.string.param_option_25_percent),
+                LaunchOption("50", R.string.param_option_50_percent),
+                LaunchOption("75", R.string.param_option_75_percent),
+                LaunchOption("100", R.string.param_option_100_percent),
+            ),
+            defaultValue = "100",
+            descriptionRes = R.string.param_desc_vibration,
+        ),
+        LaunchParam(
             key = "fps_limit", labelRes = R.string.param_fps_limit, groupRes = R.string.param_group_performance,
             options = listOf(
                 LaunchOption("30", R.string.param_option_30),

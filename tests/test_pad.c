@@ -5,8 +5,10 @@
 
 static int capture;
 static uint32_t published;
+static int vibration_percent=100;
 int gow3gpu_overlay_captures_input(void) { return capture; }
 void gow3gpu_pad_publish(uint32_t buttons) { published=buttons; }
+int gow3gpu_vibration_percent(void) { return vibration_percent; }
 uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *name) {
     (void)table; (void)count; (void)name;
     return 0;
@@ -21,6 +23,11 @@ static void inject(const char *path, const char *tokens) {
 }
 
 int main(void) {
+    assert(scale_vibration(255, 100) == 65535);
+    assert(scale_vibration(255, 50) == 32767);
+    assert(scale_vibration(255, 0) == 0);
+    assert(scale_vibration(255, 150) == 65535);
+
     char path[]="/tmp/gow3-pad-test-XXXXXX";
     int fd=mkstemp(path);
     assert(fd>=0);

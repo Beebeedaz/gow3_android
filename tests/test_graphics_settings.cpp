@@ -45,6 +45,7 @@ int main() {
         out << "display_mode=borderless\nvsync=0\nfps_limit=240\nasync_shaders=0\n"
                "render_resolution=1440p\nengine_fps=240\ndeferred_readback=0\nstale_readback=1\n"
                "fsr1=1\nrcas=0\nrcas_strength=40\nframes_queued=2\n";
+        out << "vibration=50\n";
     }
     _putenv_s("GOW3_CONFIG", path);
     _putenv_s("GOW3_ASYNC_SHADERS", "");
@@ -53,6 +54,7 @@ int main() {
     assert(v.display_mode == G::Borderless && !v.vsync && v.fps_limit == 240 && !v.async_shaders);
     assert(v.render_resolution == 3 && v.engine_fps == 240 && !v.deferred_readback && v.stale_readback);
     assert(v.fsr1 && !v.rcas && v.rcas_strength == 40 && v.frames_queued == 2);
+    assert(v.vibration == 50);
     assert(!Gow3Settings::GraphicsNeedRestart());
     v.engine_fps = 120;
     assert(Gow3Settings::GraphicsNeedRestart());
@@ -72,13 +74,14 @@ int main() {
     {
         std::ofstream out(path);
         out << "display_mode=huge\nfps_limit=7\nrender_resolution=8K\nengine_fps=1\n"
-               "rcas_strength=250\nframes_queued=9\n";
+               "rcas_strength=250\nframes_queued=9\nvibration=250\n";
     }
     _putenv_s("GOW3_ASYNC_SHADERS", "1");  // the environment still wins at start
     v.async_shaders = false;
     Gow3Settings::Load();
     assert(v.display_mode == G::Windowed && v.fps_limit == 0 && v.render_resolution == 0 && v.engine_fps == 120);
     assert(v.rcas_strength == 75 && v.frames_queued == 1);
+    assert(v.vibration == 100);
     assert(v.async_shaders);
     {
         std::ofstream out(path);

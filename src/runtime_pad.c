@@ -433,12 +433,19 @@ static ABI int32_t pad_info(int32_t handle, ControllerInfo *info) {
     pthread_mutex_unlock(&lock);
     return 0;
 }
+static uint16_t scale_vibration(uint8_t strength, unsigned percent) {
+    if (percent > 100) percent = 100;
+    return (uint16_t)(strength * 257u * percent / 100u);
+}
+
 static ABI int32_t pad_vibration(int32_t handle, const uint8_t *param) {
     if (handle!=PAD_HANDLE || !opened) return ERR_INVALID_HANDLE;
     if (!param) return ERR_INVALID_ARG;
     pthread_mutex_lock(&lock);
     SDL_Gamepad *g=current_gamepad();
-    if (g) SDL_RumbleGamepad(g,(uint16_t)(param[0]*257),(uint16_t)(param[1]*257),1000);
+    const unsigned percent=(unsigned)gow3gpu_vibration_percent();
+    if (g) SDL_RumbleGamepad(g,scale_vibration(param[0], percent),
+                             scale_vibration(param[1], percent),1000);
     pthread_mutex_unlock(&lock);
     return 0;
 }

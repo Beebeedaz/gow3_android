@@ -299,6 +299,12 @@ constexpr const char* Unsupported = "Unavailable: game version or code signature
 
 void GameTab() {
     auto& s = Gow3Settings::Get();
+    ImGui::SeparatorText("Controller");
+    if (BeginRows("##controller")) {
+        SliderRow("Vibration", s.vibration, 0, 100, "%d%%",
+                  "Strength of the controller's vibration. 0% turns it off.");
+        ImGui::EndTable();
+    }
     ImGui::SeparatorText("Cheats");
     if (BeginRows("##cheats")) {
         static const char* const names[] = {"Infinite health", "Infinite magic", "Infinite item meter",
