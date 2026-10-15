@@ -175,6 +175,8 @@ def compile_patches(xml, names, app_version, segments, image=None, skipped=None)
 PATCHES_DIR=Path(__file__).resolve().parent.parent/'patches'
 # Title ID 与 APP_VER 决定候选资格；每项特征码决定实际适用性。
 GAMES=[({'CUSA01623','CUSA01715','CUSA01720'},PATCHES_DIR/'God_of_War_III_Remastered.xml','01.02',
+        'God of War III'),
+       ({'CUSA01740'},PATCHES_DIR/'God_of_War_III_Remastered_CUSA01740.xml','01.00',
         'God of War III')]
 # The build the built-in Address values and third-party patch files are written for.
 REFERENCE_SHA256='d85c8135d330c3b601bf5dc3f1dd86bd6119fb8a9fce372bed2c9785f9a79299'
@@ -439,7 +441,10 @@ def compile_plan(game, out, names=None, *, extra='', only=False, requested=None,
         applied=[n for n in selected if n not in skipped]
         identity['patch_sites_match']=not skipped if selected else None
         if patches_dir:
-            if identity['eboot_sha256']!=REFERENCE_SHA256:
+            # 1740 仅验收内置 720p，不允许外部文件扩展到未验证的补丁。
+            if identity['title_id']=='CUSA01740':
+                external['reason']='profile-disallows-external-patches'
+            elif identity['eboot_sha256']!=REFERENCE_SHA256:
                 external['reason']='non-reference-eboot'
             else:
                 found=external_patches(patches_dir,profile[2],profile[1],{identity['title_id']})
@@ -452,7 +457,10 @@ def compile_plan(game, out, names=None, *, extra='', only=False, requested=None,
     explicit_dmem=positive_env(env,'GOW3_DMEM_MB')
     explicit_vblank=positive_env(env,'GOW3_VBLANK_HZ')
     dmem=max(base_dmem,minimum or 0,explicit_dmem or 0)
-    effective={'engine_fps':fps or 60, 'vblank_hz':explicit_vblank or fps or 60,
+    resolution=next((n.removeprefix('Resolution Patch - ') for n in applied
+                     if n.startswith('Resolution Patch - ')), 'native')
+    effective={'render_resolution':resolution, 'engine_fps':fps or 60,
+               'vblank_hz':explicit_vblank or fps or 60,
                'vblank_source':'override' if explicit_vblank else 'compiled-patches',
                'dmem_mb':dmem, 'minimum_dmem_mb':minimum,
                'dmem_source':('override' if explicit_dmem and dmem==explicit_dmem else

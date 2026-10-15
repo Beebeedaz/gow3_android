@@ -48,19 +48,29 @@ def verify(game, out):
         content_profile.prepare(game, out)
         result['prepared'] = True
         profile = patches.game_profile(identity['title_id'])
-        for name in sorted(patches.available_patches(profile[1], profile[2])):
+        available = patches.available_patches(profile[1], profile[2])
+        texture_fix = graphics_options.TEXTURE_FIX in available
+        for name in sorted(available):
             report, _ = patches.compile_plan(game, out, [name])
             result['patches'].append({'name': name, 'reason': report['reason'],
                                       'write_count': report['write_count'], 'skipped': report['skipped']})
         defaults = patches.selected_patches(profile[1], profile[2], '')
         for resolution, fps in (('native', '60'), ('native', '120'), ('native', '240'),
                                 ('720p', '60'), ('720p', '120'), ('4K', '60')):
+            # 按此身份实际提供的档位审计，不把其他版本的选项当作必选项。
+            if resolution != 'native' and f'Resolution Patch - {resolution}' not in available:
+                continue
+            if fps != '60' and f'Frame Rate Patch - {fps} FPS' not in available:
+                continue
             options = {'render_resolution': resolution, 'engine_fps': fps}
-            names = graphics_options.patch_names(defaults, options)
+            names = graphics_options.patch_names(defaults, options, texture_fix)
             report, _ = patches.compile_plan(game, out, names)
             result['combinations'][f'{resolution}-{fps}'] = report
+        options = dict(graphics_options.DEFAULTS)
+        if f'Frame Rate Patch - {options["engine_fps"]} FPS' not in available:
+            options['engine_fps'] = '60'
         report, writes = patches.compile_plan(game, out, graphics_options.patch_names(
-            defaults, graphics_options.DEFAULTS))
+            defaults, options, texture_fix))
         result['status'] = ('verified' if all(not p['skipped'] for p in result['patches']) and
                             all(not p['skipped'] for p in result['combinations'].values())
                             else 'patches-skipped')

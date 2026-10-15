@@ -41,7 +41,8 @@ def record(path, profile, env=None, turnip=None, dmem=None, vblank=None, vulkan_
         'readback_linear_source': env.get('GOW3_READBACK_LINEAR_SOURCE', 'unknown'),
         'deferred_readback': env.get('GOW3_DEFERRED_READBACK'),
         'stale_readback': env.get('GOW3_STALE_READBACK'),
-        'render_resolution': env.get('GOW3_RENDER_RES', 'native'),
+        'render_resolution': profile.get('effective', {}).get(
+            'render_resolution', env.get('GOW3_RENDER_RES', 'native')),
         'dmem_mb': int(dmem) if dmem and str(dmem).isdigit() else dmem,
         'vblank_hz': int(vblank) if vblank and str(vblank).isdigit() else vblank,
         'turnip': turnip,

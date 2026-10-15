@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!-- Android CUSA01740 01.00 专用：只提供 720p，沿用 kvicken + cuesta4 的补丁及归因。
+     从既有 God_of_War_III_Remastered.xml 的 720p 项适配，实际启动须逐项扫描特征码。
+     已核对 eboot SHA-256：4e399baa5362f47be0066aaed208d7352f1fb43e590b74be3a639a392120f396。
+     参考 Address 对应该 01.00；不将其他补丁或 01.02 自动视为可用。
+     最后一项 Video Arena 调整是此分辨率补丁的组成部分，最低总 DMEM 为 7104 MiB。 -->
+<Patch>
+    <TitleID>
+        <ID>CUSA01740</ID>
+    </TitleID>
+    <Metadata Title="God of War III Remastered" Name="Resolution Patch - 720p" Note="Decreases game output resolution to 1280x720 and increases Video Arena to 2.25 GiB. Requires setting DMEM to 2048 MB or more. Only leave one resolution patch enabled; do not enable it with Bug Fix - Texture Corruption Fix." Author="kvicken + cuesta4" PatchVer="1.1" AppVer="01.00" AppElf="eboot.bin" isEnabled="false">
+        <PatchList>
+            <Line Type="bytes" Address="0x005f0b2b" Value="00050000" Pattern="48 8d 75 a0 89 c7 e8 ?? ?? ?? ?? 41 c7 45 0c 80 07 00 00" At="15" />
+            <Line Type="bytes" Address="0x005f0b33" Value="d0020000" Pattern="41 c7 45 10 38 04 00 00 66 41 c7 45 14 80 07 66 41 c7 45 16 38 04" At="4" />
+            <Line Type="bytes" Address="0x005f0b3c" Value="0005" Pattern="41 c7 45 10 38 04 00 00 66 41 c7 45 14 80 07 66 41 c7 45 16 38 04" At="13" />
+            <Line Type="bytes" Address="0x005f0b43" Value="d002" Pattern="41 c7 45 10 38 04 00 00 66 41 c7 45 14 80 07 66 41 c7 45 16 38 04" At="20" />
+            <Line Type="bytes" Address="0x005643e3" Value="d0020000" Pattern="c7 04 24 38 04 00 00 48 8d 3d ?? ?? ?? ?? 41 b9 80 07 00 00" At="3" />
+            <Line Type="bytes" Address="0x005643f0" Value="00050000" Pattern="41 b9 80 07 00 00 4c 89 f9 4d 89 e0 e8 ?? ?? ?? ??" At="2" />
+            <Line Type="bytes" Address="0x005ff759" Value="00050000" Pattern="bf 00 01 00 00 b9 80 07 00 00 41 b8 38 04 00 00" At="6" />
+            <Line Type="bytes" Address="0x005ff75f" Value="d0020000" Pattern="bf 00 01 00 00 b9 80 07 00 00 41 b8 38 04 00 00" At="12" />
+            <Line Type="bytes" Address="0x007cd918" Value="00000090" Pattern="00 00 00 43 00 00 80 3f 00 00 00 50 00 00 00 00 00 04 00 00" At="8" />
+        </PatchList>
+    </Metadata>
+</Patch>

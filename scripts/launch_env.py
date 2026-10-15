@@ -18,7 +18,7 @@ def derive(game, config, state_path, env, *, out=None, base_dmem=5056):
     """生成并发布本轮补丁，再从编译成功集导出 native 环境。"""
     import json
     import graphics_options
-    from patches import (checked_output, compile_plan, game_profile, patch_profile_status,
+    from patches import (available_patches, checked_output, compile_plan, game_profile, patch_profile_status,
                          publish_plan, selected_patches)
 
     env = dict(env)
@@ -48,7 +48,9 @@ def derive(game, config, state_path, env, *, out=None, base_dmem=5056):
         try:
             names = selected_patches(profile[1], profile[2], extra,
                                      env.get('GOW3_PATCHES_ONLY') == '1')
-            names = graphics_options.patch_names(names, graphics)
+            names = graphics_options.patch_names(
+                names, graphics, texture_fix_available=graphics_options.TEXTURE_FIX in
+                available_patches(profile[1], profile[2]))
             requested = list(dict.fromkeys(requested + names))
         except ValueError:
             disabled = 'patch-conflict'

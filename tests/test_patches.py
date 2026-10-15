@@ -89,11 +89,10 @@ class GameProfileTests(unittest.TestCase):
                 self.assertIsNone(status['eboot_matches'])
             game, _ = make_game(directory, version='01.00')
             self.assertEqual(patch_profile_status(game)['reason'], 'unsupported-app-version')
-            self.assertIsNone(game_profile('CUSA01740', 'God of War III'))
+            self.assertEqual(game_profile('CUSA01740', 'God of War III')[2], '01.00')
 
-    def test_android_cusa01740_selects_no_patch(self):
-        # The Android test build CUSA01740 is not a validated profile: no patch is selected,
-        # and patch_profile_status reports the explicit reason rather than guessing.
+    def test_android_cusa01740_requires_metadata_and_explicit_720p(self):
+        # 1740 只提供经单独核对的 01.00/720p，不凭目录名猜测身份或默认开启补丁。
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)
             status = patch_profile_status(path)
@@ -102,8 +101,8 @@ class GameProfileTests(unittest.TestCase):
             (path / 'eboot.bin').write_bytes(b'not-a-retail-game')
             status = patch_profile_status(path)
             self.assertEqual(status['reason'], 'unsupported-title')
-            self.assertIsNone(game_profile('CUSA01740'))
-            self.assertEqual(selected_patches(GOW3, '01.00', '', only=True), [])
+            profile = game_profile('CUSA01740')
+            self.assertEqual(selected_patches(profile[1], '01.00', '', only=True), [])
 
     def test_patch_profile_status_is_safe_for_unknown_or_missing_games(self):
         with tempfile.TemporaryDirectory() as folder:
