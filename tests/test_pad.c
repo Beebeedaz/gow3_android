@@ -45,6 +45,11 @@ int main(void) {
     assert(data.touch_count==1 && data.touches[0].x==480 && data.touches[0].y==471);
     inject(path,"touchpad_right");
     assert(pad_read_state(1,&data)==0 && data.touch_count==1 && data.touches[0].x==1440);
+    assert((data.buttons & BTN_TOUCHPAD));
+    /* 裸 touchpad 仍默认左侧点击(x=480),与 touchpad_left 一致。 */
+    inject(path,"touchpad");
+    assert(pad_read_state(1,&data)==0 && data.touch_count==1 && data.touches[0].x==480);
+    assert((data.buttons & BTN_TOUCHPAD));
     inject(path,"");
     assert(pad_read_state(1,&data)==0 && data.buttons==0 && data.touch_count==0);
 
