@@ -132,7 +132,12 @@ void MemoryManager::CopySparseMemory(VAddr source, u8* dest, u64 size) {
 }
 bool MemoryManager::TryWriteBacking(void* address, const void* data, u64 size) {
     Gow3WriteLog::Note(reinterpret_cast<uintptr_t>(address), data, size, Gow3WriteLog::Backing);
-    return runtime_memory_write_backing(reinterpret_cast<uintptr_t>(address), data, size) != 0;
+    const bool written = runtime_memory_write_backing(reinterpret_cast<uintptr_t>(address), data, size) != 0;
+    // 这些写入绕过页跟踪，较大的写入可能覆盖纹理；小写入通常只是 fence/label。
+    if (written && rasterizer && size > 8) {
+        rasterizer->GetTextureCache().NoteBackingWrite(reinterpret_cast<VAddr>(address), size);
+    }
+    return written;
 }
 void AddressSpace::Protect(VAddr virtual_addr, u64 size, MemoryPermission perms) {
     Gow3Stats::Timer timer{Gow3Stats::t_protect};
@@ -227,6 +232,10 @@ extern "C" int gow3gpu_init(const Gow3GpuConfig* config) {
     std::printf("GOW3_NATIVE_FIX_081DF6F=active\n");
     // native 移植标志：用于确认设备运行的是包含 195c7ab 修复的 GPU 库。
     std::printf("GOW3_NATIVE_FIX_195C7AB=active\n");
+    // native 移植标志：用于确认设备运行的是包含 a101edb 修复的 GPU 库。
+    std::printf("GOW3_NATIVE_FIX_A101EDB=active\n");
+    // native 移植标志：用于确认设备运行的是 recorder chunk 防护修复的 GPU 库。
+    std::printf("GOW3_NATIVE_FIX_SCHEDULER_CHUNK=active\n");
     Gow3Settings::Load();
 #ifdef GOW3_PGO_GENERATE
     StartProfileWriter();
