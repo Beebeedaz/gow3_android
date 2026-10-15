@@ -37,6 +37,7 @@
     <!-- 启动参数：参数名 -->
     <string name="param_upscaler">Upscaler</string>
     <string name="param_resolution">Resolution</string>
+    <string name="param_anisotropy">Anisotropic filtering</string>
     <string name="param_fps_limit">FPS limit</string>
     <string name="param_engine_fps">Engine FPS</string>
     <string name="param_vsync">VSync</string>
@@ -55,6 +56,11 @@
     <string name="param_option_1440p">1440p</string>
     <string name="param_option_1800p">1800p</string>
     <string name="param_option_4k">4K</string>
+    <string name="param_option_game_default">Game default</string>
+    <string name="param_option_2x">2x</string>
+    <string name="param_option_4x">4x</string>
+    <string name="param_option_8x">8x</string>
+    <string name="param_option_16x">16x</string>
     <string name="param_option_30">30</string>
     <string name="param_option_60">60</string>
     <string name="param_option_120">120</string>
@@ -72,6 +78,7 @@
     <string name="param_desc_vsync">Syncs the game\'s frames with your screen\'s refresh rate to stop visual tearing. Leave it ON unless you see tearing or stutter.</string>
     <string name="param_desc_frames_queued">How many frames the game prepares ahead of what the screen shows. Lower numbers cut input lag; higher numbers can improve smoothness on weaker hardware.</string>
     <string name="param_desc_free_camera">Lets you move the camera freely around the world for exploring or testing, instead of following the gameplay camera. Meant for experimentation, not normal play.</string>
+    <string name="param_desc_anisotropy">Sharpens floors and walls viewed at an angle. Higher values may use a little more GPU bandwidth. Takes effect on the next launch.</string>
 
     <!-- 帧生成卡片 -->
     <string name="frame_gen_title">FRAME GENERATION</string>

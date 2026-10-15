@@ -392,6 +392,14 @@ void ImageTab() {
         ImGui::EndDisabled();
         ImGui::EndTable();
     }
+    ImGui::SeparatorText("Textures (applied on restart)");
+    if (BeginRows("##textures")) {
+        static const char* const labels[] = {"Game default", "2x", "4x", "8x", "16x"};
+        ChoiceRow("Anisotropic filtering", s.anisotropy, labels, G::Anisotropies.data(),
+                  int(G::Anisotropies.size()),
+                  "Sharper floors and walls seen at an angle. Little cost on most GPUs.");
+        ImGui::EndTable();
+    }
     ImGui::SeparatorText("Information");
     if (BeginRows("##image_info")) {
         char text[96];
@@ -1116,6 +1124,24 @@ u32 PadEdges() {
     return Gow3Pad::Edges(pad_published.load(), pad_seen);
 }
 
+void PollMenuShortcut() {
+    static const bool android_input = [] {
+        const char* value = std::getenv("GOW3_ANDROID_INPUT");
+        return value && value[0] == '1';
+    }();
+    if (!android_input) {
+        return;
+    }
+    static bool combo_down = false;
+    const u32 buttons = pad_published.load(std::memory_order_relaxed);
+    const bool combo = (buttons & (Gow3Pad::kR3 | Gow3Pad::kL2)) ==
+                       (Gow3Pad::kR3 | Gow3Pad::kL2);
+    if (combo && !combo_down) {
+        SetOpen(!menu_open.load(std::memory_order_relaxed));
+    }
+    combo_down = combo;
+}
+
 void BeginChoice(const std::string& title, const std::vector<std::string>& items,
                  std::vector<Gow3Png::Image> pictures, int focus) {
     std::scoped_lock lock{imgui_mutex};
@@ -1161,6 +1187,7 @@ void SetTextEntry(bool active, const std::string& prompt, const std::string& tex
 }
 
 void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent) {
+    PollMenuShortcut();
     // Present interval for the FPS readout (measured also while nothing is drawn).
     const auto now = std::chrono::steady_clock::now();
     const float ms = std::chrono::duration<float, std::milli>(now - last_present).count();

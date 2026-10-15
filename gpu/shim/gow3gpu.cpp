@@ -236,6 +236,8 @@ extern "C" int gow3gpu_init(const Gow3GpuConfig* config) {
     std::printf("GOW3_NATIVE_FIX_A101EDB=active\n");
     // native 移植标志：用于确认设备运行的是 recorder chunk 防护修复的 GPU 库。
     std::printf("GOW3_NATIVE_FIX_SCHEDULER_CHUNK=active\n");
+    // native 移植标志：用于确认设备运行的是各向异性过滤设置移植的 GPU 库。
+    std::printf("GOW3_NATIVE_FIX_9D0F51C_ANISOTROPY=active\n");
     Gow3Settings::Load();
 #ifdef GOW3_PGO_GENERATE
     StartProfileWriter();

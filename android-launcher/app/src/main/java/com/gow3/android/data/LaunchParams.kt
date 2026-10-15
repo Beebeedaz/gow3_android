@@ -59,6 +59,18 @@ internal object LaunchParams {
             defaultValue = "720p",
         ),
         LaunchParam(
+            key = "anisotropy", labelRes = R.string.param_anisotropy, groupRes = R.string.param_group_display,
+            options = listOf(
+                LaunchOption("0", R.string.param_option_game_default),
+                LaunchOption("2", R.string.param_option_2x),
+                LaunchOption("4", R.string.param_option_4x),
+                LaunchOption("8", R.string.param_option_8x),
+                LaunchOption("16", R.string.param_option_16x),
+            ),
+            defaultValue = "0",
+            descriptionRes = R.string.param_desc_anisotropy,
+        ),
+        LaunchParam(
             key = "fps_limit", labelRes = R.string.param_fps_limit, groupRes = R.string.param_group_performance,
             options = listOf(
                 LaunchOption("30", R.string.param_option_30),

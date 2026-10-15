@@ -50,6 +50,8 @@ void SetTextEntry(bool active, const std::string& prompt, const std::string& tex
 void PublishPad(u32 buttons);
 /// 上次发布的掩码中,自上次读取以来新按下的那些位。
 u32 PadEdges();
+/// Present thread: handles the Android/injected R3+L2 shortcut, which has no SDL events.
+void PollMenuShortcut();
 
 /// The game's save list: shown until the player chooses (arrows/D-pad, Enter/Cross) or
 /// cancels (Esc/Circle). `pictures`: one per item (empty = none), drawn beside its text.

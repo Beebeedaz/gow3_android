@@ -10,6 +10,7 @@ namespace Gow3Pad {
 
 /// The injected pad-file mask, in runtime_pad.c's own PS4 button layout.
 inline constexpr std::uint32_t kUp = 0x10, kDown = 0x40, kCircle = 0x2000, kCross = 0x4000;
+inline constexpr std::uint32_t kR3 = 0x4, kL2 = 0x100;
 
 /// A press is an edge, not the level a pad file holds: only the bits that appeared since the
 /// caller's previous read count, and `seen` is moved on so holding does not repeat the action.
