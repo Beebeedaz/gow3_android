@@ -1,100 +1,156 @@
-# 战神 III 重制版 Android 移植版（God of War III Remastered for Android）
-
-**简体中文** | [English](README.en.md) | [Português (Brasil)](README.pt-BR.md)
+# God of War III Remastered · Android Port
 
 <p align="center">
-  <img src="docs/a.jpg" alt="游戏截图 1" width="45%"/>
-  <img src="docs/b.jpg" alt="游戏截图 2" width="45%"/>
+  <strong>God of War III Remastered · Android / ARM64 port</strong>
 </p>
 
+<p align="center">
+  Bring the PS4 version of <em>God of War III Remastered</em> to Android devices.
+  <br />
+  Powered by FEXCore, Vulkan / Turnip, and a game-specific runtime.
+  <br />
+  <strong>Work in progress.</strong>
+</p>
 
-《**战神 III 重制版**》（God of War III Remastered，PlayStation 4）的 **Android / ARM64 移植**（开发中，见下文）。
+<p align="center">
+  <a href="docs/QUICKSTART.md">Quickstart</a> ·
+  <a href="#system-requirements">System requirements</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="docs/gow3/ROADMAP.md">Roadmap</a>
+</p>
 
-游戏的原始可执行文件是 x86-64 架构（PS4 使用的同样是 x86-64）。在 Android 设备上，游戏代码
-由 **FEXCore** 动态翻译后在 ARM64 上执行；一套为本作专门编写的运行时替代了 PS4 的系统库，图形
-部分则被翻译为 Vulkan（经 Turnip 驱动连接 Adreno GPU）。它不是通用模拟器：整个项目只服务
-这一款游戏。本项目 fork 自 [R-V-L 移植版](https://github.com/R-V-L/gow3_pc)，
-后者基于 [deadinside28 的 bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)，
-并合入了 [cuesta4 的 shadPS4 分支](https://github.com/cuesta4/shadPS4) 中针对战神 III 的修复
-（见[致谢](#致谢)）。
+<p align="center">
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <strong>English</strong> ·
+  <a href="README.pt-BR.md">Português (Brasil)</a>
+</p>
 
-> **本项目不包含任何游戏文件。** 你需要从自己的 PS4 导出的游戏文件（当前测试目标为
-> CUSA01740，版本 01.02）。
-> 本项目与 Sony Interactive Entertainment、Santa Monica Studio 无关。
-> God of War 是 Sony Interactive Entertainment 的商标。
+<p align="center">
+  <a href="#project-status"><img src="https://img.shields.io/badge/status-work--in--progress-f0a000?style=flat-square" alt="Status: work in progress" /></a>
+  <a href="#system-requirements"><img src="https://img.shields.io/badge/platform-Android%20%7C%20ARM64-3ddc84?style=flat-square" alt="Platform: Android and ARM64" /></a>
+  <a href="#how-it-works"><img src="https://img.shields.io/badge/graphics-Vulkan%20%7C%20Turnip-6f42c1?style=flat-square" alt="Graphics: Vulkan and Turnip" /></a>
+  <a href="#license"><img src="https://img.shields.io/badge/license-GPL--2.0--or--later-blue?style=flat-square" alt="License: GPL 2.0 or later" /></a>
+</p>
 
+<table align="center">
+  <tr>
+    <td align="center" width="42%">
+      <img src="docs/imgs/a.jpg" alt="God of War III gameplay screenshot one" width="100%" />
+      <sub>Gameplay · Vulkan rendering</sub>
+    </td>
+    <td align="center" width="42%">
+      <img src="docs/imgs/b.jpg" alt="God of War III gameplay screenshot two" width="100%" />
+      <sub>Gameplay · Android device</sub>
+    </td>
+  </tr>
+</table>
 
-## 快速开始
+<p align="center">
+  <img src="docs/imgs/home.jpg" alt="Android launcher home screen" width="28%" />
+  <br />
+  <sub>Android launcher · Runtime installation and launch</sub>
+</p>
 
-从拿到项目到跑起 debug 的完整教程（Android 移植，macOS Apple Silicon 主机）见
-**[docs/QUICKSTART.md](docs/QUICKSTART.md)**。
+The **Android / ARM64 port** of *God of War III Remastered* (PlayStation 4) is under development.
 
-## 性能表现
+The game's original executable is x86-64 (the PS4 uses the same architecture). On an Android
+device, the game code is dynamically translated by **FEXCore** and runs on ARM64; a runtime
+written specifically for this game replaces the PS4 system libraries, and the graphics are
+translated to Vulkan through the Turnip driver for Adreno GPUs. This is not a generic emulator:
+the whole project serves this one game. The project forks the
+[R-V-L port](https://github.com/R-V-L/gow3_pc), which is based on
+[deadinside28's bloodborne_pc](https://github.com/deadinside28/bloodborne_pc), and includes
+God of War III fixes from [cuesta4's shadPS4 fork](https://github.com/cuesta4/shadPS4)
+(see [Acknowledgments](#acknowledgments)).
 
-Android 端仍在真机验证中，暂无稳定的性能数据。
+> [!IMPORTANT]
+> **This project contains no game files.** You need game files dumped from your own PS4
+> (currently tested against CUSA01740, version 01.02). This project is not affiliated with
+> Sony Interactive Entertainment or Santa Monica Studio. God of War is a trademark of Sony
+> Interactive Entertainment.
 
-## 已实现功能
+## Project status
 
-- **运行链路**：x86-64 游戏代码由 FEXCore 在 ARM64 上执行（`cpu/`，`libgow3cpu.so`），图形
-  经 shadPS4 图形核心的 ARM64 构建（`libgow3gpu.so`）翻译为 Vulkan，经 Turnip 连接 Adreno GPU。
-- **Kotlin/Compose launcher**（`android-launcher/`）：安装 runtime（SHA-256 校验）、管理 Surface、
-  输入、音频、设置与进程生命周期。
+| Area | Current status |
+| --- | --- |
+| Android / ARM64 runtime chain | 🚧 In development; ongoing real-device validation |
+| Vulkan / Turnip graphics | ✅ Integrated |
+| Kotlin / Compose launcher | ✅ Integrated |
+| Stable performance numbers | ⏳ Not available yet |
 
-- 复用了桌面版同一套游戏运行时、PS4 系统库重实现、图形核心与补丁逻辑；Android 端当前在真机
-  上验证中，分辨率、FPS 与修改器补丁尚未做字节级校验。
+> This is a game-specific port, not a general-purpose PS4 emulator.
 
-## 系统要求
+## Quickstart
 
-- **ARM64（arm64-v8a）的 Android 设备**，无需 root。
-- 支持 Vulkan 的 GPU，且驱动（Turnip）较新（Adreno 设备）。
-- 你自己的游戏副本：**CUSA01740 并已应用 01.02 更新**（包含 `eboot.bin`、`sce_module`、
-  `sce_sys` 的目录）。下载包中不包含任何游戏文件。
+The full tutorial from getting the project to running debug (Android port, macOS Apple Silicon
+host) is in **[docs/QUICKSTART.md](docs/QUICKSTART.md)**.
 
-构建 Android 端需要一台宿主机（当前流程基于 macOS Apple Silicon），依赖与步骤见
-[docs/QUICKSTART.md](docs/QUICKSTART.md)。
+## Performance
 
+The Android side is still being validated on real devices; no stable performance numbers are
+available yet.
 
-## 工作原理
+## Implemented features
 
-| 模块     | 位置                                                             | 作用                                                                                              |
-| -------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| 准备     | `scripts/`                                                        | 读取 `eboot.bin`，应用重定位，并把游戏自带的 `libc` 与 `libSceFios2` 链接为单一镜像              |
-| 加载器   | `src/probe.c`                                                     | 加载镜像、安装经过校验的 hook（修改器、倍率、血条），并启动游戏原始代码                           |
-| 运行时   | `src/runtime_*.c`                                                 | 重新实现 PS4 系统函数：内存、线程、文件、音频、视频、手柄、存档与服务                             |
-| GPU      | `gpu/shadps4/`                                                    | shadPS4 图形核心，将 PS4 GPU 指令翻译为 Vulkan，并包含本移植的性能优化（后台着色器缓存、延迟回读） |
-| 游戏内菜单 | `gpu/shim/gow3_overlay.cpp`                                     | Dear ImGui 菜单与性能叠加层；设置位于 `gpu/shim/gow3_settings.cpp`                                 |
-| 补丁     | `patches/God_of_War_III_Remastered.xml`、`scripts/patches.py`     | 启动时在内存中应用，不修改游戏文件                                                                 |
-| 启动     | Android launcher（`android-launcher/`）、`run.sh`               | Android 端由 launcher 准备镜像、启动 `gow3-probe`；`run.sh` 为桌面版启动入口                     |
+- **Runtime chain**: x86-64 game code runs on ARM64 through FEXCore (`cpu/`, `libgow3cpu.so`),
+  while the ARM64 shadPS4 graphics core (`libgow3gpu.so`) translates graphics to Vulkan and
+  connects to Adreno GPUs through Turnip.
+- **Kotlin / Compose launcher** (`android-launcher/`): installs the runtime with SHA-256
+  validation and manages the Surface, input, audio, settings, and process lifecycle.
+- The Android port reuses the desktop build's game runtime, PS4 system library reimplementation,
+  graphics core, and patch logic. Resolution, FPS, and cheat patches are still awaiting byte-level
+  validation on the Android build.
 
-更多文档：[模组](docs/MODS.md)、[帧图与放大器](docs/upscaler.md)、[GPU 并行工作](docs/parallel_gpu.md)
-与[路线图](docs/gow3/ROADMAP.md)。
+## System requirements
 
-## 致谢
+- **ARM64 (arm64-v8a) Android device**, no root required.
+- A Vulkan-capable GPU with a reasonably recent driver (Turnip; Adreno devices).
+- Your own game copy: **CUSA01740 with the 01.02 update applied** (a folder containing
+  `eboot.bin`, `sce_module`, and `sce_sys`). No game files are included in the downloads.
 
-本项目 fork 自 R-V-L 的 linux 移植版，后者又源自 FelipePrado0 的原创项目：
+Building the Android side requires a host machine (the current flow is based on macOS Apple
+Silicon); dependencies and steps are in [docs/QUICKSTART.md](docs/QUICKSTART.md).
 
-- **deadinside28**：[bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)，最初的原生移植。
-- **gow3_pc**（R-V-L）：[bloodborne_pc for Windows](https://github.com/R-V-L/gow3_pc)，
-  本项目所基于的分支。
-- **cuesta4**：[专注于 God of War III Remastered 的 shadPS4 分支](https://github.com/cuesta4/shadPS4)
-  （分支 `eltutz`）。本移植使用了其中的 GNM 混合重写、深度/模板状态与图像别名修复。
-- **shadPS4 团队**：[shadPS4](https://github.com/shadps4-emu/shadPS4) 渲染器。
-- **fexdroid** [fexdroid](https://github.com/cobrabm12/fexdroid) 
+## How it works
 
-补丁：kvicken 与 cuesta4（分辨率、贴图修复、120 FPS 与跳过视频，基于 illusion0001 的 PS3
-补丁），发布于 shadPS4 的
-[shadps4-emu/ps4_cheats#145](https://github.com/shadps4-emu/ps4_cheats/pull/145)，并针对本可执行
-文件做了适配。240 FPS 补丁由 Felipe Prado 从 120 FPS 补丁改编而来。修改器改编自 Celogamez 的
-[GoldHEN cheats](https://github.com/GoldHEN/GoldHEN_Cheat_Repository)。
+| Module | Location | Purpose |
+| ------ | -------- | ------- |
+| Prepare | `scripts/` | Reads `eboot.bin`, applies relocations, and links the game's bundled `libc` and `libSceFios2` into a single image |
+| Loader | `src/probe.c` | Loads the image, installs validated hooks (cheats, multipliers, health bars), and starts the game's original code |
+| Runtime | `src/runtime_*.c` | Reimplements PS4 system functions: memory, threads, files, audio, video, gamepad, saves, and services |
+| GPU | `gpu/shadps4/` | Translates PS4 GPU instructions to Vulkan and includes performance optimizations such as background shader caching and deferred readback |
+| In-game menu | `gpu/shim/gow3_overlay.cpp` | Dear ImGui menu and performance overlay; settings live in `gpu/shim/gow3_settings.cpp` |
+| Patches | `patches/God_of_War_III_Remastered.xml`, `scripts/patches.py` | Applied in memory at startup; game files are never modified |
+| Launch | `android-launcher/`, `run.sh` | The Android launcher prepares the image and starts `gow3-probe`; `run.sh` is the desktop launch entry point |
 
-此外还使用了：[LibAtrac9](https://github.com/Thealexbarney/LibAtrac9)、[FFmpeg](https://ffmpeg.org)、
-[SDL3](https://github.com/libsdl-org/SDL)、[Dear ImGui](https://github.com/ocornut/imgui)、
-[sirit](https://github.com/shadps4-emu/sirit)、[magic_enum](https://github.com/Neargye/magic_enum)、
-[miniz](https://github.com/richgel999/miniz)、[xbyak](https://github.com/herumi/xbyak)、
-[Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)、
-[FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) 与 AMD FidelityFX SDK、
-[LLVM](https://llvm.org) 以及 [Pillow](https://python-pillow.org)。
+More docs: [Mods](docs/MODS.md), [Upscaler & frame generation](docs/upscaler.md),
+[Parallel GPU work](docs/parallel_gpu.md), and the [Roadmap](docs/gow3/ROADMAP.md).
 
-## 许可证
+## Acknowledgments
 
-GNU GPL v2 或更高版本（见 [LICENSE](LICENSE)）。第三方组件保留各自的许可证。
+This project forks R-V-L's Linux port, which in turn derives from FelipePrado0's original
+project:
+
+- **deadinside28**: [bloodborne_pc](https://github.com/deadinside28/bloodborne_pc), the original native port.
+- **gow3_pc** (R-V-L): [bloodborne_pc for Windows](https://github.com/R-V-L/gow3_pc), the branch this project is based on.
+- **cuesta4**: [shadPS4 fork focused on God of War III Remastered](https://github.com/cuesta4/shadPS4) (branch `eltutz`). This port uses its GNM hybrid rewrite, depth/stencil state, and image alias fixes.
+- **shadPS4 team**: [shadPS4](https://github.com/shadps4-emu/shadPS4) renderer.
+- **fexdroid**: [fexdroid](https://github.com/cobrabm12/fexdroid).
+
+Patches: kvicken and cuesta4 (resolution, texture fixes, 120 FPS, and video skipping, based on
+illusion0001's PS3 patches), published in shadPS4's
+[shadps4-emu/ps4_cheats#145](https://github.com/shadps4-emu/ps4_cheats/pull/145) and adapted
+for this executable. The 240 FPS patch was adapted from the 120 FPS patch by Felipe Prado. The
+cheats are adapted from Celogamez's [GoldHEN cheats](https://github.com/GoldHEN/GoldHEN_Cheat_Repository).
+
+Also used: [LibAtrac9](https://github.com/Thealexbarney/LibAtrac9), [FFmpeg](https://ffmpeg.org),
+[SDL3](https://github.com/libsdl-org/SDL), [Dear ImGui](https://github.com/ocornut/imgui),
+[sirit](https://github.com/shadps4-emu/sirit), [magic_enum](https://github.com/Neargye/magic_enum),
+[miniz](https://github.com/richgel999/miniz), [xbyak](https://github.com/herumi/xbyak),
+[Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator),
+[FSR-Vulkan](https://github.com/FireBurn/FSR-Vulkan) and the AMD FidelityFX SDK,
+[LLVM](https://llvm.org), and [Pillow](https://python-pillow.org).
+
+## License
+
+GNU GPL v2 or later (see [LICENSE](LICENSE)). Third-party components retain their own licenses.

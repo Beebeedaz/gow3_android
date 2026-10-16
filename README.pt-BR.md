@@ -1,10 +1,42 @@
-# God of War III Remastered para Android
+# God of War III Remastered · Port para Android
 
-[简体中文](README.md) | [English](README.en.md) | **Português (Brasil)**
+[简体中文](README.zh-CN.md) | [English](README.md) | **Português (Brasil)**
 
 <p align="center">
-  <img src="docs/a.jpg" alt="游戏截图 1" width="45%"/>
-  <img src="docs/b.jpg" alt="游戏截图 2" width="45%"/>
+  <strong>God of War III Remastered · port para Android / ARM64</strong>
+</p>
+
+<p align="center">
+  Leve a versão de PS4 de <em>God of War III Remastered</em> para dispositivos Android.
+  <br />
+  Desenvolvido com FEXCore, Vulkan / Turnip e um runtime específico para o jogo.
+  <br />
+  <strong>Em desenvolvimento.</strong>
+</p>
+
+<p align="center">
+  <a href="docs/QUICKSTART.md">Início rápido</a> ·
+  <a href="#requisitos">Requisitos</a> ·
+  <a href="#como-funciona">Como funciona</a> ·
+  <a href="docs/gow3/ROADMAP.md">Roadmap</a>
+</p>
+
+<p align="center">
+  <a href="#status-do-projeto"><img src="https://img.shields.io/badge/status-work--in--progress-f0a000?style=flat-square" alt="Status: em desenvolvimento" /></a>
+  <a href="#requisitos"><img src="https://img.shields.io/badge/platform-Android%20%7C%20ARM64-3ddc84?style=flat-square" alt="Plataforma: Android e ARM64" /></a>
+  <a href="#como-funciona"><img src="https://img.shields.io/badge/graphics-Vulkan%20%7C%20Turnip-6f42c1?style=flat-square" alt="Gráficos: Vulkan e Turnip" /></a>
+  <a href="#licença"><img src="https://img.shields.io/badge/license-GPL--2.0--or--later-blue?style=flat-square" alt="Licença: GPL 2.0 ou posterior" /></a>
+</p>
+
+<p align="center">
+  <img src="docs/imgs/a.jpg" alt="Captura de tela do jogo 1" width="45%"/>
+  <img src="docs/imgs/b.jpg" alt="Captura de tela do jogo 2" width="45%"/>
+</p>
+
+<p align="center">
+  <img src="docs/imgs/home.jpg" alt="Tela inicial do launcher Android" width="28%" />
+  <br />
+  <sub>Launcher Android · Instalação e inicialização do runtime</sub>
 </p>
 
 Este documento é uma tradução em português do README do repositório.
@@ -25,6 +57,17 @@ correções de God of War III do [fork do shadPS4 de cuesta4](https://github.com
 > próprio PS4 (testados atualmente com CUSA01740, versão 01.02). Este projeto não tem relação com
 > a Sony Interactive Entertainment nem com o Santa Monica Studio. God of War é marca registrada da
 > Sony Interactive Entertainment.
+
+## Status do projeto
+
+| Área | Status atual |
+| --- | --- |
+| Runtime Android / ARM64 | 🚧 Em desenvolvimento; validação contínua em aparelhos reais |
+| Gráficos Vulkan / Turnip | ✅ Integrado |
+| Launcher Kotlin / Compose | ✅ Integrado |
+| Números estáveis de desempenho | ⏳ Ainda não disponíveis |
+
+> Este é um port específico para um jogo, não um emulador geral de PS4.
 
 ## Início rápido
 
