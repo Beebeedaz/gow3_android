@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.gow3.android.BuildConfig
 import com.gow3.android.R
 import com.gow3.android.data.LanguageManager
 import com.gow3.android.data.LogArchive
@@ -76,7 +77,7 @@ internal fun AboutScreen(
 
     ScreenColumn {
         Text(stringResource(R.string.about_title), color = LauncherColors.textPrimary, fontFamily = FontFamily.Serif, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text(stringResource(R.string.about_version_fmt, "1.2.4"), color = LauncherColors.gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.about_version_fmt, BuildConfig.VERSION_NAME), color = LauncherColors.gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         Text(stringResource(R.string.about_description), color = LauncherColors.textMuted, fontSize = 13.sp, lineHeight = 19.sp)
         Spacer(Modifier.height(8.dp))
         ContactCard()
