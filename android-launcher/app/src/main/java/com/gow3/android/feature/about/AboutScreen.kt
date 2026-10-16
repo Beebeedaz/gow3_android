@@ -19,6 +19,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,8 +43,12 @@ import com.gow3.android.data.LogResult
 import com.gow3.android.data.SaveArchive
 import com.gow3.android.data.SaveManager
 import com.gow3.android.data.SaveResult
+import com.gow3.android.data.UpdateChecker
 import com.gow3.android.ui.components.LauncherColors
 import com.gow3.android.ui.components.ScreenColumn
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun AboutScreen(
@@ -54,6 +59,8 @@ internal fun AboutScreen(
     val context = LocalContext.current
     var hasSaves by remember { mutableStateOf(SaveArchive.hasSaves(saves.savedataDir())) }
     var hasLogs by remember { mutableStateOf(LogArchive.hasLogs(logs.logsDir())) }
+    var updateState by remember { mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle) }
+    val scope = rememberCoroutineScope()
 
     fun refresh() {
         hasSaves = SaveArchive.hasSaves(saves.savedataDir())
@@ -62,6 +69,17 @@ internal fun AboutScreen(
 
     fun toast(message: String) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    // 只在玩家点击入口时发起检查；网络请求在 Dispatchers.IO 上跑，不阻塞界面，
+    // scope 随 composition 销毁而取消，玩家离开本页后不会继续持有请求。
+    fun checkForUpdates() {
+        if (updateState == UpdateCheckState.Checking) return
+        updateState = UpdateCheckState.Checking
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { UpdateChecker.check(BuildConfig.VERSION_NAME) }
+            updateState = UpdateCheckState.Done(result)
+        }
     }
 
     // 玩家可能在应用退到后台期间备份/恢复存档、安装运行时或运行游戏，
@@ -79,6 +97,7 @@ internal fun AboutScreen(
         Text(stringResource(R.string.about_title), color = LauncherColors.textPrimary, fontFamily = FontFamily.Serif, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Text(stringResource(R.string.about_version_fmt, BuildConfig.VERSION_NAME), color = LauncherColors.gold, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         Text(stringResource(R.string.about_description), color = LauncherColors.textMuted, fontSize = 13.sp, lineHeight = 19.sp)
+        UpdateCheckCard(state = updateState, onCheck = ::checkForUpdates)
         Spacer(Modifier.height(8.dp))
         ContactCard()
         GitHubCard()

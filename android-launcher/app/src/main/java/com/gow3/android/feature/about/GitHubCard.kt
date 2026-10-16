@@ -25,13 +25,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import com.gow3.android.R
+import com.gow3.android.data.ProjectRepo
 import com.gow3.android.ui.components.ActionButton
 import com.gow3.android.ui.components.LauncherColors
 
-private const val GITHUB_URL = "https://github.com/zFitness/gow3_android_port"
-private const val ISSUES_URL = "https://github.com/zFitness/gow3_android_port/issues"
-
-/** 求 Star 与问题反馈，跳转到作者的 GitHub 仓库 / Issues 页面。 */
+/** 求 Star 与问题反馈，跳转到作者 GitHub 仓库 / Issues 页面。 */
 @Composable
 internal fun GitHubCard() {
     val context = LocalContext.current
@@ -62,14 +60,14 @@ internal fun GitHubCard() {
                 description = stringResource(R.string.github_star_description),
                 action = stringResource(R.string.github_open),
             ) {
-                openGitHub(context, GITHUB_URL)
+                openExternalUrl(context, ProjectRepo.URL)
             }
             GitHubRow(
                 label = stringResource(R.string.github_issue_label),
                 description = stringResource(R.string.github_issue_description),
                 action = stringResource(R.string.github_open),
             ) {
-                openGitHub(context, ISSUES_URL)
+                openExternalUrl(context, ProjectRepo.ISSUES_URL)
             }
         }
     }
@@ -108,8 +106,12 @@ private fun GitHubRow(
     }
 }
 
-/** 在能够处理 [url] 的应用中打开它；当没有任何应用可以打开时（例如未安装浏览器）返回 false。 */
-private fun openGitHub(context: android.content.Context, url: String): Boolean =
+/**
+ * 在能够处理 [url] 的应用中打开它；当没有任何应用可以打开时（例如未安装浏览器）
+ * 用 `contact_no_app_fmt` 提示并把地址展示给玩家，返回 false。
+ * About 页的仓库 / Issues 入口与检测更新的下载入口共用这一处降级。
+ */
+internal fun openExternalUrl(context: android.content.Context, url: String): Boolean =
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
         true
