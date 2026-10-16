@@ -71,8 +71,9 @@ class GameProfileTests(unittest.TestCase):
             self.assertEqual(xml.name, f'God_of_War_III_Remastered_{title}.xml')
             root = ET.parse(xml).getroot()
             self.assertEqual({e.text for e in root.iter('ID')}, ids)
-            self.assertEqual({m.get('AppVer') for m in root.iter('Metadata')}, {version})
-            names = [m.get('Name') for m in root.iter('Metadata')]
+            self.assertEqual({m.get('AppVer') for m in root.iter('Metadata')},
+                             {'01.00', '01.02'} if title == 'CUSA01740' else {version})
+            names = [m.get('Name') for m in root.iter('Metadata') if m.get('AppVer') == version]
             self.assertEqual(len(names), len(set(names)))
             self.assertEqual(len(names), 14 if title == 'CUSA01740' else 20)
             for m in root.iter('Metadata'):
@@ -123,7 +124,7 @@ class GameProfileTests(unittest.TestCase):
             self.assertEqual(game_profile('CUSA01740', 'God of War III')[2], '01.00')
 
     def test_android_cusa01740_requires_metadata_and_explicit_720p(self):
-        # 1740 仅开放 01.00 的明确选择，不凭目录名猜测身份或默认开启补丁。
+        # 1740 按明确身份和版本选择，不凭目录名猜测或默认开启补丁。
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)
             status = patch_profile_status(path)

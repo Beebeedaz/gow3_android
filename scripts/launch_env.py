@@ -40,7 +40,7 @@ def derive(game, config, state_path, env, *, out=None, base_dmem=5056):
         updates[f'{key}_SOURCE'] = 'override' if key in env else 'android-safe-default'
 
     identity = patch_profile_status(game)
-    profile = game_profile(identity['title_id'])
+    profile = game_profile(identity['title_id'], app_version=identity['app_version'])
     extra = env.get('GOW3_PATCHES', '')
     requested = [n.strip() for n in extra.split(';') if n.strip()]
     names, disabled = [], None

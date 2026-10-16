@@ -176,7 +176,7 @@ PATCHES_DIR=Path(__file__).resolve().parent.parent/'patches'
 # Title ID 与 APP_VER 决定候选资格；每项特征码决定实际适用性。
 GAMES=[({title},PATCHES_DIR/f'God_of_War_III_Remastered_{title}.xml',version,'God of War III')
        for title,version in (('CUSA01623','01.02'), ('CUSA01715','01.02'),
-                             ('CUSA01720','01.02'), ('CUSA01740','01.00'))]
+                             ('CUSA01720','01.02'), ('CUSA01740','01.00'), ('CUSA01740','01.02'))]
 # The build the built-in Address values and third-party patch files are written for.
 REFERENCE_SHA256='d85c8135d330c3b601bf5dc3f1dd86bd6119fb8a9fce372bed2c9785f9a79299'
 DMEM_RETAIL_MB=5056  # runtime_memory.c POOL_SIZE default
@@ -197,15 +197,16 @@ def game_title_id(game):
     return game_sfo(game).get('TITLE_ID')
 
 
-def game_profile(title_id, title=None):
-    """只按明确的 Title ID 识别；保留 title 参数兼容已有调用方。"""
-    return next((g for g in GAMES if title_id in g[0]),None)
+def game_profile(title_id, title=None, *, app_version=None):
+    """按 Title ID 和版本选目录；未知版本保留默认记录，由身份门禁明确拒绝。"""
+    profiles=[g for g in GAMES if title_id in g[0]]
+    return next((g for g in profiles if g[2]==app_version), profiles[0] if profiles else None)
 
 
 def game_profile_for(game):
     """读取 SFO 的明确 Title ID，不根据目录名或标题文本猜测。"""
     values=game_sfo(game) if game else {}
-    return game_profile(values.get('TITLE_ID'),values.get('TITLE'))
+    return game_profile(values.get('TITLE_ID'),values.get('TITLE'),app_version=values.get('APP_VER'))
 
 
 def eboot_sha256(game):
@@ -225,7 +226,7 @@ def patch_profile_status(game):
     """只读身份预检查；位点尚未扫描，eligible 不等于 validated。"""
     title=game_title_id(game)
     version=game_app_version(game)
-    profile=game_profile(title)
+    profile=game_profile(title,app_version=version)
     result={'title_id':title,'app_version':version,'supported':bool(profile and version==profile[2]),
             'eboot_sha256':None,'eboot_matches':None,'patch_sites_match':None,'reason':None}
     result['eboot_sha256']=eboot_sha256(game)
@@ -414,7 +415,7 @@ def compile_plan(game, out, names=None, *, extra='', only=False, requested=None,
     reason=identity['reason']
     if reason=='missing-or-unreadable-eboot':
         raise ValueError(reason)
-    profile=game_profile(identity['title_id'])
+    profile=game_profile(identity['title_id'],app_version=identity['app_version'])
     disabled=reason if reason!='eligible' else disabled_reason
     requested=list(requested if requested is not None else
                    (names if names is not None else filter(None,(n.strip() for n in extra.split(';')))))

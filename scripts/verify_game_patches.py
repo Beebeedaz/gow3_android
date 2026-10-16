@@ -47,7 +47,7 @@ def verify(game, out):
         link_modules.link(game, out)
         content_profile.prepare(game, out)
         result['prepared'] = True
-        profile = patches.game_profile(identity['title_id'])
+        profile = patches.game_profile(identity['title_id'], app_version=identity['app_version'])
         available = patches.available_patches(profile[1], profile[2])
         texture_fix = graphics_options.TEXTURE_FIX in available
         for name in sorted(available):

@@ -157,7 +157,7 @@ class PatchCatalogTest {
 
     @Test fun `update version is authoritative and unrelated updates are rejected`() {
         val base = game("base", "CUSA01740", "01.00")
-        val newer = game("update", "CUSA01740", "01.02")
+        val newer = game("update", "CUSA01740", "01.03")
         val wrong = game("wrong", "CUSA01715", "01.02")
         for ((update, expected) in listOf(newer to CatalogProblem.VERSION, wrong to CatalogProblem.INVALID_UPDATE)) {
             val error = assertThrows(PatchCatalogException::class.java) {
@@ -176,6 +176,19 @@ class PatchCatalogTest {
                 PatchCatalog.parse(it, "CUSA01715", "01.00")
             }
         }
-        assertThrows(IllegalArgumentException::class.java) { catalog(version = "01.02") }
+        assertThrows(IllegalArgumentException::class.java) { catalog(version = "01.03") }
+    }
+
+    @Test fun `1740 update 0102 keeps all patches and mobile profiles available`() {
+        val base = game("CUSA01740", "CUSA01740", "01.00")
+        val update = game("CUSA01740-patch", "CUSA01740", "01.02")
+        val loaded = PatchCatalog.load(base, update) { File(catalogs, it).inputStream() }
+        assertEquals("01.02", loaded.appVersion)
+        assertEquals(14, loaded.patches.size)
+        assertEquals(catalog().patches.map { it.name }, loaded.patches.map { it.name })
+        assertTrue(loaded.patches.all { it.validation == "offline-matched" })
+        assertEquals(4, com.gow3.android.data.MobilePresets.available(loaded).size)
+        assertTrue(loaded.selected(native + ("patches_CUSA01740_01_00" to "Skip Intro")).isEmpty())
+        assertEquals(setOf("Skip Intro"), loaded.selected(native + (loaded.selectionKey to "Skip Intro")))
     }
 }

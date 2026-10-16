@@ -105,12 +105,37 @@ class Android1740Tests(unittest.TestCase):
                 self.assertEqual(result['patch_report']['effective']['render_resolution'], 'native')
 
     def test_other_versions_and_titles_are_rejected(self):
-        for title, version, reason in [('CUSA01740', '01.02', 'unsupported-app-version'),
+        for title, version, reason in [('CUSA01740', '01.03', 'unsupported-app-version'),
                                        ('CUSA99999', '01.00', 'unsupported-title')]:
             make_game(self.root, title, version)
             result = self.launch()
             self.assertEqual(result['patch_report']['reason'], reason)
             self.assertEqual(result['patch_report']['write_count'], 0)
+
+    def test_update_overlay_uses_0102_catalog_and_scoped_selection(self):
+        from game_update import create_view, remove_view
+        from test_game_update import make_sfo
+        update = self.root / 'update'
+        (update / 'sce_sys').mkdir(parents=True)
+        (update / 'sce_sys/param.sfo').write_bytes(make_sfo([
+            ('TITLE_ID', 'CUSA01740'), ('APP_VER', '01.02')]))
+        (update / 'eboot.bin').write_bytes((self.game / 'eboot.bin').read_bytes())
+        view = create_view(self.game, update, self.root / 'views')
+        self.addCleanup(remove_view, view)
+        self.assertEqual(patches.game_profile_for(view)[2], '01.02')
+        self.config.write_text('render_resolution=720p\nengine_fps=60\n'
+                               'patches_CUSA01740_01_00=Disable Bloom\n'
+                               'patches_CUSA01740_01_02=Skip Intro\n')
+        result = derive(view, self.config, self.out / 'state.json', {}, out=self.out)
+        self.assertEqual(result['identity']['app_version'], '01.02')
+        self.assertEqual(set(result['patch_names']), {RES720, 'Skip Intro'})
+        self.assertEqual(result['patch_report']['skipped'], {})
+        self.assertEqual(result['patch_report']['write_count'], 13)
+        self.assertEqual(patches.selected_patches(self.xml, '01.02', ''), [])
+        for name in patches.available_patches(self.xml, '01.02'):
+            report, writes = patches.compile_plan(view, self.out, [name])
+            self.assertEqual(report['skipped'], {})
+            self.assertTrue(writes, name)
 
     def test_external_patches_stay_disabled_even_for_reference_hash(self):
         with mock.patch.object(patches, 'REFERENCE_SHA256', patches.eboot_sha256(self.game)), \

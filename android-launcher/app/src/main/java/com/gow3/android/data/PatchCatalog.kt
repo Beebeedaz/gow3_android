@@ -71,7 +71,10 @@ internal data class PatchCatalog(val titleId: String, val appVersion: String, va
 
     companion object {
         private const val TEXTURE = "Bug Fix - Texture Corruption Fix"
-        private val versions = mapOf("CUSA01623" to "01.02", "CUSA01715" to "01.02", "CUSA01720" to "01.02", "CUSA01740" to "01.00")
+        private val versions = mapOf(
+            "CUSA01623" to setOf("01.02"), "CUSA01715" to setOf("01.02"),
+            "CUSA01720" to setOf("01.02"), "CUSA01740" to setOf("01.00", "01.02"),
+        )
 
         fun load(game: File?, update: File?, open: (String) -> InputStream): PatchCatalog {
             if (game == null) throw PatchCatalogException(CatalogProblem.NO_GAME)
@@ -87,7 +90,7 @@ internal data class PatchCatalog(val titleId: String, val appVersion: String, va
             val title = effective["TITLE_ID"] ?: throw PatchCatalogException(CatalogProblem.INVALID_GAME)
             val version = effective["APP_VER"] ?: throw PatchCatalogException(CatalogProblem.INVALID_GAME)
             if (title !in versions) throw PatchCatalogException(CatalogProblem.UNSUPPORTED)
-            if (version != versions[title]) throw PatchCatalogException(CatalogProblem.VERSION)
+            if (version !in versions.getValue(title)) throw PatchCatalogException(CatalogProblem.VERSION)
             return open("God_of_War_III_Remastered_$title.xml").use { parse(it, title, version) }
         }
 
