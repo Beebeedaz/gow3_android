@@ -23,6 +23,12 @@ aapt=${GOW3_AAPT:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}/build-tools/35.
 
 "$project/gradlew" -p "$project" :app:assembleDebug
 [[ -f $apk ]] || { echo "build_kotlin_launcher: APK was not generated" >&2; exit 1; }
+if [[ ${GOW3_BIONIC:-0} == 1 ]]; then
+    # Bionic：glibc bridge（libfxdisplay/libfxio）与 glibc runtime-manifest 校验不适用；
+    # APK 校验由 build_bionic_debug_apk.sh 的 Bionic 分支完成。
+    echo "Built $apk (Bionic)"
+    exit 0
+fi
 [[ -x $aapt ]] || { echo "build_kotlin_launcher: missing aapt: $aapt" >&2; exit 1; }
 python3 tools/android/apk/validate_release_apk.py "$apk" \
     --aapt "$aapt" --allow-debuggable \

@@ -153,44 +153,49 @@ internal fun HomeScreen(
         LaunchParameters(gameDir, updateDir, iniValues, ::save, onChooseGameFolder, onChooseUpdateFolder,
             catalog, catalogLoading, ::applyPreset)
         Spacer(Modifier.height(16.dp))
-        FrameGenerationCard(
-            state = dllState,
-            notice = notice,
-            onImport = {
-                losslessDlls.launchPicker { result ->
-                    when (result) {
-                        is ImportResult.Success -> {
-                            refreshDll()
-                            toast(context.getString(R.string.home_imported_fmt, LosslessDllManager.FILE_NAME, formatBytes(result.state.sizeBytes)))
+        // gow3port: LSFG 运行时能力已废除（Bionic 迁移，见 openspec change
+        // migrate-android-runtime-to-bionic）。「Steam 下载 LSFG / 导入 LSFG」入口保留代码、
+        // 仅隐藏（不删除文件、不产生帧生成行为），供未来插帧方案复用。恢复时打开下面的调用。
+        if (false) {
+            FrameGenerationCard(
+                state = dllState,
+                notice = notice,
+                onImport = {
+                    losslessDlls.launchPicker { result ->
+                        when (result) {
+                            is ImportResult.Success -> {
+                                refreshDll()
+                                toast(context.getString(R.string.home_imported_fmt, LosslessDllManager.FILE_NAME, formatBytes(result.state.sizeBytes)))
+                            }
+                            ImportResult.Cancelled -> refreshDll()
+                            is ImportResult.Failed -> toast(result.message)
                         }
-                        ImportResult.Cancelled -> refreshDll()
-                        is ImportResult.Failed -> toast(result.message)
                     }
-                }
-            },
-            onSteam = {
-                // Steam 下载成功后（该构建不含 Steam 时则由 stub 自行提示）回到这里刷新，
-                // 让完成的下载无需重新进入页面即可显示。
-                onGetFromSteam { _, message ->
-                    refreshDll()
-                    toast(message)
-                }
-            },
-            onRemove = {
-                when (val result = losslessDlls.remove()) {
-                    is RemoveResult.Done -> {
+                },
+                onSteam = {
+                    // Steam 下载成功后（该构建不含 Steam 时则由 stub 自行提示）回到这里刷新，
+                    // 让完成的下载无需重新进入页面即可显示。
+                    onGetFromSteam { _, message ->
                         refreshDll()
-                        toast(
-                            if (result.gameFolderRemains)
-                                context.getString(R.string.home_removed_game_folder_copy)
-                            else
-                                context.getString(R.string.home_removed_fmt, LosslessDllManager.FILE_NAME),
-                        )
+                        toast(message)
                     }
-                    is RemoveResult.Failed -> toast(result.message)
-                }
-            },
-        )
+                },
+                onRemove = {
+                    when (val result = losslessDlls.remove()) {
+                        is RemoveResult.Done -> {
+                            refreshDll()
+                            toast(
+                                if (result.gameFolderRemains)
+                                    context.getString(R.string.home_removed_game_folder_copy)
+                                else
+                                    context.getString(R.string.home_removed_fmt, LosslessDllManager.FILE_NAME),
+                            )
+                        }
+                        is RemoveResult.Failed -> toast(result.message)
+                    }
+                },
+            )
+        }
         Spacer(Modifier.height(24.dp))
     }
 }

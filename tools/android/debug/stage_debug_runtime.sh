@@ -10,6 +10,12 @@ set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "$0")" && pwd)
 cd -- "$script_dir/../../.."
 
+# Bionic 运行时（NDK/Bionic 原生进程，无 rootfs）：显式 GOW3_BIONIC=1，或 out/bionic 已构建时
+# 自动选择（Gradle 的 preDebugBuild hook 不传 GOW3_BIONIC，用文件存在性判断最稳）。
+if [[ ${GOW3_BIONIC:-0} == 1 || -x out/bionic/bin/gow3-probe ]]; then
+    exec bash "$script_dir/stage_bionic_runtime.sh"
+fi
+
 if [[ ${GOW3_REBUILD_DEBUG_RUNTIME:-0} == 1 || ! -f out/debug/runtime.tar.gz ]]; then
     # The debug runtime reuses the locally built Turnip/LSFG. build_release_runtime.py
     # --profile debug reads them from .local-deps/android/{turnip,turnip-gen8,lsfg}, so stage

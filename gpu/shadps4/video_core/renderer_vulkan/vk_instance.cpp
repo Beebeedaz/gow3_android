@@ -258,8 +258,13 @@ bool Instance::CreateDevice() {
     };
 
     // Required
+#ifndef __ANDROID__
+    // gow3port: Bionic 的 swapchain 是 AHardwareBuffer（vk_swapchain_ahb.h），不经过 VkSurfaceKHR /
+    // VkSwapchainKHR，所以 Bionic 不要求这个扩展。Turnip 这类嵌入式驱动干脆不暴露它：把它当硬要求
+    // 会让它们连实例都建不起来，而它们其实完全能跑我们的 AHB 路径。
     ASSERT_MSG(add_extension(VK_KHR_SWAPCHAIN_EXTENSION_NAME),
                "Required Vulkan extension unavailable: {}", VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+#endif
     ASSERT_MSG(add_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME),
                "Required Vulkan extension unavailable: {}", VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
     ASSERT_MSG(add_extension(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME),
@@ -275,6 +280,24 @@ bool Instance::CreateDevice() {
                "Required Vulkan feature unavailable: robustImageAccess2");
     ASSERT_MSG(robustness2_features.nullDescriptor,
                "Required Vulkan feature unavailable: nullDescriptor");
+
+#ifdef __ANDROID__
+    // Bionic 的 swapchain 是 vk_swapchain_ahb.h（VkSwapchainKHR 在直连加载的 Android 驱动上不
+    // 可用），它把 AHardwareBuffer 导入成 VkImage，并把 present/acquire 的信号量导成 sync file。
+    // 这些入口只在对应扩展被启用时才从 vkGetDeviceProcAddr 取到：没启用时取到的是 nullptr，
+    // 直接调用会跳到地址 0（SIGSEGV at RIP 0），所以这里必须启用并当作硬要求。
+    ASSERT_MSG(add_extension("VK_ANDROID_external_memory_android_hardware_buffer"),
+               "Required Vulkan extension unavailable: VK_ANDROID_external_memory_android_hardware_buffer "
+               "(the AHardwareBuffer swapchain cannot import the app's buffers)");
+    ASSERT_MSG(add_extension(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME),
+               "Required Vulkan extension unavailable: VK_KHR_external_semaphore_fd "
+               "(the AHardwareBuffer swapchain cannot hand fences to the app)");
+    // VK_QUEUE_FAMILY_FOREIGN_EXT（vk_swapchain_ahb.h 的 AcquireQueues/ReleaseQueues 用它把图像
+    // 的所有权在 Android 合成器与本进程之间交接）需要这个扩展；没有它就没有 FOREIGN 队列族。
+    ASSERT_MSG(add_extension(VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME),
+               "Required Vulkan extension unavailable: VK_EXT_queue_family_foreign "
+               "(the AHardwareBuffer swapchain cannot hand image ownership to the compositor)");
+#endif
 
     // Optional
     maintenance_5 = add_extension(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);

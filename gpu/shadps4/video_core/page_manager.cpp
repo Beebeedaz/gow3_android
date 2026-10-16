@@ -23,6 +23,10 @@
 #include <windows.h>
 #endif
 
+// gow3port: Bionic 没有 PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP，LockType 回退到 SpinLock，
+// 因此这里直接包含 spin_lock.h（glibc 靠其它头文件传递引入，Bionic 没有）。
+#include "common/spin_lock.h"
+
 #ifdef __linux__
 #include <thread>
 #include <fcntl.h>

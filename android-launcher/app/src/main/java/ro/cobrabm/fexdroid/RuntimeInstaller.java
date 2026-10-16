@@ -64,6 +64,26 @@ final class RuntimeInstaller {
     }
 
     private static void validateRuntime(File root) throws Exception {
+        File manifest = path(root, "runtime-manifest.json");
+        if (!manifest.isFile()) throw new IllegalStateException("Runtime archive is incomplete: manifest");
+        String text = new String(Files.readAllBytes(manifest.toPath()), StandardCharsets.UTF_8);
+        if (!text.contains("\"schema_version\": 1") ||
+                !text.contains("\"application_id\": \"com.gow3.android\"") ||
+                !text.contains("\"java_package\": \"ro.cobrabm.fexdroid\""))
+            throw new IllegalStateException("Runtime archive is incompatible: manifest identity");
+        // Bionic 运行时（NDK/Bionic 原生进程，无 rootfs/X11/LSFG）：gow3port/bionic。
+        if (path(root, "gow3port/bionic/bin/gow3-probe").isFile()) {
+            requireExecutable(root, "gow3port/bionic/bin/gow3-probe");
+            requireExecutable(root, "gow3port/bionic/bin/kgsl-chip-id");
+            requireExecutable(root, "gow3port/run-bionic.sh");
+            requireDirectory(root, "home/gow3port");
+            if (path(root, "bbport/rootfs").exists() || path(root, "gow3port/rootfs").exists())
+                throw new IllegalStateException("Runtime archive has an invalid nested rootfs layout");
+            if (!path(root, "gow3port/bionic/lib/libgow3cpu.so").isFile() ||
+                    !path(root, "gow3port/bionic/lib/libgow3gpu.so").isFile())
+                throw new IllegalStateException("Runtime archive is incomplete: Bionic ARM64 libraries");
+            return;
+        }
         requireExecutable(root, "rootfs/bin/sh");
         requireExecutable(root, "rootfs/usr/bin/Xvfb");
         requireExecutable(root, "rootfs/usr/libexec/fxshmd");
@@ -78,13 +98,6 @@ final class RuntimeInstaller {
         if (!path(root, "gow3port/arm64/lib/libgow3cpu.so").isFile() ||
                 !path(root, "gow3port/arm64/lib/libgow3gpu.so").isFile())
             throw new IllegalStateException("Runtime archive is incomplete: ARM64 libraries");
-        File manifest = path(root, "runtime-manifest.json");
-        if (!manifest.isFile()) throw new IllegalStateException("Runtime archive is incomplete: manifest");
-        String text = new String(Files.readAllBytes(manifest.toPath()), StandardCharsets.UTF_8);
-        if (!text.contains("\"schema_version\": 1") ||
-                !text.contains("\"application_id\": \"com.gow3.android\"") ||
-                !text.contains("\"java_package\": \"ro.cobrabm.fexdroid\""))
-            throw new IllegalStateException("Runtime archive is incompatible: manifest identity");
         if (!path(root, "gow3port/arm64/lsfg/liblsfg-vk.so").isFile() ||
                 !path(root, "gow3port/arm64/lsfg/VkLayer_LS_frame_generation.json").isFile())
             throw new IllegalStateException("Runtime archive is incomplete: LSFG layer");
@@ -107,6 +120,8 @@ final class RuntimeInstaller {
         File port = new File(files, "gow3port");
         File home = new File(files, "home");
         File manifest = new File(files, "runtime-manifest.json");
+        // Bionic 运行时没有 rootfs：stage 里不存在就不提升新的（旧的 glibc rootfs 仍被清掉）。
+        boolean stagedRoot = new File(stage, "rootfs").exists();
         boolean movedRoot = false, movedPort = false, movedHome = false, movedManifest = false;
         boolean installedRoot = false, installedPort = false, installedHome = false, installedManifest = false;
         try {
@@ -114,9 +129,11 @@ final class RuntimeInstaller {
             if (port.exists()) { renameRequired(port, oldPort, "gow3port"); movedPort = true; }
             if (home.exists()) { renameRequired(home, oldHome, "home"); movedHome = true; }
             if (manifest.exists()) { renameRequired(manifest, oldManifest, "manifest"); movedManifest = true; }
-            if (!new File(stage, "rootfs").renameTo(root))
-                throw new IllegalStateException("Cannot promote runtime rootfs");
-            installedRoot = true;
+            if (stagedRoot) {
+                if (!new File(stage, "rootfs").renameTo(root))
+                    throw new IllegalStateException("Cannot promote runtime rootfs");
+                installedRoot = true;
+            }
             if (!new File(stage, "gow3port").renameTo(port))
                 throw new IllegalStateException("Cannot promote gow3port");
             installedPort = true;

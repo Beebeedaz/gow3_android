@@ -33,6 +33,11 @@ void SetLoading(bool active, u32 done, u32 total);
 /// Background cache warm-up: a small corner note while the game runs; `total` 0 hides it.
 void SetBackgroundLoading(u32 done, u32 total);
 
+/// True once the ImGui Vulkan backend came up. False after a failed Init: there is no ImGui
+/// context then, so nothing may call ImGui::GetIO(), and a dialog the player would have to read
+/// cannot be shown - callers must refuse instead of opening an invisible one.
+bool Available();
+
 /// Whether anything is drawn this frame (menu open or FPS counter on).
 bool Visible();
 
@@ -52,6 +57,9 @@ void PublishPad(u32 buttons);
 u32 PadEdges();
 /// Present thread: handles the Android/injected R3+L2 shortcut, which has no SDL events.
 void PollMenuShortcut();
+/// Present thread (Bionic only): feeds pad-state edges into the open menu as ImGui gamepad
+/// keys (no SDL event stream; see gow3_overlay.cpp).
+void PollMenuPad();
 
 /// The game's save list: shown until the player chooses (arrows/D-pad, Enter/Cross) or
 /// cancels (Esc/Circle). `pictures`: one per item (empty = none), drawn beside its text.

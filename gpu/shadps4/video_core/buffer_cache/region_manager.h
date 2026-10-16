@@ -17,6 +17,9 @@
 #else
 #include "common/spin_lock.h"
 #endif
+// gow3port: Bionic 是 __unix__ 但没有 PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP，LockType 回退到
+// SpinLock，因此这里无条件包含 spin_lock.h（glibc 靠 adaptive_mutex.h 传递引入）。
+#include "common/spin_lock.h"
 #include "common/debug.h"
 #include "common/types.h"
 #include "video_core/buffer_cache/region_definitions.h"

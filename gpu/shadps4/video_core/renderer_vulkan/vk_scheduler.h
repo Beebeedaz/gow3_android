@@ -75,11 +75,23 @@ struct SubmitInfo {
     u32 num_signal_semas;
 
     void AddWait(vk::Semaphore semaphore, u64 tick = 1) {
+        // A null handle is not a valid VkSemaphore: it reaches vkQueueSubmit as an entry of
+        // pWaitSemaphores and the driver dereferences it (Adreno faults at vkQueueSubmit+0x102dc0,
+        // address 0x108). The AHB swapchain hands out a null acquire semaphore on the first use of
+        // a buffer - the one frame that needs no wait - so drop those instead of submitting them.
+        // Dropping keeps the arrays consistent: num_wait_semas does not grow, so wait_ticks and
+        // the timeline submit info's waitSemaphoreValueCount stay paired with the handles.
+        if (semaphore == vk::Semaphore{}) {
+            return;
+        }
         wait_semas[num_wait_semas] = semaphore;
         wait_ticks[num_wait_semas++] = tick;
     }
 
     void AddSignal(vk::Semaphore semaphore, u64 tick = 1) {
+        if (semaphore == vk::Semaphore{}) {
+            return;
+        }
         signal_semas[num_signal_semas] = semaphore;
         signal_ticks[num_signal_semas++] = tick;
     }
