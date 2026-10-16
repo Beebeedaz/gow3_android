@@ -62,6 +62,12 @@ the whole project serves this one game. The project forks the
 [deadinside28's bloodborne_pc](https://github.com/deadinside28/bloodborne_pc), and includes
 God of War III fixes from [cuesta4's shadPS4 fork](https://github.com/cuesta4/shadPS4)
 (see [Acknowledgments](#acknowledgments)).
+The direct foundation of this project is `gow3_pc`; for the Android adaptation, it also draws
+from parts of the implementation of [ducvd89's Bloodborne-Android](https://github.com/ducvd89/Bloodborne-Android),
+including the runtime, system services, input, logging, and launcher. Bloodborne-Android is an
+important Android reference project, but it is not this project's direct parent project.
+The project also uses parts of the Android / FEX-related implementation from
+[fexdroid](https://github.com/cobrabm12/fexdroid).
 
 > [!IMPORTANT]
 > **This project contains no game files.** You need game files dumped from your own PS4
@@ -136,6 +142,7 @@ project:
 - **cuesta4**: [shadPS4 fork focused on God of War III Remastered](https://github.com/cuesta4/shadPS4) (branch `eltutz`). This port uses its GNM hybrid rewrite, depth/stencil state, and image alias fixes.
 - **shadPS4 team**: [shadPS4](https://github.com/shadps4-emu/shadPS4) renderer.
 - **fexdroid**: [fexdroid](https://github.com/cobrabm12/fexdroid).
+- **ducvd89**: [Bloodborne-Android](https://github.com/ducvd89/Bloodborne-Android), whose Android runtime, system services, input, logging, and launcher implementations were referenced and partially ported here.
 
 Patches: kvicken and cuesta4 (resolution, texture fixes, 120 FPS, and video skipping, based on
 illusion0001's PS3 patches), published in shadPS4's

@@ -239,6 +239,37 @@ static void sample_host(PadData *d) {
 static struct { uint32_t buttons; int stick[4]; int trigger[2]; int touch_side; } injected={0,{-1,-1,-1,-1},{-1,-1},-1};
 static int replay_armed;      /* 1 while a GOW3_PAD_REPLAY recording plays, 2 once it ended */
 static uint64_t replay_start; /* 0: (re)start at the next sample */
+/* 非 quiet 时把注入的按键状态解码为可读按钮名并只在状态变化时打印一行；首帧总是打印。
+ * GOW3_PAD_QUIET=1（Android 默认，见 run-gow3.sh）时完全静默，避免每帧改写 pad 文件
+ * 造成的刷屏淹没真正要看的报错；静音只影响日志输出，不影响手柄注入本身。 */
+static void log_pad_state(void) {
+    static int quiet = -1; /* -1 未探测 */
+    static uint32_t last_buttons; static int last_stick[4], last_trigger[2]; static int have_last;
+    if (quiet < 0) {
+        const char *q = getenv("GOW3_PAD_QUIET");
+        quiet = (q && q[0] == '1') ? 1 : 0;
+    }
+    if (quiet) return;
+    if (have_last && injected.buttons == last_buttons &&
+        injected.stick[0] == last_stick[0] && injected.stick[1] == last_stick[1] &&
+        injected.stick[2] == last_stick[2] && injected.stick[3] == last_stick[3] &&
+        injected.trigger[0] == last_trigger[0] && injected.trigger[1] == last_trigger[1]) return;
+    have_last = 1;
+    last_buttons = injected.buttons;
+    for (int i = 0; i < 4; ++i) last_stick[i] = injected.stick[i];
+    last_trigger[0] = injected.trigger[0]; last_trigger[1] = injected.trigger[1];
+    char names[160] = "";
+    for (size_t i = 0; i < sizeof(ps_names) / sizeof(*ps_names); ++i) {
+        if (injected.buttons & ps_names[i].ps) {
+            if (names[0]) strncat(names, " ", sizeof(names) - strlen(names) - 1);
+            strncat(names, ps_names[i].name, sizeof(names) - strlen(names) - 1);
+        }
+    }
+    printf("Runtime: pad file: buttons %s sticks %d %d %d %d l2=%d r2=%d\n",
+           names[0] ? names : "none",
+           injected.stick[0], injected.stick[1], injected.stick[2], injected.stick[3],
+           injected.trigger[0], injected.trigger[1]);
+}
 static void read_inject(void) {
     static const char *path; static int checked; static uint64_t last_check; static struct timespec mtime;
     if (!checked) { path=getenv("GOW3_PAD_FILE"); checked=1; }
@@ -277,9 +308,7 @@ static void read_inject(void) {
         for (int i=0;i<2;++i) if (!strncmp(token,triggers[i],3)) { int v=atoi(token+3); injected.trigger[i]=v<0 ? 0 : v>255 ? 255 : v; }
     }
     fclose(f);
-    printf("Runtime: pad file: buttons 0x%x sticks %d %d %d %d l2=%d r2=%d\n",injected.buttons,
-           injected.stick[0],injected.stick[1],injected.stick[2],injected.stick[3],
-           injected.trigger[0],injected.trigger[1]);
+    log_pad_state();
 }
 /* GOW3_PAD_RECORD=<file>: F9 starts and stops recording the pad state (gamepad or keyboard) with
  * the time since F9; GOW3_PAD_REPLAY=<file> plays such a recording back, started by the token

@@ -766,6 +766,15 @@ public final class GameActivity extends Activity {
         new File(BASE,"lsfg-fallback.marker").delete();
         pickRefreshRate();
         new File(BASE,"ime.request").delete(); new File(BASE,"ime.request.result").delete();
+        // 上一轮日志保留一代：写新的 android-game.log 前把旧的轮转为 android-game.prev.log，
+        // 使崩溃日志在重启后不丢，并随日志导出一起打包。轮转失败时忽略，照常写新日志。
+        File logDir=new File(DATA,"logs");
+        File gameLog=new File(logDir,"android-game.log"), previous=new File(logDir,"android-game.prev.log");
+        if (gameLog.isFile()) {
+            if (previous.exists()) previous.delete();
+            if (!gameLog.renameTo(previous))
+                android.util.Log.w("God of War III","log rotation: could not rename android-game.log to android-game.prev.log");
+        }
         try {
             Process launched=process(ROOT+"/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
                 ROOT+"/bin/sh",BASE+"/run-gow3.sh","game"); game=launched;

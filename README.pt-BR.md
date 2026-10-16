@@ -52,6 +52,12 @@ Vulkan (ligados à GPU Adreno pelo driver Turnip). Não é um emulador genérico
 baseia no [bloodborne_pc de deadinside28](https://github.com/deadinside28/bloodborne_pc) e traz as
 correções de God of War III do [fork do shadPS4 de cuesta4](https://github.com/cuesta4/shadPS4)
 (veja os [Créditos](#créditos)).
+O fundamento direto deste projeto é o `gow3_pc`; para a adaptação Android, também foram usados como
+referência e portados alguns componentes do [Bloodborne-Android de ducvd89](https://github.com/ducvd89/Bloodborne-Android),
+incluindo runtime, serviços do sistema, entrada, logs e launcher. O Bloodborne-Android é uma referência
+importante para a parte Android, mas não é o projeto pai direto deste port.
+O projeto também usa partes da implementação relacionada a Android / FEX do
+[fexdroid](https://github.com/cobrabm12/fexdroid).
 
 > **Nenhum arquivo do jogo está incluído.** Você precisa de arquivos do jogo extraídos do seu
 > próprio PS4 (testados atualmente com CUSA01740, versão 01.02). Este projeto não tem relação com
@@ -130,7 +136,9 @@ FelipePrado0:
   (branch `eltutz`). Este port usa dele a regravação de blends da GNM, o estado de profundidade e
   stencil e as correções de imagens que compartilham memória.
 - **Equipe do shadPS4**: o renderizador do [shadPS4](https://github.com/shadps4-emu/shadPS4).
-- **fexdroid**: [fexdroid](https://github.com/cobrabm12/fexdroid)
+- **fexdroid**: [fexdroid](https://github.com/cobrabm12/fexdroid).
+- **ducvd89**: [Bloodborne-Android](https://github.com/ducvd89/Bloodborne-Android), cujas implementações de runtime Android,
+  serviços do sistema, entrada, logs e launcher foram usadas como referência e parcialmente portadas para este projeto.
 
 Patches: kvicken e cuesta4 (resolução, correção de texturas, 120 FPS e pular vídeos, a partir dos
 patches de PS3 de illusion0001), publicados para o shadPS4 em

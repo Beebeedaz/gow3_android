@@ -45,6 +45,10 @@
 fork 自 [R-V-L 移植版](https://github.com/R-V-L/gow3_pc)，后者基于
 [deadinside28 的 bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)，并合入了
 [cuesta4 的 shadPS4 分支](https://github.com/cuesta4/shadPS4) 中针对战神 III 的修复。
+本项目的直接基础是 `gow3_pc`；在 Android 适配层参考并移植了部分
+[ducvd89 的 Bloodborne-Android](https://github.com/ducvd89/Bloodborne-Android) 实现，包括运行时、系统服务、
+输入、日志和启动器等部分。因此，`Bloodborne-Android` 是本项目 Android 侧的重要参考来源，但并不是本项目的直接父项目。
+同时，本项目也使用了 [fexdroid](https://github.com/cobrabm12/fexdroid) 的部分 Android / FEX 相关实现。
 
 > [!IMPORTANT]
 > **本项目不包含任何游戏文件。** 你需要使用从自己的 PS4 导出的游戏文件（当前测试目标为 CUSA01740，
@@ -110,10 +114,12 @@ Android 端仍在真机验证中，暂无稳定的性能数据。
 本项目 fork 自 R-V-L 的 Linux 移植版，后者又源自 FelipePrado0 的原创项目：
 
 - **deadinside28**：[bloodborne_pc](https://github.com/deadinside28/bloodborne_pc)，最初的原生移植。
-- **gow3_pc**（R-V-L）：[bloodborne_pc for Windows](https://github.com/R-V-L/gow3_pc)，本项目所基于的分支。
+- **gow3_pc**（R-V-L）：[gow3_pc](https://github.com/R-V-L/gow3_pc)，本项目所基于的分支。
 - **cuesta4**：[专注于 God of War III Remastered 的 shadPS4 分支](https://github.com/cuesta4/shadPS4)（分支 `eltutz`）。
 - **shadPS4 团队**：[shadPS4](https://github.com/shadps4-emu/shadPS4) 渲染器。
 - **fexdroid**：[fexdroid](https://github.com/cobrabm12/fexdroid)。
+- **ducvd89**：[Bloodborne-Android](https://github.com/ducvd89/Bloodborne-Android)。本项目在 Android 适配层
+  参考并移植了其中运行时、系统服务、输入、日志和启动器等部分实现。
 
 此外还使用了：[LibAtrac9](https://github.com/Thealexbarney/LibAtrac9)、[FFmpeg](https://ffmpeg.org)、
 [SDL3](https://github.com/libsdl-org/SDL)、[Dear ImGui](https://github.com/ocornut/imgui)、
