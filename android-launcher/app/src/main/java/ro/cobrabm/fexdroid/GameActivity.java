@@ -58,7 +58,7 @@ public final class GameActivity extends Activity {
     private LinearLayout drawerItems;
     private TextView status;
     private View resume;
-    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem;
+    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem, swapFaceItem;
     private TouchControllerOverlay controllerOverlay;
     private PadBridge pad;
     private AudioBridge audio;
@@ -88,7 +88,8 @@ public final class GameActivity extends Activity {
             getWindow().setAttributes(attrs);
         }
         displayOnly="x".equals(getIntent().getStringExtra("action"));
-        pad=new PadBridge(new File(BASE,"android-pad.state"));
+        pad=new PadBridge(new File(BASE,"android-pad.state"),
+            getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("swap_square_triangle",false));
         audio=new AudioBridge(new File(BASE,"audio.fifo"));
         buildScreen();
         immersive();
@@ -228,6 +229,14 @@ public final class GameActivity extends Activity {
             controllerOverlay.release();
             closeDrawer();
         });
+        // 部分物理手柄按印刷标签上报 X/Y 轴,方块/三角与常见手柄相反;这一行即时切换交换,
+        // 只影响物理手柄,不影响触屏虚拟按键。
+        swapFaceItem=menuItem("ic_gamepad","Swap Square/Triangle (some gamepads)","",() -> {
+            boolean on=!swapFaceEnabled();
+            getSharedPreferences("gow3",MODE_PRIVATE).edit().putBoolean("swap_square_triangle",on).apply();
+            if (pad!=null) pad.setSwapFaceButtons(on);
+            closeDrawer();
+        });
         menuItem("ic_edit","Edit controller layout","Drag and resize the buttons",() -> {
             getSharedPreferences("gow3",MODE_PRIVATE).edit().putBoolean("controller_overlay",true).apply();
             closeDrawer();
@@ -343,6 +352,7 @@ public final class GameActivity extends Activity {
             : lsfgOn ? lsfg+"× frames · flow "
             +(setting("lsfg_flow_scale")==null ? "1.0" : setting("lsfg_flow_scale")) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
+        setDetail(swapFaceItem,swapFaceEnabled() ? "On" : "Off");
     }
 
     private void openDrawer() {
@@ -442,6 +452,9 @@ public final class GameActivity extends Activity {
     }
     private boolean controllerEnabled() {
         return getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("controller_overlay",false);
+    }
+    private boolean swapFaceEnabled() {
+        return getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("swap_square_triangle",false);
     }
     @Override protected void onPause() {
         if (controllerOverlay!=null) controllerOverlay.release();
