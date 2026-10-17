@@ -40,6 +40,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.gow3.android.R
 import com.gow3.android.data.Gow3Data
 import com.gow3.android.data.Gow3Ini
+import com.gow3.android.data.DriverManager
+import com.gow3.android.data.DriverEntry
 import com.gow3.android.data.ImportResult
 import com.gow3.android.data.LosslessDllManager
 import com.gow3.android.data.RemoveResult
@@ -70,6 +72,10 @@ internal fun HomeScreen(
     var catalog by remember { mutableStateOf<PatchCatalog?>(null) }
     var catalogLoading by remember { mutableStateOf(true) }
     var catalogRevision by remember { mutableIntStateOf(0) }
+    // 驱动卡片的重扫信号：回到前台 / 目录变化 / 本页写入选择时都会递增。
+    var driverRevision by remember { mutableIntStateOf(0) }
+    // 启动配置卡驱动下拉的数据：每次 revision 递增（前台/目录变化/本页写入）重扫磁盘。
+    var driverEntries by remember { mutableStateOf(emptyList<DriverEntry>()) }
     val prefs = remember(context) { context.getSharedPreferences("gow3", Context.MODE_PRIVATE) }
 
     fun refreshDll() {
@@ -92,6 +98,7 @@ internal fun HomeScreen(
             catalog = null
             catalogLoading = true
             catalogRevision++
+            driverRevision++
         }
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == "game_dir" || key == "update_dir") refreshSettings()
@@ -110,6 +117,10 @@ internal fun HomeScreen(
         }
     }
 
+    LaunchedEffect(driverRevision) {
+        driverEntries = withContext(Dispatchers.IO) { DriverManager.scan(context.filesDir) }
+    }
+
     LaunchedEffect(gameDir, updateDir, catalogRevision) {
         catalog = null
         catalogLoading = true
@@ -121,11 +132,13 @@ internal fun HomeScreen(
         catalogLoading = false
     }
 
-    fun saveUpdates(updates: Map<String, String>) {
-        if (Gow3Ini.write(gow3IniFile(context), updates)) {
+    fun saveUpdates(updates: Map<String, String>): Boolean {
+        return if (Gow3Ini.write(gow3IniFile(context), updates)) {
             iniValues = loadIni(context)
+            true
         } else {
             Toast.makeText(context, context.getString(R.string.settings_save_failed), Toast.LENGTH_SHORT).show()
+            false
         }
     }
 
@@ -133,6 +146,14 @@ internal fun HomeScreen(
         val currentCatalog = catalog ?: return
         if (preset !in MobilePresets.available(currentCatalog)) return
         saveUpdates(MobilePresets.updates(preset, currentCatalog, loadIni(context)))
+    }
+
+    /** 驱动选择：写 `gpu_driver=` 键（系统驱动写 auto），与 run-bionic.sh 的解析契约一致。 */
+    fun selectDriver(id: String?, displayName: String) {
+        if (saveUpdates(mapOf(DriverManager.INI_KEY to (id ?: DriverManager.SYSTEM_VALUE)))) {
+            toast(context.getString(R.string.driver_pick_selected_fmt, displayName))
+        }
+        driverRevision++
     }
 
     ScreenColumn(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -143,7 +164,12 @@ internal fun HomeScreen(
         LaunchButton(onStartGame)
         Spacer(Modifier.height(20.dp))
         LaunchParameters(gameDir, updateDir, iniValues, onChooseGameFolder, onChooseUpdateFolder,
-            catalog, catalogLoading, ::applyPreset)
+            catalog, catalogLoading, ::applyPreset, driverEntries, gameDir != null) { id ->
+            // 下拉只回传 id：展示名从扫描结果解析（系统驱动回退到本地化文案）。
+            val name = id?.let { picked -> driverEntries.firstOrNull { it.id == picked }?.name }
+                ?: context.getString(R.string.driver_card_system)
+            selectDriver(id, name)
+        }
         Spacer(Modifier.height(16.dp))
         // gow3port: LSFG 运行时能力已废除（Bionic 迁移，见 openspec change
         // migrate-android-runtime-to-bionic）。「Steam 下载 LSFG / 导入 LSFG」入口保留代码、

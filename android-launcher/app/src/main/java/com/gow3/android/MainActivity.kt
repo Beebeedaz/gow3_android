@@ -49,7 +49,13 @@ class MainActivity : ComponentActivity() {
                 LauncherScreen(
                     onStartGame = {
                         if (gameFolderManager.hasGameFolder()) {
-                            startActivity(Intent(this, ro.cobrabm.fexdroid.GameActivity::class.java))
+                            // action=launch：GameActivity 的单次启动踢动标记。没有它，
+                            // surfaceCreated 只记录 holder、等一个永不到来的用户动作，
+                            // 启动流程（runtime 解包 → 游戏进程）不会开始。
+                            startActivity(
+                                Intent(this, ro.cobrabm.fexdroid.GameActivity::class.java)
+                                    .putExtra("action", "launch"),
+                            )
                         }
                     },
                     losslessDlls = losslessDllManager,

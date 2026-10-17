@@ -29,14 +29,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gow3.android.R
+import com.gow3.android.data.DriverEntry
 import com.gow3.android.data.MobilePreset
 import com.gow3.android.data.MobilePresets
 import com.gow3.android.data.PatchCatalog
 import com.gow3.android.ui.components.LauncherColors
 
 /**
- * Home 页的「启动配置」卡片：只承载游戏目录/更新目录选择与默认配置（DEFAULT PROFILE）
- * 预设选择。启动参数的就地编辑全部位于 Settings tab（见 change add-android-launcher-config-tab）。
+ * Home 页的「启动配置」卡片：承载游戏目录/更新目录选择、默认配置（DEFAULT PROFILE）
+ * 预设选择与 GPU 驱动下拉。启动参数的就地编辑全部位于 Settings tab
+ * （见 change add-android-launcher-config-tab），驱动管理（列表/删除/导入/下载/加速）
+ * 位于 Settings DRIVER 分类（见 change add-android-launcher-driver-manager）。
  */
 @Composable
 internal fun LaunchParameters(
@@ -48,6 +51,9 @@ internal fun LaunchParameters(
     catalog: PatchCatalog?,
     catalogLoading: Boolean,
     applyPreset: (MobilePreset) -> Unit,
+    driverEntries: List<DriverEntry>,
+    driverEnabled: Boolean,
+    onDriverSelected: (String?) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -111,6 +117,7 @@ internal fun LaunchParameters(
             color = LauncherColors.textMuted, fontSize = 11.sp, lineHeight = 16.sp,
         )
         MobilePresetSelector(catalog, ini, applyPreset)
+        DriverSelector(ini, driverEntries, driverEnabled, onDriverSelected)
     }
 }
 
@@ -148,5 +155,65 @@ private fun MobilePresetSelector(catalog: PatchCatalog?, ini: Map<String, String
         }
         Text(stringResource(R.string.mobile_preset_description), color = LauncherColors.textMuted,
             fontSize = 11.sp, lineHeight = 16.sp)
+    }
+}
+
+/**
+ * GPU 驱动下拉（spec：首页展示与选择驱动）：款式与 [MobilePresetSelector] 一致，
+ * 菜单项 =「系统驱动」兜底 + 各有效驱动包（名称 · 版本），选中经 [onSelected] 写
+ * `gow3.ini` 的 `gpu_driver=`。无游戏目录时下拉禁用并以 footer 提示。
+ */
+@Composable
+private fun DriverSelector(
+    ini: Map<String, String>,
+    entries: List<DriverEntry>,
+    enabled: Boolean,
+    onSelected: (String?) -> Unit,
+) {
+    val valid = entries.filter { it.valid }
+    // 指向失效/已删除包的选择按「系统驱动」回退展示（spec：驱动包失效后显示回退）。
+    val selectedId = com.gow3.android.data.DriverManager.selectedId(ini)
+    val selectedEntry = valid.firstOrNull { it.id == selectedId }
+    var expanded by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.driver_card_title), color = LauncherColors.gold,
+            fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Box {
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                    .background(LauncherColors.navSurface)
+                    .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)), RoundedCornerShape(8.dp))
+                    .clickable(enabled = enabled) { expanded = true }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val current = selectedEntry?.let { it.name + if (it.version.isBlank()) "" else "  ·  ${it.version}" }
+                    ?: stringResource(R.string.driver_card_system)
+                Text(current, modifier = Modifier.weight(1f),
+                    color = if (enabled) LauncherColors.textPrimary else LauncherColors.textMuted,
+                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text("▾", color = LauncherColors.textMuted)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.driver_card_system)) }, onClick = {
+                    expanded = false
+                    onSelected(null)
+                })
+                valid.forEach { entry ->
+                    DropdownMenuItem(
+                        text = { Text(entry.name + if (entry.version.isBlank()) "" else "  ·  ${entry.version}") },
+                        onClick = {
+                            expanded = false
+                            onSelected(entry.id)
+                        },
+                    )
+                }
+            }
+        }
+        Text(
+            if (enabled) stringResource(R.string.driver_card_footer)
+            else stringResource(R.string.driver_card_needs_game_folder),
+            color = LauncherColors.textMuted, fontSize = 11.sp, lineHeight = 16.sp,
+        )
     }
 }

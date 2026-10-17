@@ -150,8 +150,15 @@ internal fun SettingsScreen() {
                     when (entry) {
                         is SettingsEntry.Param -> ParamRow(entry.param, iniValues, ::save)
                         is SettingsEntry.Card -> {
-                            // 功能卡 slot：内容由对应功能的 change 注册（design D2）；
-                            // 首版无激活 slot，渲染为空，占位可见输出交给占位文案。
+                            // 功能卡 slot：内容由对应功能的 change 注册（design D2）。
+                            // 目前仅 driver_manager 有内容；未注册的 slot 渲染为空。
+                            if (entry.slotId == "driver_manager") {
+                                DriverManagerCard(
+                                    ini = iniValues,
+                                    hasGameDir = gameDir != null,
+                                    onIniChanged = { iniValues = loadIni(context) },
+                                )
+                            }
                         }
                     }
                 }

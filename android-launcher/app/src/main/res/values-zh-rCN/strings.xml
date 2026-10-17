@@ -248,4 +248,59 @@
     <string name="mods_details">查看说明</string>
     <string name="mods_hide_details">收起说明</string>
     <string name="mods_author">作者：%1$s</string>
+
+    <!-- 驱动管理卡片（Home 选择 + Settings DRIVER 分类） -->
+    <string name="driver_card_title">GPU 驱动</string>
+    <string name="driver_card_system">系统驱动</string>
+    <string name="driver_card_footer">切换在下次启动游戏时生效。更多驱动可在 设置 → 驱动 中下载。</string>
+    <string name="driver_card_needs_game_folder">请先选择游戏目录，之后才能切换驱动。</string>
+    <string name="driver_pick_selected_fmt">已选择 %1$s，下次启动游戏时生效。</string>
+
+    <string name="driver_manager_title">GPU 驱动</string>
+    <string name="driver_manager_system_fmt">系统驱动（%1$s）</string>
+    <string name="driver_manager_stock">自带</string>
+    <string name="driver_manager_version_fmt">版本 %1$s</string>
+    <string name="driver_manager_author_fmt">作者：%1$s</string>
+    <string name="driver_manager_library_fmt">驱动库：%1$s</string>
+    <string name="driver_manager_invalid">不可用——缺少驱动库文件</string>
+    <string name="driver_manager_delete">删除</string>
+    <string name="driver_manager_confirm_delete_fmt">删除 %1$s？该驱动包将从应用私有目录中移除。</string>
+    <string name="driver_manager_deleted_fmt">已删除 %1$s。</string>
+    <string name="driver_manager_deleted_fallback_fmt">已删除 %1$s，并回退到系统驱动。</string>
+    <string name="dialog_cancel">取消</string>
+    <string name="driver_manager_download">下载驱动</string>
+    <string name="driver_manager_import">导入驱动</string>
+    <string name="driver_manager_network">下载加速</string>
+    <string name="driver_manager_needs_game_folder">请先选择游戏目录，之后才能更改驱动。</string>
+    <string name="driver_manager_footer">驱动包保存在应用私有目录，运行链在下次启动时经 gow3.ini 解析加载。</string>
+
+    <string name="driver_dl_title">下载驱动</string>
+    <string name="driver_dl_sources_unavailable">内置驱动源列表无法加载。</string>
+    <string name="driver_dl_loading">加载中…</string>
+    <string name="driver_dl_empty">该源下没有可下载的驱动包。</string>
+    <string name="driver_dl_failed_network">无法连接 GitHub，请检查网络后重试。</string>
+    <string name="driver_dl_failed_rate_limit">GitHub 访问频率受限，请稍后再试。</string>
+    <string name="driver_dl_failed_http_fmt">请求失败（HTTP %1$d）。</string>
+    <string name="driver_dl_retry">重试</string>
+    <string name="driver_dl_downloaded">已下载</string>
+    <string name="driver_dl_download">下载</string>
+    <string name="driver_dl_downloading_fmt">正在下载 %1$s… %2$s / %3$s</string>
+    <string name="driver_dl_unknown_size">大小未知</string>
+    <string name="driver_dl_cancel">取消</string>
+    <string name="driver_dl_done_fmt">已安装 %1$s，它已出现在驱动列表中。</string>
+    <string name="driver_dl_failed_install">下载的包不是可用的驱动包，已丢弃。</string>
+    <string name="driver_dl_failed_download">下载失败，请重试。</string>
+    <string name="driver_dl_close">关闭</string>
+
+    <string name="driver_px_title">下载加速</string>
+    <string name="driver_px_direct">直连</string>
+    <string name="driver_px_custom">自定义镜像前缀</string>
+    <string name="driver_px_active_fmt">生效：%1$s</string>
+    <string name="driver_px_direct_label">直连</string>
+    <string name="driver_px_save">保存</string>
+    <string name="driver_px_speedtest">测速</string>
+    <string name="driver_px_testing">测速中…</string>
+    <string name="driver_px_ms_fmt">%1$d 毫秒</string>
+    <string name="driver_px_failed">失败</string>
+    <string name="driver_px_note">始终先直连 GitHub；失败且已配置镜像时，自动经该镜像重试一次。测速仅衡量各内置镜像的延迟。</string>
 </resources>

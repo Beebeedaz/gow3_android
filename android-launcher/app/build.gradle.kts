@@ -108,6 +108,9 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)
+    // 本地单测（无 Robolectric）需要真实的 org.json 实现：android.jar 里的 org.json
+    // 是会抛 "Stub!" 的桩。仅测试 classpath 使用，不进 APK。
+    testImplementation("org.json:json:20240303")
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
