@@ -1,10 +1,8 @@
-Native display and X11 input bridges: fexdroid
-https://github.com/cobrabm12/fexdroid
-Source revision 2b03ec73c3507b640fba1942fb8d99b43b88945a
-Reused unmodified from the verified fexdroid legacy APK. The developer-provided
-ARM64 extraction is recorded in tools/android/bridges/provenance.json; the
-source APK is not included in this repository. Verify the upstream fexdroid
-license before redistributing the extracted binaries.
+The native display and X11 input bridges from the fexdroid project
+(https://github.com/cobrabm12/fexdroid) were reused unmodified by earlier builds. They
+belonged to the retired glibc/proot runtime: the X11 display bridge is replaced by
+libgow3present, and the XTEST input bridge could never work under Bionic, which has no X
+server. Neither binary is part of this build any more.
 
 Turnip Vulkan driver: Mesa (MIT), https://gitlab.freedesktop.org/mesa/mesa
 commit 35b085c4c067f198ce0b6437d94678e47b9c645f, with fexdroid's Mesa patches
@@ -13,7 +11,10 @@ dbf9808b07570faf5aa912af16d4c4a1b5d0130f), under the fexdroid license below.
 Adreno 8xx variant: Mesa from https://github.com/whitebelyash/mesa-unified
 (turnip/gen8, commit 9c7e022677dfa3abb356c2b6732cbd2e25783d01, MIT), with
 upstream Mesa commits b889ab52, b7ad24ad, e984ef29, 6cb65e61 and the same
-fexdroid patches.
+fexdroid patches. The driver is not bundled in this APK: the game loads whichever
+pack the player installs under files/drivers/<name>, and the shipped default is the
+phone's own driver (gow3.ini: gpu_driver). tools/android/build/build_turnip.sh
+builds the main and Adreno 8xx variants for packaging as a driver pack.
 
 lsfg-vk 1.0.0 (gow3port/arm64/lsfg): Lossless Scaling frame generation on Linux,
 https://github.com/PancakeTAS/lsfg-vk (tag v1.0.0), MIT License, Copyright (c)
@@ -23,11 +24,14 @@ It includes dxbc from DXVK (zlib/libpng license; Copyright (c) 2017 Philip
 Rebohle, 2019 Joshua Ashton, 2019 Robin Kertels, 2023 Jeffrey Ellison),
 pe-parse (MIT, Copyright (c) 2013 Andrew Ruef), toml11 (MIT, Copyright (c) 2017
 Toru Niina) and volk (MIT, Copyright (c) 2018-2025 Arseny Kapoulkine).
-Lossless Scaling and its Lossless.dll are not included and are never
+Frame generation itself is not part of the Bionic runtime: the AHB swapchain
+loads no LSFG layer, and the launcher's FRAME GENERATION entry is disabled.
+Lossless Scaling and its Lossless.dll are also not included and are never
 redistributed with this app: the player supplies their own copy, either by
 importing the file on the launcher Home page (FRAME GENERATION, IMPORT .DLL)
 or by signing in to Steam below. The app only stores it in its own private
-folder.
+folder. tools/android/build/build_lsfg.sh remains for packaging the module
+separately where that is wanted.
 
 Steam sign-in (downloads Lossless.dll from the player's own Lossless Scaling):
 JavaSteam 1.8.0 (MIT, https://github.com/Longi94/JavaSteam), with Kotlin and

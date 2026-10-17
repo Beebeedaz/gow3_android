@@ -1,4 +1,5 @@
-// gow3: SDL3 window for the Vulkan swapchain (X11 or Wayland).
+// gow3: SDL3 window for the Vulkan swapchain (X11 or Wayland). Not built on Android (window_android.cpp).
+#ifndef __ANDROID__
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -234,3 +235,4 @@ void WindowSDL::UpdateCursor() {
 }
 
 } // namespace Frontend
+#endif // __ANDROID__

@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 
 #define PORTS 25
 #define ERR_NOT_OPENED ((int32_t)0x80260001)
@@ -68,9 +69,22 @@ static int sdl_audio(void) {
         const char *driver=getenv("SDL_AUDIO_DRIVER");
         android_disk=getenv("GOW3_ANDROID_INPUT") && !strcmp(getenv("GOW3_ANDROID_INPUT"),"1") &&
             driver && !strcmp(driver,"disk");
+        // SDL refuses SDL_InitSubSystem until the app has declared main() as its own: with
+        // SDL_MAIN_NEEDED (Android) SDL_MainIsReady starts false and the call fails with
+        // "Application didn't initialize properly, did you include SDL_main.h ...". probe's main()
+        // is the real entry point, so mark it ready before touching any SDL subsystem.
+        SDL_SetMainReady();
         sdl_ready = (!mode || strcmp(mode,"none")) && SDL_InitSubSystem(SDL_INIT_AUDIO);
         printf("Runtime: audio backend %s%s\n", sdl_ready ? SDL_GetCurrentAudioDriver() : "timer (silent)",
                android_disk ? " (Android PCM bridge: s16 stereo 48 kHz)" : "");
+        if (!sdl_ready) {
+            // Why it failed matters: with SDL_AUDIO_DRIVER=disk the sink is the app's FIFO. Report
+            // it on stderr - stdout is block-buffered into the log file and a fatal signal ends
+            // the process with _exit(), which drops whatever is still buffered.
+            fprintf(stderr, "Runtime: SDL audio init failed: %s (driver=%s, output=%s)\n",
+                    SDL_GetError(), driver ? driver : "(unset)",
+                    getenv("SDL_AUDIO_DISK_OUTPUT_FILE") ?: "(unset)");
+        }
     }
     return sdl_ready;
 }
@@ -120,14 +134,18 @@ static ABI int32_t audio_open(int32_t user, int32_t type, int32_t index, uint32_
     p->used=1; p->type=type; p->channels=channels[format]; p->is_float=format>=3 && format!=6;
     p->sample_bytes=p->is_float ? 4 : 2; p->frames=(int)length; p->std_layout=format>=6;
     sdl_audio();
+    // The app's FIFO sink is what makes the game audible on Android. If SDL could not open it, the
+    // port used to be refused outright, and the guest faulted during start-up right after this
+    // refusal (null handle + 8). Silently keeping the port on the timer sink is not a fix for the
+    // missing sink, but a game that is out of audio can still reach its main menu, and the port
+    // stays consistent with what the guest thinks it opened.
+    if (android_disk && !sdl_ready) {
+        fprintf(stderr,"Runtime: Android audio sink unavailable; port %d falls back to the silent "
+                       "timer sink\n",id);
+        android_disk = 0;
+    }
     p->output_channels=android_disk ? 2 : p->channels;
     p->output_sample_bytes=android_disk ? 2 : p->sample_bytes;
-    if (android_disk && !sdl_ready) {
-        fprintf(stderr,"Runtime: Android audio backend unavailable; refusing silent port %d\n",id);
-        p->used=0; pthread_mutex_destroy(&p->lock);
-        pthread_mutex_unlock(&table_lock);
-        return ERR_NOT_OPENED;
-    }
     for (int c=0;c<8;++c) p->volume[c]=VOLUME_0DB;
     if (sdl_ready) {
         SDL_AudioSpec spec={android_disk ? SDL_AUDIO_S16 : (p->is_float ? SDL_AUDIO_F32 : SDL_AUDIO_S16),
@@ -137,10 +155,11 @@ static ABI int32_t audio_open(int32_t user, int32_t type, int32_t index, uint32_
         else fprintf(stderr,"Runtime: SDL audio stream failed (%s); port %d uses the timer sink (type %d, %d ch)\n",
                      SDL_GetError(),id,type,p->channels);
         if (android_disk && !p->stream) {
-            fprintf(stderr,"Runtime: Android audio stream unavailable; refusing silent port %d\n",id);
-            p->used=0; pthread_mutex_destroy(&p->lock);
-            pthread_mutex_unlock(&table_lock);
-            return ERR_NOT_OPENED;
+            // Same reasoning as above: no FIFO stream. Stay on the timer sink instead of taking the
+            // port back, so the guest keeps a usable audio handle.
+            fprintf(stderr,"Runtime: Android audio stream unavailable; port %d falls back to the "
+                           "silent timer sink\n",id);
+            android_disk = 0;
         }
     }
     p->stats=getenv("GOW3_AUDIO_STATS")!=NULL;

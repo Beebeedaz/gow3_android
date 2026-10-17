@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <time.h>
 #ifdef _WIN32
 #include <windows.h>
@@ -110,7 +111,16 @@ void VideoOutDriver::SwapThread(std::stop_token token) {
             swap_queue.pop_front();
             swap_busy = true;
         }
-        work();
+        // GOW3_SKIP_PRESENT=1 drops the flip work instead of running it: the game keeps rendering and
+        // submitting draws, but nothing reaches the queue through the present path. Used to tell
+        // "the game's own rendering lost the device" apart from "our present submission did".
+        static const bool skip_present = [] {
+            const char* value = std::getenv("GOW3_SKIP_PRESENT");
+            return value && *value && std::strcmp(value, "1") == 0;
+        }();
+        if (!skip_present) {
+            work();
+        }
     }
 }
 

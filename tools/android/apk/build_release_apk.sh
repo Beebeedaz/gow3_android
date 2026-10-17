@@ -1,20 +1,40 @@
 #!/usr/bin/env bash
+# Build, sign and validate the Bionic Android release APK.
+#
+# Bionic replacement of the retired glibc packer: the payload is the Bionic runtime tree
+# assembled by tools/android/debug/stage_bionic_runtime.sh (no rootfs, no fexdroid bridges),
+# validated against tools/android/runtime/runtime-manifest.bionic.json by
+# tools/android/apk/validate_release_apk.py.
+#
+# Signing: GOW3_KEYSTORE + GOW3_KEYSTORE_PASSWORD / GOW3_KEY_ALIAS / GOW3_KEY_PASSWORD (CI,
+# see tools/android/prepare_signing.sh), or a generated local development key when none are
+# configured. The output lands in out/release/ with a sha256 file beside it.
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../../.."
 root=$PWD
 version=$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' android-launcher/app/build.gradle.kts)
-apk="out/release/God of War III-$version.apk"
-# Steam sign-in libraries (SteamDllDialog.java); fetched on demand like the fexdroid payload.
+apk="out/release/God of War III-bionic-$version.apk"
+
+# Steam sign-in libraries (SteamDllDialog.java); fetched on demand like the debug payload.
 [[ -f .local-deps/android/steam-libs/jars.txt ]] || bash tools/android/inputs/fetch_steam_libs.sh
-python3 tools/android/runtime/build_release_runtime.py
 
-# Stage the release runtime payload where the Kotlin launcher's release source set reads it
+# The Bionic runtime payload, into the release source set the Kotlin launcher reads
 # (android-launcher/app/build.gradle.kts: out/android-release/assets).
+out=out/bionic
+[[ -x $out/bin/gow3-probe ]] || {
+    echo "build_release_apk: the Bionic runtime is missing at $out/bin/gow3-probe." >&2
+    echo "  Build it first: bash tools/android/build_bionic.sh" >&2
+    exit 1
+}
+bash tools/android/debug/stage_bionic_runtime.sh
+# stage_bionic_runtime.sh stages into out/android-debug/assets (the debug source set); the release
+# source set reads out/android-release/assets, so mirror the two files across.
 mkdir -p out/android-release/assets
-cp out/release/runtime.tar.gz out/android-release/assets/runtime.payload
-cp out/release/runtime.sha256 out/android-release/assets/runtime.sha256
+cp out/android-debug/assets/runtime.payload out/android-release/assets/runtime.payload
+cp out/android-debug/assets/runtime.sha256 out/android-release/assets/runtime.sha256
 
-"$root/android-launcher/gradlew" -p "$root/android-launcher" :app:assembleRelease
+"$root/android-launcher/gradlew" -p "$root/android-launcher" \
+    :app:mergeReleaseJniLibFolders :app:assembleRelease --rerun-tasks
 unsigned="$root/android-launcher/app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk"
 [[ -f $unsigned ]] || { echo "build_release_apk: release APK was not generated: $unsigned" >&2; exit 1; }
 
@@ -53,10 +73,11 @@ mkdir -p out/release
 "$bt/apksigner" sign --ks "$key" --ks-key-alias "$key_alias" \
     --ks-pass "$ks_pass" --key-pass "$key_pass" \
     --out "$apk" "$unsigned"
-"$bt/apksigner" verify --verbose "$apk"
-"$bt/aapt" dump badging "$apk" | grep -F com.gow3.android >/dev/null
-unzip -l "$apk" | grep -F lib/arm64-v8a/ >/dev/null
-python3 tools/android/validate_release_apk.py "$apk" --aapt "$bt/aapt"
+"$bt/apksigner" verify --verbose "$apk" >/dev/null
+"$bt/aapt" dump badging "$apk" | grep -F com.gow3.android.bionic >/dev/null
+unzip -l "$apk" | grep -F lib/arm64-v8a/libgow3 >/dev/null
+python3 tools/android/apk/validate_release_apk.py "$apk" --aapt "$bt/aapt" \
+    --manifest tools/android/runtime/runtime-manifest.bionic.json
 (cd out/release && if command -v sha256sum >/dev/null; then
     sha256sum "$(basename "$apk")" > "$(basename "$apk").sha256"
 else

@@ -10,3 +10,12 @@ set_target_properties(gow3cpu PROPERTIES
   C_VISIBILITY_PRESET hidden
   CXX_VISIBILITY_PRESET hidden
   VISIBILITY_INLINES_HIDDEN TRUE)
+
+if(ANDROID)
+  # libc++（Bionic 唯一可用的 C++ 库）不满足 fextl::move_only_function 对 noexcept
+  # std::function 赋值的需求，而 FEXServerClient.cpp 依赖这一点。本库不跑 FEXServer，
+  # 因此把该文件从 FEX 的 Common 移出；链接阶段会告诉我们是否还有别处需要它。
+  get_target_property(gow3_common_sources Common SOURCES)
+  list(FILTER gow3_common_sources EXCLUDE REGEX "FEXServerClient\\.cpp$")
+  set_target_properties(Common PROPERTIES SOURCES "${gow3_common_sources}")
+endif()

@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
+#ifndef __ANDROID__ // Bionic: vk_swapchain_ahb.cpp
 
 #include <algorithm>
 #include <cstdio>
@@ -378,3 +379,4 @@ void Swapchain::SetupImages() {
 }
 
 } // namespace Vulkan
+#endif // __ANDROID__

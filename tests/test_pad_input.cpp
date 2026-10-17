@@ -44,5 +44,31 @@ int main() {
     // Buttons the list does not use (shoulders, sticks) never act.
     P::Map(0x400 | 0x800 | 0x2 | 0x4, move, finish); assert(move == 0 && finish == 0);
 
-    puts("PASS: pad snapshot edges, dialog reset, choice key mapping");
+    // ---- android-overlay-input-capture: 多来源去重（tasks 4.4）----
+    // Overlay 对话框有两个输入来源：SDL 事件（桌面/手柄）与 pad 状态注入（Android）。
+    // 去重契约分两层，各测其一：
+    //
+    //   a) pad 注入侧：一次按下只有一个边沿。就算 SDL 在同一轮采样里也报了确认
+    //      （HandleChoiceEvent -> ApplyChoiceAction），pad 侧再次采样同一电平也
+    //      不会产生第二个边沿——pad_seen 已跟上。这是同一轮"只计一次"的 pad 半边。
+    //   b) SDL 侧：ApplyChoiceAction 是唯一入口，且它关闭对话框（choice_active=false），
+    //      所以另一来源随后到达的同一动作会被路由门挡掉。这一半在 gow3_overlay.cpp 里，
+    //      依赖 ImGui 编译不了单测，靠 PollChoice/HandleEvent 的 choice_active 判断
+    //      与这里的 (a) 共同成立。
+    std::atomic<std::uint32_t> both{0};
+    // pad 先被采样，SDL 的确认随后到达：pad 只报一次边沿。
+    assert(P::Edges(P::kCross, both) == P::kCross);   // pad 注入确认
+    assert(P::Edges(P::kCross, both) == 0);           // 同一轮 SDL 再确认：无新边沿
+    assert(P::Edges(P::kCross, both) == 0);           // 持续按住也不重复
+    assert(P::Edges(0, both) == 0);                   // 释放
+    // SDL 先（对话框已被它关掉），pad 注入随后采样：同样只有一个边沿。
+    std::atomic<std::uint32_t> sdl_first{0};
+    assert(P::Edges(P::kCircle, sdl_first) == P::kCircle);
+    assert(P::Edges(P::kCircle, sdl_first) == 0);
+    // 对话框重开时 Forget 掉按住的键，两个来源各自的旧电平都不会变成新按下。
+    P::Forget(both, P::kCross);
+    assert(P::Edges(P::kCross, both) == 0);
+    assert(P::Edges(P::kCross | P::kDown, both) == P::kDown);
+
+    puts("PASS: pad snapshot edges, dialog reset, choice key mapping, multi-source dedup");
 }

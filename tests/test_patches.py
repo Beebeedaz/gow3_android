@@ -83,10 +83,10 @@ class GameProfileTests(unittest.TestCase):
                     self.assertEqual(m.get('isEnabled'), 'false')
                 for line in m.iter('Line'):
                     self.assertTrue(line.get('Pattern') or line.get('Target'))
-            for profile in ('runtime', 'debug'):
-                manifest = json.loads((ROOT / 'tools/android' / profile / 'runtime-manifest.json').read_text())
-                self.assertIn('gow3port/patches/' + xml.name,
-                              [item['path'] for item in manifest['required_paths']])
+            # The launcher compiles these on the device, so they must reach the APK as assets. The
+            # runtime payload deliberately does not carry them (libgow3prepare needs the XML, and
+            # libgow3present the socket), which is what test_android_1740_patches.py now asserts.
+            self.assertTrue(xml.is_file(), '%s is missing' % xml)
             files.add(xml)
         self.assertEqual(len(files), 4)
 

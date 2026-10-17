@@ -362,6 +362,12 @@ extern "C" int gow3gpu_overlay_captures_input(void) {
     return Gow3Overlay::CapturesInput() ? 1 : 0;
 }
 
+// C entry point like the others: libgow3gpu.so only exports C symbols to the runtime bridge, so a
+// plain Gow3Overlay::Available() would be an undefined symbol at load time.
+extern "C" int gow3gpu_overlay_available(void) {
+    return Gow3Overlay::Available() ? 1 : 0;
+}
+
 extern "C" int gow3gpu_vibration_percent(void) {
     return Gow3Settings::Get().vibration.load(std::memory_order_relaxed);
 }
@@ -375,6 +381,14 @@ extern "C" int gow3gpu_text_input_begin(const char* initial, const char* prompt)
 extern "C" int gow3gpu_choice_begin(const char* title, const char* const* items, const char* const* images,
                                     int count, int focus) {
     if (!g_window || count <= 0) return 0;
+    // The save list is shown as a dialog the player has to read. When the overlay could not come up
+    // the dialog would never be drawn while the game kept waiting for an answer and held its input
+    // neutral, so refuse here instead of opening a list nobody can see.
+    if (!gow3gpu_overlay_available()) {
+        LOG_ERROR(Lib_SaveDataDialog,
+                  "save list: the overlay is unavailable, refusing the dialog ({} entries)", count);
+        return 0;
+    }
     // Pictures are decoded here, on the game's thread, before the list is shown.
     std::vector<Gow3Png::Image> pictures(count);
     for (int i = 0; images && i < count; ++i) {

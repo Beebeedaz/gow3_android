@@ -30,3 +30,10 @@ patches.json
 local.properties
 .idea
 game
+
+# APK-side JNI libraries: built from android-launcher/app/src/main/jni by
+# tools/android/build_jni_libs.sh, which the APK build runs first. The two .so next to them
+# (libfxdisplay.so, libfxio.so) are not built here - they are extracted inputs recorded in
+# provenance.json - so they stay tracked.
+tools/android/bridges/arm64-v8a/libgow3present.so
+tools/android/bridges/arm64-v8a/libgow3prepare.so

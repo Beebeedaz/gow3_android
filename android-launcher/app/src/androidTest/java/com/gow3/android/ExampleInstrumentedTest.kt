@@ -19,6 +19,6 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // 被测应用的上下文。
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("com.gow3.android", appContext.packageName)
+        assertEquals("com.gow3.android.bionic", appContext.packageName)
     }
 }

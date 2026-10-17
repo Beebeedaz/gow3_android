@@ -14,7 +14,6 @@ from launch_env import derive
 from patch_fixtures import make_game, RES720, TEXTURE, STARTUP, FPS120
 from prepare import parse_self
 from test_prepare import fixture
-from texture_diagnostics import record
 
 
 class Android1740Tests(unittest.TestCase):
@@ -66,8 +65,9 @@ class Android1740Tests(unittest.TestCase):
         self.assertEqual((result['dmem'], result['vblank']), (7104, 60))
         self.assertEqual(result['updates']['GOW3_ENGINE_FPS'], '60')
         self.assertEqual(before, verify.input_digests(self.game))
-        data = record(self.root / 'diagnostics.json', report, env={})
-        self.assertEqual(data['render_resolution'], '720p')
+        # 诊断文件（texture_integrity.json）已随 glibc 退役移除；分辨率来自 report 本身，
+        # 由 Gow3Prepare 写进 patch_status.json 供日志与排查消费。
+        self.assertEqual(report['effective']['render_resolution'], '720p')
 
     def test_native_restart_replaces_previous_720p(self):
         first = self.launch()
@@ -197,11 +197,20 @@ class Android1740Tests(unittest.TestCase):
         self.assertEqual(report['reason'], 'patch-conflict')
         self.assertEqual(writes, [])
 
-    def test_android_manifests_require_the_1740_xml(self):
-        expected = 'gow3port/patches/' + self.xml.name
-        for profile in ('runtime', 'debug'):
-            manifest = json.loads((ROOT / 'tools/android' / profile / 'runtime-manifest.json').read_text())
-            self.assertIn(expected, [item['path'] for item in manifest['required_paths']])
+    def test_bionic_runtime_manifest_carries_the_runtime_not_the_patches(self):
+        # Under Bionic the runtime payload holds only the native runtime; the patch XML travels as an
+        # APK asset (android-launcher/app/build.gradle.kts: assets.srcDir("../../patches"), because
+        # libgow3prepare compiles it on the device. So the manifest no longer names the XML - what it
+        # must still name is the executable the launcher starts and its libraries.
+        manifest = json.loads(
+            (ROOT / 'tools/android' / 'runtime' / 'runtime-manifest.bionic.json').read_text())
+        paths = [item['path'] for item in manifest['required_paths']]
+        self.assertEqual(manifest['profile'], 'release-bionic')
+        for required in ('gow3port/bionic/bin/gow3-probe', 'gow3port/bionic/lib/libgow3gpu.so',
+                         'gow3port/bionic/lib/libgow3cpu.so', 'gow3port/run-bionic.sh'):
+            self.assertIn(required, paths)
+        self.assertEqual([p for p in paths if p.endswith('.xml')], [],
+                         'the Bionic runtime must not ship patch XML; it is an APK asset')
 
 
 if __name__ == '__main__':

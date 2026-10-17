@@ -611,6 +611,21 @@ Frame* Presenter::PrepareBlankFrame(bool present_thread) {
     return frame;
 }
 
+namespace {
+// The AHB swapchain hands image ownership to the Android compositor across queue families
+// (VK_QUEUE_FAMILY_FOREIGN_EXT). Whether that is correct on a given driver is worth being able to
+// A/B without a rebuild: GOW3_AHB_OWNERSHIP=0 keeps the layout transition but leaves both queue
+// families IGNORED, which is what the WSI swapchain does. A GPU fault that disappears with it
+// points at the ownership transfer rather than at the game.
+bool AhbOwnershipEnabled() {
+    static const bool enabled = [] {
+        const char* value = std::getenv("GOW3_AHB_OWNERSHIP");
+        return !(value && *value && std::strcmp(value, "0") == 0);
+    }();
+    return enabled;
+}
+} // namespace
+
 void Presenter::PresentLoadingFrame() {
     if (window.GetWidth() == 0 || window.GetHeight() == 0) {
         return;
@@ -630,8 +645,13 @@ void Presenter::PresentLoadingFrame() {
         .levelCount = 1,
         .layerCount = VK_REMAINING_ARRAY_LAYERS,
     };
+    // Queue families default to IGNORED (a plain layout change inside this queue); the AHB
+    // swapchain passes the real pair so the image is actually handed over to / taken back from
+    // the Android compositor (VK_QUEUE_FAMILY_FOREIGN_EXT), which VK_EXT_queue_family_foreign
+    // provides and vk_instance.cpp enables.
     const auto barrier = [&](vk::ImageLayout from, vk::ImageLayout to, vk::AccessFlags src,
-                             vk::AccessFlags dst) {
+                             vk::AccessFlags dst, u32 src_family = VK_QUEUE_FAMILY_IGNORED,
+                             u32 dst_family = VK_QUEUE_FAMILY_IGNORED) {
         cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
                                vk::PipelineStageFlagBits::eAllCommands, {}, {}, {},
                                vk::ImageMemoryBarrier{
@@ -639,26 +659,63 @@ void Presenter::PresentLoadingFrame() {
                                    .dstAccessMask = dst,
                                    .oldLayout = from,
                                    .newLayout = to,
-                                   .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                   .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                                   .srcQueueFamilyIndex = src_family,
+                                   .dstQueueFamilyIndex = dst_family,
                                    .image = image,
                                    .subresourceRange = range,
                                });
     };
-    barrier(vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, {},
-            vk::AccessFlagBits::eTransferWrite);
+    // Taking the image back from the app: it comes in PresentLayout(), owned by the FOREIGN queue
+    // family, and has to end up usable here - TransferDst for the loading frame's clear,
+    // ColorAttachmentOptimal for the frame that renders.
+    const auto acquire_from_app = [&](vk::ImageLayout to) {
+        const auto [src_family, dst_family] = AhbOwnershipEnabled() ? swapchain.AcquireQueues()
+                                                                   : std::pair<u32, u32>{
+                                                                         VK_QUEUE_FAMILY_IGNORED,
+                                                                         VK_QUEUE_FAMILY_IGNORED};
+        barrier(swapchain.PresentLayout(), to, vk::AccessFlagBits::eNone,
+                vk::AccessFlagBits::eColorAttachmentWrite, src_family, dst_family);
+    };
+    // Handing the finished image over: layout and ownership both change, so the app's compositor
+    // sees it as SHARED and waits on the present-ready fence.
+    const auto release_to_app = [&] {
+        const auto [src_family, dst_family] = AhbOwnershipEnabled() ? swapchain.ReleaseQueues()
+                                                                   : std::pair<u32, u32>{
+                                                                         VK_QUEUE_FAMILY_IGNORED,
+                                                                         VK_QUEUE_FAMILY_IGNORED};
+        barrier(vk::ImageLayout::eColorAttachmentOptimal, swapchain.PresentLayout(),
+                vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eNone, src_family,
+                dst_family);
+    };
+    acquire_from_app(vk::ImageLayout::eTransferDstOptimal);
     cmdbuf.clearColorImage(image, vk::ImageLayout::eTransferDstOptimal,
                            vk::ClearColorValue{std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}},
                            range);
     barrier(vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eColorAttachmentOptimal,
             vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eColorAttachmentWrite);
     Gow3Overlay::Render(cmdbuf, swapchain.ImageView(), extent);
-    barrier(vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
-            vk::AccessFlagBits::eColorAttachmentWrite, {});
+    release_to_app();
     SubmitInfo info{};
     info.AddWait(swapchain.GetImageAcquiredSemaphore());
     info.AddSignal(swapchain.GetPresentReadySemaphore());
+    // Same reason as in Present(): the AHB export in Swapchain::Present() needs the present-ready
+    // signal to be no longer pending, so give the submission a fence and wait on it below.
+    vk::Fence present_fence;
+    if (swapchain.NeedsSubmittedBeforePresent()) {
+        auto [fence_result, fence] = instance.GetDevice().createFence({});
+        ASSERT_MSG(fence_result == vk::Result::eSuccess, "Loading frame fence creation failed: {}",
+                   vk::to_string(fence_result));
+        present_fence = fence;
+        info.AddSignal(present_fence);
+    }
     present_scheduler.Flush(info);
+    if (present_fence) {
+        const auto waited = instance.GetDevice().waitForFences(present_fence, vk::True,
+                                                               std::numeric_limits<u64>::max());
+        instance.GetDevice().destroyFence(present_fence, nullptr);
+        ASSERT_MSG(waited == vk::Result::eSuccess,
+                   "Waiting before the AHB present export failed: {}", vk::to_string(waited));
+    }
     {
         std::scoped_lock submit_lock{Scheduler::submit_mutex};
         swapchain.Present();
@@ -729,14 +786,22 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
             .baseArrayLayer = 0,
             .layerCount = VK_REMAINING_ARRAY_LAYERS,
         };
+        // The swapchain image comes back from its consumer before this frame: on the AHB path the
+        // app's compositor left it in PresentLayout() and owns it in the FOREIGN queue family, so
+        // take it here (layout and ownership). A VkSwapchainKHR hands out a fresh image instead,
+        // and its AcquireQueues/PresentLayout answer with IGNORED / ePresentSrcKHR.
+        const auto [acquire_src, acquire_dst] = AhbOwnershipEnabled()
+                                                 ? swapchain.AcquireQueues()
+                                                 : std::pair<u32, u32>{VK_QUEUE_FAMILY_IGNORED,
+                                                                       VK_QUEUE_FAMILY_IGNORED};
         const std::array pre_barriers{
             vk::ImageMemoryBarrier{
                 .srcAccessMask = vk::AccessFlagBits::eNone,
                 .dstAccessMask = vk::AccessFlagBits::eTransferWrite,
-                .oldLayout = vk::ImageLayout::eUndefined,
+                .oldLayout = swapchain.PresentLayout(),
                 .newLayout = vk::ImageLayout::eTransferDstOptimal,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .srcQueueFamilyIndex = acquire_src,
+                .dstQueueFamilyIndex = acquire_dst,
                 .image = swapchain_image,
                 .subresourceRange = color_range,
             },
@@ -776,7 +841,7 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
                                          : vk::AccessFlagBits::eNone,
                 .oldLayout = vk::ImageLayout::eTransferDstOptimal,
                 .newLayout = overlay ? vk::ImageLayout::eColorAttachmentOptimal
-                                     : vk::ImageLayout::ePresentSrcKHR,
+                                     : swapchain.PresentLayout(),
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .image = swapchain_image,
@@ -798,19 +863,45 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
                                vk::DependencyFlagBits::eByRegion, {}, {}, post_barriers);
         if (overlay) {
             Gow3Overlay::Render(cmdbuf, swapchain.ImageView(), extent);
+            const auto [release_src, release_dst] = AhbOwnershipEnabled()
+                                                      ? swapchain.ReleaseQueues()
+                                                      : std::pair<u32, u32>{VK_QUEUE_FAMILY_IGNORED,
+                                                                        VK_QUEUE_FAMILY_IGNORED};
             const vk::ImageMemoryBarrier to_present{
                 .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
                 .dstAccessMask = vk::AccessFlagBits::eNone,
                 .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
-                .newLayout = vk::ImageLayout::ePresentSrcKHR,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .newLayout = swapchain.PresentLayout(),
+                .srcQueueFamilyIndex = release_src,
+                .dstQueueFamilyIndex = release_dst,
                 .image = swapchain_image,
                 .subresourceRange = color_range,
             };
             cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
                                    vk::PipelineStageFlagBits::eBottomOfPipe,
                                    vk::DependencyFlagBits::eByRegion, {}, {}, to_present);
+        } else {
+            // Without the overlay the post barrier above already left the image in
+            // PresentLayout(), but it did not hand ownership over. On the AHB path the image has
+            // to be owned by the FOREIGN queue family before the app's compositor uses it, and a
+            // queue-family release needs its own barrier (a release is always a separate write
+            // after the layout change above).
+            const auto [release_src, release_dst] = swapchain.ReleaseQueues();
+            if (release_src != release_dst) {
+                const vk::ImageMemoryBarrier hand_over{
+                    .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+                    .dstAccessMask = vk::AccessFlagBits::eNone,
+                    .oldLayout = swapchain.PresentLayout(),
+                    .newLayout = swapchain.PresentLayout(),
+                    .srcQueueFamilyIndex = release_src,
+                    .dstQueueFamilyIndex = release_dst,
+                    .image = swapchain_image,
+                    .subresourceRange = color_range,
+                };
+                cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
+                                       vk::PipelineStageFlagBits::eAllCommands,
+                                       vk::DependencyFlagBits::eByRegion, {}, {}, hand_over);
+            }
         }
     }
     if (EmulatorSettings.IsVkHostMarkersEnabled()) {
@@ -825,6 +916,18 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
     info.AddSignal(swapchain.GetPresentReadySemaphore());
     info.AddSignal(frame->present_done);
     scheduler.Flush(info);
+    // gow3: the AHB swapchain exports the present-ready semaphore as a sync file in Present()
+    // (vkGetSemaphoreFdKHR). Vulkan requires an exported semaphore to not be in use by the GPU,
+    // and right after Flush() its signal is still pending - exporting it there is a spec violation,
+    // and the Adreno driver answers it by losing the device (VK_ERROR_DEVICE_LOST on the next
+    // submit). The submission above signals frame->present_done, so wait for it here. A
+    // VkSwapchainKHR needs none of this, hence the swapchain's own answer.
+    if (swapchain.NeedsSubmittedBeforePresent()) {
+        const auto waited = instance.GetDevice().waitForFences(frame->present_done, vk::True,
+                                                               std::numeric_limits<u64>::max());
+        ASSERT_MSG(waited == vk::Result::eSuccess, "Waiting before the AHB present export failed: {}",
+                   vk::to_string(waited));
+    }
     // gow3：vkQueuePresentKHR 处的 Vulkan layer（Lossless Scaling 插帧，GOW3_LSFG，由 run-gow3.sh
     // 配合玩家自备的 Lossless.dll 加载 lsfg-vk）会等待上面这次提交所 signal 的 present-ready
     // 信号量。GOW3 有意不在应用侧为它加等待：

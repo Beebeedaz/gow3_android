@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
 
 /** God of War III-only Android player. Keeps the game surface alive beneath its sliding drawer. */
 public final class GameActivity extends Activity {
-    /** The app's files (application id com.gow3.android), its Linux rootfs and gow3port runtime.
+    /** The app's files (application id com.gow3.android.bionic) and its gow3port runtime tree.
      *  Rootfs programs are launched through the in-tree loader when their PT_INTERP slot cannot
      *  hold the app-private path. */
     private String FILES, ROOT, BASE, DATA;
@@ -62,12 +62,16 @@ public final class GameActivity extends Activity {
     private TouchControllerOverlay controllerOverlay;
     private PadBridge pad;
     private AudioBridge audio;
-    private volatile Process xvfb, game;
+    private volatile Process game;
     private volatile int shmid=-1;
     private volatile boolean destroyed;
-    /** run-gow3.sh 报告 LSFG 运行时失败并自动回退后置位：刷新率要退回「无 LSFG」的目标，避免
+    /** 报告 LSFG 运行时失败并自动回退后置位：刷新率要退回「无 LSFG」的目标，避免
      *  停在 LSFG 倍率对应的高刷新率上空跑（4.1 复评）。 */
     private volatile boolean lsfgFallbackOff;
+    /** Bionic 运行时（gow3port/bionic/bin/gow3-probe）存在时用 NDK/Bionic 原生路径：不经
+     *  帧走 GOW3_PRESENT_SOCKET（Gow3Present）。 */
+    /** Bionic 下 app 侧 present socket（run-bionic.sh 的 GOW3_PRESENT_SOCKET 同一个）。 */
+    private String presentSocket() { return FILES+"/gow3present.sock"; }
     private boolean drawerOpen, displayOnly, startingX, hadError, swipeConsumed;
     private float touchX, touchY;
     private boolean edgeGesture, imeOpen, imePolling;
@@ -122,32 +126,40 @@ public final class GameActivity extends Activity {
         screen.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> fitSurface(r-l,b-t));
         surface.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override public void surfaceCreated(SurfaceHolder h) {
-                if (shmid>=0) attach(h);
-                else if (!hasGame()) {
-                    // MainActivity owns the first-run game-folder check. Reaching this state means
-                    // the launcher was bypassed or the selected folder was removed while away.
+                // Surface 重建（熄屏、翻盖、旋转）只恢复画面连接，从不启动游戏：启动只发生在
+                // 用户动作的 startX 流程里。shmid 在游戏进程结束时复位，所以游戏退出后再熄屏
+                // 也不会在这里把整个游戏静默拉起来。
+                if (shmid>=0) attach(h, false);
+                else {
+                    // 不在这里启动游戏：surface 回调只记下 holder，等用户动作（LAUNCH/权限/选目录
+                    // -> startPending）发起 startX。否则游戏退出后一次熄屏/翻盖就会把整个游戏
+                    // 静默重启。MainActivity owns the first-run game-folder check；走到这说明
+                    // launcher 被绕过或所选目录已不在。
                     pendingHolder=h;
-                    error("Game folder is unavailable. Return to the launcher and choose it again.");
+                    if (!hasGame()) error("Game folder is unavailable. Return to the launcher and choose it again.");
                 }
-                else if (!startingX) { startingX=true; worker.execute(() -> startX(h)); }
             }
             @Override public void surfaceChanged(SurfaceHolder h,int format,int w,int height) {}
-            @Override public void surfaceDestroyed(SurfaceHolder h) { DisplayBridge.stop(); }
+            @Override public void surfaceDestroyed(SurfaceHolder h) {
+                // Do not close the frame connection here. A surface goes away for transient reasons
+                // too (screen off, folding, a resize); Gow3Present's own SurfaceHolder.Callback
+                // already handles this by handing the surface back with setSurface(null) and keeps
+                // the socket, so the game keeps running and the next surface resumes showing. The
+                // game treats a closed connection as "end of game" and exits immediately, so
+                // stopping here turned every surface loss into a crash back to the launcher. The
+                // legacy X11 bridge is gone from this build, so there is nothing left to stop.
+            }
         });
         surface.setOnTouchListener((v,e) -> {
-            if (shmid<0 || drawerOpen) return true;
-            XInput.moveTo(Math.round(e.getX()*1280/Math.max(1,v.getWidth())),
-                          Math.round(e.getY()*720/Math.max(1,v.getHeight())));
-            if (e.getActionMasked()==MotionEvent.ACTION_DOWN) XInput.button(1,true);
-            if (e.getActionMasked()==MotionEvent.ACTION_UP || e.getActionMasked()==MotionEvent.ACTION_CANCEL)
-                XInput.button(1,false);
+            // Touch reaches the game through the on-screen control overlay, not the retired X11
+            // input bridge.
             return true;
         });
         status=text("Starting God of War III…",18,0xffc6ad76); status.setGravity(Gravity.CENTER);
         screen.addView(status,frame(-1,-1,Gravity.CENTER));
         status.setClickable(false);
 
-        controllerOverlay=new TouchControllerOverlay(this,pad,"1".equals(setting("overlay_mouse")));
+        controllerOverlay=new TouchControllerOverlay(this,pad);
         controllerOverlay.setVisibility(controllerEnabled() ? View.VISIBLE : View.GONE);
         screen.addView(controllerOverlay,frame(-1,-1,Gravity.CENTER));
 
@@ -211,7 +223,7 @@ public final class GameActivity extends Activity {
             closeDrawer();
             new SettingsDialog(this,new File(DATA,"gow3.ini"),this::restartGame).show();
         });
-        // Tuning only. Supplying Lossless.dll is the launcher Home page's job (com.gow3.android);
+        // Tuning only. Supplying Lossless.dll is the launcher Home page's job;
         // the drawer's row reports the multiplier, never where the DLL came from. LSFG 是唯一帧生成
         // 路径，FSR 3.1 帧生成未接通，不要在这里再加 FSR 帧生成入口。
         losslessItem=menuItem("ic_frames","Lossless Scaling","",() -> {
@@ -357,7 +369,7 @@ public final class GameActivity extends Activity {
 
     private void openDrawer() {
         if (drawerOpen) return;
-        drawerOpen=true; controllerOverlay.release(); pad.reset(); XInput.button(1,false);
+        drawerOpen=true; controllerOverlay.release(); pad.reset();
         refreshDrawer();
         controllerOverlay.setVisibility(View.GONE);
         handle.setVisibility(View.GONE);
@@ -441,9 +453,6 @@ public final class GameActivity extends Activity {
         // 放到后面就永远轮不到这里。按下确认名字的那个键也不该同时进游戏。
         if (imeGamepad(e)) return true;
         if (pad.key(e)) return true;
-        if (shmid>=0 && e.getScanCode()>0 && e.getScanCode()+8<=255) {
-            XInput.key(e.getScanCode()+8,e.getAction()==KeyEvent.ACTION_DOWN); return true;
-        }
         return super.dispatchKeyEvent(e);
     }
     @Override public boolean dispatchGenericMotionEvent(MotionEvent e) {
@@ -474,24 +483,20 @@ public final class GameActivity extends Activity {
     private Process process(String... args) throws java.io.IOException {
         ProcessBuilder b=new ProcessBuilder(args).redirectErrorStream(true);
         Map<String,String> env=b.environment(); env.clear();
-        String target=args.length>1 && args[0].equals(ROOT+"/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1") ? args[1] : args[0];
-        env.put("PATH",ROOT+"/usr/bin:"+ROOT+"/bin:/system/bin");
-        env.put("HOME",FILES+"/home/gow3port"); env.put("LANG","C.UTF-8");
-        env.put("TMPDIR",ROOT+"/tmp"); env.put("XDG_RUNTIME_DIR",ROOT+"/tmp");
-        env.put("FXD_FILES",FILES); env.put("FXD_ROOT",ROOT); env.put("GOW3_ANDROID_INPUT","1");
-        // Keep native port libraries and rootfs libraries visible to the explicit rootfs loader.
-        env.put("LD_LIBRARY_PATH",BASE+"/arm64/lib:"+ROOT+"/usr/lib/aarch64-linux-gnu:"+ROOT+"/usr/lib");
-        // Its libc emulates SysV shared memory through fxshmd (started below).
-        env.put("FXD_SHM_SOCKET",ROOT+"/tmp/.fxshm/sock");
-        env.put("GOW3_DATA_DIR",DATA);
-        env.put("GOW3_CONFIG",DATA+"/gow3.ini");
-        env.put("GOW3_USER_DIR",DATA+"/user");
-        env.put("GOW3_LOG_DIR",DATA+"/logs");
-        env.put("GOW3_LOSSLESS_DLL",DATA+"/Lossless.dll");
+        // Bionic: no rootfs, so the environment is the platform's - toybox paths, the Bionic
+        // libraries, and the present socket.
+            env.put("PATH","/system/bin");
+            env.put("HOME",FILES+"/home/gow3port"); env.put("LANG","C.UTF-8");
+            env.put("TMPDIR",FILES+"/tmp"); env.put("XDG_RUNTIME_DIR",FILES+"/tmp");
+            env.put("FXD_FILES",FILES); env.put("GOW3_ANDROID_INPUT","1");
+            env.put("LD_LIBRARY_PATH",BASE+"/bionic/lib");
+            env.put("GOW3_PRESENT_SOCKET",presentSocket());
+            env.put("GOW3_DATA_DIR",DATA);
+            env.put("GOW3_CONFIG",DATA+"/gow3.ini");
+            env.put("GOW3_USER_DIR",DATA+"/user");
+            env.put("GOW3_LOG_DIR",DATA+"/logs");
         if (gameDir!=null) env.put("GOW3_GAME_DIR",gameDir);
         if (updateDir!=null) env.put("GOW3_PATCH_DIR",updateDir);
-        if (target.endsWith("/Xvfb")) env.put("LD_PRELOAD",ROOT+"/usr/lib/fexdroid/libfxpath.so");
-        env.put("LIBGL_DRIVERS_PATH",ROOT+"/usr/lib/aarch64-linux-gnu/dri");
         return b.start();
     }
     private void startX(SurfaceHolder holder) {
@@ -501,53 +506,30 @@ public final class GameActivity extends Activity {
             if (audio!=null) audio.start();
             if (audio==null || !audio.awaitReady(5000))
                 throw new java.io.IOException("Android audio bridge did not become ready; see logcat for details.");
-            if (!new File(ROOT,"usr/bin/Xvfb").canExecute() ||
-                    !new File(BASE,"arm64/bin/gow3-probe").canExecute() ||
-                    !new File(BASE,"run-gow3.sh").isFile())
-                throw new java.io.IOException("The God of War III runtime is missing. Install the runtime bundle.");
-            new File(FILES,"home/gow3port").mkdirs();
-            try (PrintWriter passwd=new PrintWriter(new File(ROOT,"etc/passwd"));
-                 PrintWriter group=new PrintWriter(new File(ROOT,"etc/group"))) {
-                int uid=android.os.Process.myUid();
-                passwd.println("root:x:0:0:root:/root:/bin/sh");
-                passwd.println("user:x:"+uid+":"+uid+":God of War III:"+FILES+"/home/gow3port:"+ROOT+"/bin/sh");
-                group.println("root:x:0:"); group.println("user:x:"+uid+":");
-            }
-            new File(ROOT,"tmp/.X0-lock").delete(); new File(ROOT,"tmp/.X11-unix/X0").delete();
-            // The shared memory daemon (Xvfb's frame, the display bridge): forks itself and stays.
-            Process shmd=process(ROOT+"/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
-                ROOT+"/usr/libexec/fxshmd","--dir",ROOT+"/tmp/.fxshm");
-            shmd.waitFor();
-            xvfb=process(ROOT+"/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
-                ROOT+"/usr/bin/Xvfb",":0","-screen","0","1280x720x24",
-                "-shmem","-ac","-nolisten","tcp","-pn");
-            Pattern ready=Pattern.compile("screen 0 shmid (\\d+)");
-            BufferedReader r=new BufferedReader(new InputStreamReader(xvfb.getInputStream()));
-            {
-                String line;
-                while ((line=r.readLine())!=null && !destroyed) {
-                    android.util.Log.i("God of War III-X11",line);
-                    Matcher m=ready.matcher(line);
-                    if (m.find()) {
-                        shmid=Integer.parseInt(m.group(1));
-                        main.post(() -> attach(holder));
-                        break;
-                    }
-                }
-                if (shmid<0) throw new java.io.IOException("The game display could not start.");
-                Thread drain=new Thread(() -> { try (BufferedReader reader=r) { while (reader.readLine()!=null) {} }
-                    catch (Exception ignored) {} },"X11-log");
-                drain.setDaemon(true); drain.start();
-            }
+            startXbionic(holder);
         } catch (Exception ex) { error(ex.toString()); }
     }
-    private void attach(SurfaceHolder holder) {
+    /** Bionic 运行时的显示路径：不启动 fxshmd/Xvfb，直接用 Gow3Present 把帧送到 Surface。 */
+    private void startXbionic(SurfaceHolder holder) {
+        try {
+            if (!new File(BASE,"bionic/bin/gow3-probe").canExecute() ||
+                    !new File(BASE,"run-bionic.sh").isFile())
+                throw new java.io.IOException("The Bionic runtime is missing. Install the runtime bundle.");
+            new File(FILES,"home/gow3port").mkdirs();
+            // present socket 由 Gow3Present 监听（run-bionic.sh 的 GOW3_PRESENT_SOCKET 指向它）。
+            main.post(() -> attach(holder, true));
+        } catch (Exception ex) { error(ex.toString()); }
+    }
+    /** @param launch true 仅当这是用户动作触发的 startX 流程；surface 重建传 false，只重连显示。 */
+    private void attach(SurfaceHolder holder, boolean launch) {
         if (destroyed || !holder.getSurface().isValid()) return;
-        String result=DisplayBridge.start(holder.getSurface(),ROOT+"/tmp/.fxshm/sock",shmid,60,ROOT+"/tmp/fxpresent.sock");
+        // Frames reach the Surface through the present socket and Gow3Present (AHardwareBuffer).
+        String result=Gow3Present.start(holder, presentSocket());
         android.util.Log.i("God of War III",result);
         if (!result.startsWith("bridge running:")) { error(result); return; }
-        XInput.connect(0);
-        if (!displayOnly && game==null) worker.execute(() -> startGame());
+        shmid=1; // present 已连接
+        startingX=false; // 启动流程走完，之后的 surface 重建都走纯重连
+        if (launch && !displayOnly && game==null) worker.execute(() -> startGame());
         pollFrames();
         if (!imePolling) { imePolling=true; pollIme(); }
     }
@@ -630,7 +612,8 @@ public final class GameActivity extends Activity {
 
     private void pollFrames() {
         if (destroyed) return;
-        if (!hadError && DisplayBridge.directFrames()>0) status.setVisibility(View.GONE);
+        if (!hadError && (Gow3Present.framesIfLoaded()>0))
+            status.setVisibility(View.GONE);
         // run-gow3.sh 在 LSFG 运行时失败、自动回退到普通 Vulkan 时会写这个标记：这时刷新率要退回
         // 「无 LSFG」的目标，否则会停在 LSFG 倍率对应的高刷上空跑（4.1 复评）。
         if (!lsfgFallbackOff && new File(BASE,"lsfg-fallback.marker").isFile()) {
@@ -758,6 +741,55 @@ public final class GameActivity extends Activity {
             if (attrs.preferredDisplayModeId!=id) { attrs.preferredDisplayModeId=id; getWindow().setAttributes(attrs); }
         });
     }
+    /**
+     * The Bionic runtime needs the game's derived inputs before it starts: the patch blob, the
+     * AppContent profile and launch.env. The glibc build produced these with the Python scripts in
+     * a rootfs or on a host; here libgow3prepare compiles them from the installed game. Returns
+     * false and reports when the game cannot be prepared, so a stale run never starts.
+     */
+    private boolean prepareBionicGame() {
+        try {
+            File game=new File(gameDir);
+            File update=updateDir!=null && !updateDir.isEmpty() ? new File(updateDir) : null;
+            com.gow3.android.data.PatchCatalog catalog=
+                    com.gow3.android.data.PatchCatalog.Companion.load(game, update, getAssets());
+            java.util.Map<String,String> ini=readIni(new File(DATA,"gow3.ini"));
+            com.gow3.android.data.Gow3Prepare.Result result=
+                    com.gow3.android.data.Gow3Prepare.INSTANCE.prepare(this,game,update,catalog,ini);
+            android.util.Log.i("God of War III",
+                    "bionic prepare: "+result.getReason()+"; applied="+result.getApplied()
+                            +"; writes="+result.getWriteCount()+"; dmem="+result.getDmemMb()
+                            +"; vblank="+result.getVblankHz());
+            if (!result.getOk()) {
+                error("Game preparation failed ("+result.getReason()+"): "+result.getMessage());
+                return false;
+            }
+            return true;
+        } catch (com.gow3.android.data.PatchCatalogException ex) {
+            error("This game's patch set is not available: "+ex.getProblem());
+            return false;
+        } catch (java.io.IOException ex) {
+            android.util.Log.e("God of War III","bionic prepare: cannot read the patch catalogue",ex);
+            error("Game preparation failed: "+ex);
+            return false;
+        } catch (Exception ex) {
+            android.util.Log.e("God of War III","bionic prepare failed",ex);
+            error("Game preparation failed: "+ex);
+            return false;
+        }
+    }
+    /** gow3.ini as key -> value, the same shape the settings dialog edits and PatchCatalog reads. */
+    private static java.util.Map<String,String> readIni(File file) {
+        java.util.Map<String,String> values=new java.util.LinkedHashMap<>();
+        try (java.io.BufferedReader reader=new java.io.BufferedReader(new java.io.FileReader(file))) {
+            String line;
+            while ((line=reader.readLine())!=null) {
+                int eq=line.indexOf('=');
+                if (eq>0 && !line.startsWith("#")) values.put(line.substring(0,eq).trim(),line.substring(eq+1).trim());
+            }
+        } catch (java.io.IOException ignored) { /* a missing ini means the defaults */ }
+        return values;
+    }
     private void startGame() {
         if (destroyed) return;
         hadError=false;
@@ -766,6 +798,7 @@ public final class GameActivity extends Activity {
         new File(BASE,"lsfg-fallback.marker").delete();
         pickRefreshRate();
         new File(BASE,"ime.request").delete(); new File(BASE,"ime.request.result").delete();
+        if (!prepareBionicGame()) return;
         // 上一轮日志保留一代：写新的 android-game.log 前把旧的轮转为 android-game.prev.log，
         // 使崩溃日志在重启后不丢，并随日志导出一起打包。轮转失败时忽略，照常写新日志。
         File logDir=new File(DATA,"logs");
@@ -776,8 +809,9 @@ public final class GameActivity extends Activity {
                 android.util.Log.w("God of War III","log rotation: could not rename android-game.log to android-game.prev.log");
         }
         try {
-            Process launched=process(ROOT+"/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
-                ROOT+"/bin/sh",BASE+"/run-gow3.sh","game"); game=launched;
+            // /system/bin/sh pulls run-bionic.sh directly (toybox): no rootfs loader, no X11.
+            final Process launched=process("/system/bin/sh",BASE+"/run-bionic.sh","game");
+            game=launched;
             Thread log=new Thread(() -> {
                 try (BufferedReader r=new BufferedReader(new InputStreamReader(launched.getInputStream()));
                      PrintWriter out=new PrintWriter(new File(DATA,"logs/android-game.log"))) {
@@ -785,6 +819,8 @@ public final class GameActivity extends Activity {
                     int code=launched.waitFor();
                     if (game==launched) {
                         game=null;
+                        shmid=-1; // present 的对端（游戏进程）没了：surface 重建不得再算"已连接"
+                        Gow3Present.stop();
                         // run-gow3.sh exits 4 when Vulkan/Turnip cannot initialize: the driver
                         // failure must not be reported as validated texture integrity.
                         if (code==4) error("Graphics initialization failed (Vulkan/Turnip). See logs/android-game.log.");
@@ -805,11 +841,31 @@ public final class GameActivity extends Activity {
     }
     private void stopGame() {
         Process p=game; game=null;
-        if (p!=null) { p.destroyForcibly(); try { p.waitFor(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }
+        if (p!=null) {
+            p.destroyForcibly();
+            try { p.waitFor(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        shmid=-1; // 同上：游戏进程没了，surface 重建只能走完整的用户启动流程
+        Gow3Present.stop();
     }
     @Override protected void onDestroy() {
         destroyed=true; pad.reset(); audio.stop(); main.removeCallbacksAndMessages(null);
-        DisplayBridge.stop(); stopGame(); if (xvfb!=null) xvfb.destroyForcibly();
-        worker.shutdownNow(); super.onDestroy();
+        worker.shutdownNow();
+        // The teardown used to run here on the main thread, which is what turned every quit into an
+        // ANR. Process.waitFor() blocks until the game is gone, so the teardown runs on its own
+        // thread: the activity goes away at once and the game is reaped behind it.
+        final Process p=game; game=null;
+        new Thread(() -> {
+            try {
+                Gow3Present.stop();
+                if (p!=null) {
+                    p.destroyForcibly();
+                    try { p.waitFor(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                }
+            } catch (RuntimeException ignored) {
+                // Teardown is best effort: the activity is already going away.
+            }
+        },"gow3-teardown").start();
+        super.onDestroy();
     }
 }

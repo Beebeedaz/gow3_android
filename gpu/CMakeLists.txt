@@ -40,7 +40,16 @@ elseif (GOW3_PGO STREQUAL "use")
                         -fprofile-correction -Wno-missing-profile -Wno-coverage-mismatch)
 endif()
 
-find_package(Vulkan REQUIRED)
+if (ANDROID)
+    # Bionic：不链接 libvulkan（gow3port vk_driver_loader dlopen 驱动），只要头文件。
+    # NDK 自带的 Vulkan 头太旧，vulkan-hpp（1.3.275 无 .hpp）用不了，因此用
+    # tools/android/build_bionic_deps.sh 构建的 Vulkan-Headers；Vulkan::Vulkan 就是这些头。
+    find_package(VulkanHeaders CONFIG REQUIRED)
+    add_library(Vulkan::Vulkan INTERFACE IMPORTED)
+    target_link_libraries(Vulkan::Vulkan INTERFACE Vulkan::Headers)
+else()
+    find_package(Vulkan REQUIRED)
+endif()
 find_package(fmt REQUIRED)
 find_package(Boost REQUIRED)
 # gow3 (Windows): MSYS2 has no magic_enum/miniz packages; the submodules are used instead.
@@ -62,9 +71,18 @@ if (NOT VulkanMemoryAllocator_FOUND)
 endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(XXHASH REQUIRED IMPORTED_TARGET libxxhash)
-pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
-if (NOT WIN32)
-    pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11)
+if (ANDROID)
+    # Bionic：libgow3gpu 既不用 SDL（无窗口：帧经 AHB swapchain 送给 app，
+    # shim/gow3_present_client.cpp；输入和音频归 runtime）也不用 X11。
+    add_library(gow3_sdl3 INTERFACE)
+    add_library(PkgConfig::SDL3 ALIAS gow3_sdl3)
+    add_library(gow3_no_x11 INTERFACE)
+    add_library(PkgConfig::X11 ALIAS gow3_no_x11)
+else()
+    pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
+    if (NOT WIN32)
+        pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11)
+    endif()
 endif()
 find_package(miniz QUIET)
 if (NOT miniz_FOUND)
@@ -141,7 +159,13 @@ set(COMMON
     shadps4/common/string_util.cpp shadps4/common/thread.cpp shadps4/common/signal_context.cpp
     shim/common/logging/log.cpp)
 file(GLOB AVPLAYER CONFIGURE_DEPENDS shadps4/core/libraries/avplayer/*.cpp)
+if (ANDROID)
+    set(PKG_CONFIG_ARGN --static) # 静态 FFmpeg：它的私有库（-lm 等）也要带上
+endif()
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil libswscale libswresample)
+if (ANDROID)
+    unset(PKG_CONFIG_ARGN)
+endif()
 file(GLOB SHIM_SOURCES CONFIGURE_DEPENDS shim/*.cpp shim/*/*.cpp)
 # Windows: a DLL cannot leave the runtime_* symbols for gow3-probe.exe to resolve, so the
 # library is static there and linked into the executable.
@@ -169,6 +193,22 @@ set_source_files_properties(shim/gow3_overlay.cpp PROPERTIES
 target_include_directories(gow3gpu PRIVATE shim shadps4 ${SHADER_INCLUDE} third_party/gcn/include third_party/half/include)
 target_compile_definitions(gow3gpu PRIVATE BOOST_ASIO_STANDALONE NDEBUG)
 target_compile_options(gow3gpu PRIVATE -Wno-deprecated-declarations -Wno-missing-field-initializers)
+if (ANDROID)
+    # Bionic：第三方 C 代码（FidelityFX、FSR）的直接 vk* 调用走 dispatcher
+    # （shim/vk_forwarders.cpp，由 tools/android/gen_vk_forwarders.py 生成）。
+    # AHB swapchain：AHardwareBuffer_*（libnativewindow）、Vulkan Android 平台类型、与 app 共享的
+    # wire format（tools/android/present）。每个 vulkan.hpp 用户必须看到相同的平台宏
+    # （dispatcher 的布局依赖它们）。
+    target_compile_definitions(gow3gpu PRIVATE VK_USE_PLATFORM_ANDROID_KHR)
+    target_include_directories(gow3gpu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../tools/android/present)
+    target_link_libraries(gow3gpu PRIVATE nativewindow)
+    # FFmpeg 的 arm64 汇编用 adrp/add 寻址自己的表：它的符号在共享对象内不能被抢占。
+    target_link_options(gow3gpu PRIVATE
+        -Wl,--exclude-libs,libavcodec.a:libavformat.a:libavutil.a:libswscale.a:libswresample.a
+        # runtime_* 函数来自 gow3-probe（见下）；NDK 的 --no-undefined 会拒绝它们。
+        # tools/android/check_bionic_symbols.sh 验证每一个都被提供。
+        -Wl,-z,undefs)
+endif()
 # Runtime symbols (runtime_memory_*, runtime_process_*) resolve against gow3-probe.
 if (NOT WIN32)
     target_link_options(gow3gpu PRIVATE -Wl,--allow-shlib-undefined)
