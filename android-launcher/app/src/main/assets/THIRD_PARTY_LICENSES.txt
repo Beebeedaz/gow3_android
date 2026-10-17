@@ -1,10 +1,8 @@
-Native display and X11 input bridges: fexdroid
-https://github.com/cobrabm12/fexdroid
-Source revision 2b03ec73c3507b640fba1942fb8d99b43b88945a
-Reused unmodified from the verified fexdroid legacy APK. The developer-provided
-ARM64 extraction is recorded in tools/android/bridges/provenance.json; the
-source APK is not included in this repository. Verify the upstream fexdroid
-license before redistributing the extracted binaries.
+The native display and X11 input bridges from the fexdroid project
+(https://github.com/cobrabm12/fexdroid) were reused unmodified by earlier builds. They
+belonged to the retired glibc/proot runtime: the X11 display bridge is replaced by
+libgow3present, and the XTEST input bridge could never work under Bionic, which has no X
+server. Neither binary is part of this build any more.
 
 Turnip Vulkan driver: Mesa (MIT), https://gitlab.freedesktop.org/mesa/mesa
 commit 35b085c4c067f198ce0b6437d94678e47b9c645f, with fexdroid's Mesa patches

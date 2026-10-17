@@ -2,7 +2,7 @@
 # Build the debug APK with the Bionic runtime payload (NDK/Bionic native path, no rootfs/X11).
 # 与 tools/android/debug/build_debug_apk.sh 对应，但 runtime 是 Bionic 版：
 #   - stage_bionic_runtime.sh 产出 out/android-debug/assets/runtime.payload
-#   - 跳过 glibc 专属校验（libfxdisplay/libfxio、glibc runtime-manifest），
+#   - 只打包 Bionic 自己的 JNI 库（libgow3prepare/libgow3present）与 Bionic runtime payload，
 #     用 Bionic 的 validate（见下）。
 set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "$0")" && pwd)
