@@ -994,6 +994,12 @@ void UpdateChoiceTextures() {
 }
 
 // 施加列表动作的唯一入口,这样 SDL 事件和 pad 快照不会对同一个键各移动或各关闭一次。
+// 多来源去重(android-overlay-input-capture)由两半共同成立,各测其一:
+//   - SDL 先到:这里关闭对话框(choice_active=false),随后 pad 侧 PollChoice 的
+//     if (choice_active) 判断把它挡住;
+//   - pad 先到:PadEdges 只产出一个边沿(pad_seen 已跟上),且 PollChoice 关掉对话框后
+//     SDL 的 HandleEvent 也不再路由进 HandleChoiceEvent。
+//   pad 半边的边沿语义在 tests/test_pad_input.cpp 里验证(build.sh --test 跑)。
 // finish:1 确认,2 取消。调用方持有 imgui_mutex。
 static void ApplyChoiceAction(int move, int finish) {
     const int count = int(choice_items.size());

@@ -115,4 +115,8 @@ if [[ ${1:-} == --test ]]; then
     out/videodec-test tests/data/tiny.h264
     "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread -I. -Isrc tests/test_services.c -o out/services-test
     out/services-test
+    # overlay 对话框的 pad 边沿/映射与多来源去重（android-overlay-input-capture，tasks 4.4）。
+    # （test_pad_map.c 依赖 glibc 的 st_mtim，macOS 的 struct stat 没有，进不了本地 --test。）
+    "${CXX:-clang++}" -std=c++17 -O2 -g -Wall -Wextra -Werror -I gpu/shim tests/test_pad_input.cpp -o out/pad-input-test
+    out/pad-input-test
 fi
