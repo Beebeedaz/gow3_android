@@ -59,6 +59,11 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            // The fexdroid X11 display and input bridges belonged to the glibc/proot runtime. Bionic
+            // renders through libgow3present and injects input from Java, so nothing loads these and
+            // they must not ship. They stay in tools/android/bridges/ with provenance.json, which
+            // records where the extracted binaries came from.
+            excludes += listOf("**/libfxdisplay.so", "**/libfxio.so")
         }
     }
     sourceSets {

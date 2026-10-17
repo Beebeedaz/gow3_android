@@ -1,46 +1,22 @@
 #!/usr/bin/env bash
 # Stage the debug runtime payload for the Gradle debug source set
-# (android-launcher/app/build.gradle.kts: out/android-debug/assets) and the LOCAL_*
-# Turnip/LSFG inputs that build_release_runtime.py --profile debug reads.
+# (android-launcher/app/build.gradle.kts: out/android-debug/assets).
 #
-# Idempotent: only rebuilds the runtime archive when it is missing or
-# GOW3_REBUILD_DEBUG_RUNTIME=1; otherwise it validates and re-stages the existing one.
-# Called both by build_debug_apk.sh and by the Gradle preDebugBuild hook (Android Studio).
+# Bionic only: the payload is the Bionic runtime tree (gow3-probe, its libraries, run-bionic.sh and
+# the config files), with no glibc rootfs behind it. Called by build_bionic_debug_apk.sh, and by the
+# Gradle preDebugBuild hook (Android Studio), which does not pass GOW3_BIONIC - hence the
+# auto-detection on the built runtime.
+#
+# Idempotent: rebuilds the payload only when an input is missing or changed.
 set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "$0")" && pwd)
 cd -- "$script_dir/../../.."
 
-# Bionic 运行时（NDK/Bionic 原生进程，无 rootfs）：显式 GOW3_BIONIC=1，或 out/bionic 已构建时
-# 自动选择（Gradle 的 preDebugBuild hook 不传 GOW3_BIONIC，用文件存在性判断最稳）。
 if [[ ${GOW3_BIONIC:-0} == 1 || -x out/bionic/bin/gow3-probe ]]; then
     exec bash "$script_dir/stage_bionic_runtime.sh"
 fi
 
-if [[ ${GOW3_REBUILD_DEBUG_RUNTIME:-0} == 1 || ! -f out/debug/runtime.tar.gz ]]; then
-    # The debug runtime reuses the locally built Turnip/LSFG. build_release_runtime.py
-    # --profile debug reads them from .local-deps/android/{turnip,turnip-gen8,lsfg}, so stage
-    # the out/arm64/ artifacts there first (overwrites stale copies).
-    stage_local_input() { # src_dir name
-        local src=$1 dst=".local-deps/android/$2"
-        if [[ -d $src ]]; then
-            mkdir -p "$dst"
-            cp -R "$src/." "$dst/"
-            echo "staged $2 <- $src"
-        else
-            echo "stage_debug_runtime: no $src (run build_android_runtime.sh first)" >&2
-            return 1
-        fi
-    }
-    stage_local_input out/arm64/turnip turnip
-    stage_local_input out/arm64/turnip-gen8 turnip-gen8
-    stage_local_input out/arm64/lsfg lsfg
-    python3 tools/android/runtime/build_release_runtime.py --profile debug
-else
-    python3 tools/android/runtime/validate_runtime_archive.py out/debug/runtime.tar.gz \
-        --digest out/debug/runtime.sha256 --manifest tools/android/debug/runtime-manifest.json
-fi
-
-mkdir -p out/android-debug/assets
-cp out/debug/runtime.tar.gz out/android-debug/assets/runtime.payload
-cp out/debug/runtime.sha256 out/android-debug/assets/runtime.sha256
-echo "Debug runtime payload: out/android-debug/assets/runtime.payload"
+echo "stage_debug_runtime: no Bionic runtime at out/bionic/bin/gow3-probe." >&2
+echo "  Build it first (tools/android/build/build_android_runtime.sh), or the Bionic debug APK" >&2
+echo "  cannot be assembled." >&2
+exit 1

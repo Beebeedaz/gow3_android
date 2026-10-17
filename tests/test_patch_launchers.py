@@ -61,21 +61,12 @@ runpy.run_path(str(script), run_name='__main__')
                         GOW3_DEVICE_MEM_MB='16384', PATCH_TEST_CAPTURE=str(self.capture),
                         PATCH_TEST_XML=str(self.xml), PYTHON=str(self.python))
 
-    def run_shell(self, android=False):
-        if not android:
-            command = ['bash', str(ROOT / 'run.sh')]
-        else:
-            source = (ROOT / 'tools/android/device/run-gow3.sh').read_text()
-            # 执行未经改写的游戏准备至 probe 启动段；Surface/驱动初始化不属于本测试。
-            block = source[source.index('# Prepare the runtime image'):]
-            script = self.root / 'android-patch-start.sh'
-            script.write_text('set -eu\n' + block)
-            self.env.update(host=str(self.root), loader=str(self.loader), python=str(self.python),
-                            base=str(ROOT), game=str(self.game), out=str(self.out),
-                            probe=str(self.probe), turnip='main', vulkan_status='unknown',
-                            lsfg_failure_code='46')
-            command = ['sh', str(script)]
-        return subprocess.run(command, env=self.env, capture_output=True, text=True, timeout=15)
+    def run_shell(self):
+        # Linux shell and Windows entry points only. Android used to run the same Python here, under
+        # a glibc rootfs; libgow3prepare now compiles the patches on the device, and that port is
+        # checked byte for byte by tools/migration/run_prepare_golden.sh.
+        return subprocess.run(['bash', str(ROOT / 'run.sh')], env=self.env, capture_output=True,
+                              text=True, timeout=15)
 
     def run_windows(self):
         spec = importlib.util.spec_from_file_location('patch_test_run', ROOT / 'run.py')
@@ -97,10 +88,9 @@ runpy.run_path(str(script), run_name='__main__')
 
     def test_all_launchers_consume_same_compiled_result(self):
         captures = []
-        for android in (False, True):
-            result = self.run_shell(android)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            captures.append(json.loads(self.capture.read_text()))
+        result = self.run_shell()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        captures.append(json.loads(self.capture.read_text()))
         self.assertEqual(self.run_windows(), 0)
         captures.append(json.loads(self.capture.read_text()))
         for capture in captures:
@@ -110,29 +100,23 @@ runpy.run_path(str(script), run_name='__main__')
             self.assertEqual(capture['count'], capture['report']['write_count'])
             self.assertIn(FPS120, capture['report']['applied'])
         self.assertEqual(captures[0], captures[1])
-        self.assertEqual(captures[0], captures[2])
 
     def test_shell_rejected_selection_reaches_probe_with_zero_writes(self):
         self.env.update(GOW3_DEVICE_MEM_MB='4096', GOW3_PATCHES=FPS120)
-        for android in (False, True):
-            result = self.run_shell(android)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            capture = json.loads(self.capture.read_text())
-            self.assertEqual(capture['count'], 0)
-            self.assertEqual(capture['GOW3_PATCHES'], '')
-            self.assertEqual(capture['GOW3_ENGINE_FPS'], '60')
-            self.assertEqual(capture['report']['reason'], 'insufficient-memory-budget')
-        diagnostics = json.loads((self.out / 'texture_integrity.json').read_text())
-        self.assertEqual(diagnostics['patch_write_count'], 0)
-        self.assertEqual(diagnostics['patch_profile_status'], 'insufficient-memory-budget')
+        result = self.run_shell()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        capture = json.loads(self.capture.read_text())
+        self.assertEqual(capture['count'], 0)
+        self.assertEqual(capture['GOW3_PATCHES'], '')
+        self.assertEqual(capture['GOW3_ENGINE_FPS'], '60')
+        self.assertEqual(capture['report']['reason'], 'insufficient-memory-budget')
 
     def test_shell_preparation_failure_never_launches_stale_patch(self):
         for failure in ('prepare.py', 'launch_env.py'):
             self.env['PATCH_TEST_FAIL'] = failure
-            for android in (False, True):
-                result = self.run_shell(android)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertFalse(self.capture.exists())
+            result = self.run_shell()
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(self.capture.exists())
 
     def test_windows_publish_failure_never_launches_probe(self):
         with mock.patch.object(patches, 'atomic_write', side_effect=PermissionError('read-only')):
