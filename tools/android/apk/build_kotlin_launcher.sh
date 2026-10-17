@@ -2,9 +2,9 @@
 # Assemble the debug APK with the Gradle launcher.
 #
 # Bionic only: the launcher's JNI libraries are built by Gradle externalNativeBuild from
-# app/src/main/cpp, the runtime payload comes from stage_bionic_runtime.sh. The glibc/proot
-# runtime, its rootfs and the fexdroid X11 bridges are gone, so this no longer validates against
-# a glibc runtime manifest - build_bionic_debug_apk.sh checks the Bionic payload instead.
+# app/src/main/cpp, the runtime payload comes from stage_bionic_runtime.sh (also wired into the
+# Gradle preDebugBuild hook). The glibc/proot runtime, its rootfs and the fexdroid X11 bridges
+# are gone, so this no longer validates against a glibc runtime manifest.
 set -euo pipefail
 
 cd -- "$(dirname -- "$0")/../../.."
