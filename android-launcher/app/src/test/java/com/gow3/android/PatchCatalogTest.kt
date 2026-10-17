@@ -187,7 +187,7 @@ class PatchCatalogTest {
         assertEquals(14, loaded.patches.size)
         assertEquals(catalog().patches.map { it.name }, loaded.patches.map { it.name })
         assertTrue(loaded.patches.all { it.validation == "offline-matched" })
-        assertEquals(4, com.gow3.android.data.MobilePresets.available(loaded).size)
+        assertEquals(5, com.gow3.android.data.MobilePresets.available(loaded).size)
         assertTrue(loaded.selected(native + ("patches_CUSA01740_01_00" to "Skip Intro")).isEmpty())
         assertEquals(setOf("Skip Intro"), loaded.selected(native + (loaded.selectionKey to "Skip Intro")))
     }

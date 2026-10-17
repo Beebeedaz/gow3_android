@@ -14,6 +14,7 @@ internal data class MobilePreset(val resolution: String, val labelRes: Int) {
 
 internal object MobilePresets {
     val all = listOf(
+        MobilePreset("480p", R.string.mobile_preset_480p),
         MobilePreset("540p", R.string.mobile_preset_light),
         MobilePreset("720p", R.string.mobile_preset_balanced),
         MobilePreset("900p", R.string.mobile_preset_clear),

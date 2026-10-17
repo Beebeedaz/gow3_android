@@ -75,6 +75,7 @@
     <string name="home_patch_unavailable">未匹配到补丁目录。请检查游戏与升级目录后再调整分辨率和引擎帧率，具体原因可在补丁页查看。</string>
     <string name="home_patch_unavailable_value">%1$s（当前版本不可用）</string>
     <string name="mobile_preset_title">默认配置</string>
+    <string name="mobile_preset_480p">480p · 极速省资源</string>
     <string name="mobile_preset_light">540p · 轻量省资源</string>
     <string name="mobile_preset_balanced">720p · 均衡</string>
     <string name="mobile_preset_clear">900p · 清晰优先</string>

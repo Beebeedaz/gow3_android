@@ -17,8 +17,8 @@ class MobilePresetsTest {
         PatchCatalog.parse(it, "CUSA01740", "01.00")
     }
 
-    @Test fun `1740 offers all four imported mobile tiers`() {
-        assertEquals(listOf("540p", "720p", "900p", "1080p"), MobilePresets.available(catalog()).map { it.resolution })
+    @Test fun `1740 offers all five imported mobile tiers`() {
+        assertEquals(listOf("480p", "540p", "720p", "900p", "1080p"), MobilePresets.available(catalog()).map { it.resolution })
         assertTrue(MobilePresets.available(null).isEmpty())
         val c = catalog()
         val limited = c.copy(patches = c.patches.filter { it.resolution != "900p" })
@@ -65,7 +65,7 @@ class MobilePresetsTest {
         val ini = MobilePresets.updates(preset, c, emptyMap())
         assertEquals(9, c.selected(ini).size)
         assertNull(MobilePresets.matching(c, ini + ("fps_limit" to "30")))
-        assertNull(MobilePresets.matching(c, ini + ("render_resolution" to "480p")))
+        assertNull(MobilePresets.matching(c, ini + ("render_resolution" to "1440p")))
         val bloom = c.patches.first { it.name == "Disable Bloom" }
         val changed = ini + c.toggle(ini, bloom, false)
         assertFalse(bloom.name in c.selected(changed))
@@ -75,8 +75,9 @@ class MobilePresetsTest {
 
     @Test fun `unsupported profile cannot partially apply`() {
         val c = catalog().let { c -> c.copy(patches = c.patches.filter { it.resolution != "540p" }) }
+        val light = MobilePresets.all.first { it.resolution == "540p" }
         assertThrows(IllegalArgumentException::class.java) {
-            MobilePresets.updates(MobilePresets.all.first(), c, emptyMap())
+            MobilePresets.updates(light, c, emptyMap())
         }
     }
 }

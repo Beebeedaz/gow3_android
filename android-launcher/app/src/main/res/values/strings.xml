@@ -94,6 +94,7 @@
     <string name="home_patch_unavailable">No matching patch catalog. Check the game and update folders to enable resolution and engine frame rate settings. See Patches for details.</string>
     <string name="home_patch_unavailable_value">%1$s (unavailable for this version)</string>
     <string name="mobile_preset_title">DEFAULT PROFILE</string>
+    <string name="mobile_preset_480p">480p · Lowest GPU load</string>
     <string name="mobile_preset_light">540p · Lower GPU load</string>
     <string name="mobile_preset_balanced">720p · Balanced</string>
     <string name="mobile_preset_clear">900p · Sharper image</string>
