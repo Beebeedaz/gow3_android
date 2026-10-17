@@ -156,9 +156,8 @@ jobs:
           set -euo pipefail
           bash tools/android/inputs/fetch_steam_libs.sh
 
-      # 自编 Turnip（tools/android/build/build_turnip.sh + mesa-patches/）是驱动包的可选
-      # 来源，产物不进 payload；CI 不再构建（设备侧由 DriverManager / install_bionic_driver.sh
-      # 安装驱动包）。LSFG 运行时能力已废除。
+      # Vulkan 驱动不进 payload：设备侧由 DriverManager / install_bionic_driver.sh 安装
+      # adrenotools 风格驱动包（下载源见 launcher assets driver_sources.json）。
 
       - name: Build the Bionic runtime
         shell: bash -el {0}
