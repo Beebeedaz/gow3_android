@@ -44,7 +44,6 @@ import com.gow3.android.data.ImportResult
 import com.gow3.android.data.LosslessDllManager
 import com.gow3.android.data.RemoveResult
 import com.gow3.android.data.PatchCatalog
-import com.gow3.android.data.LaunchParams
 import com.gow3.android.data.MobilePreset
 import com.gow3.android.data.MobilePresets
 import com.gow3.android.ui.components.LauncherColors
@@ -130,13 +129,6 @@ internal fun HomeScreen(
         }
     }
 
-    fun save(key: String, value: String) {
-        val param = LaunchParams.forCatalog(catalog).firstOrNull { it.key == key } ?: return
-        if (!param.enabled || param.options.none { it.value == value }) return
-        saveUpdates(if (LaunchParams.isPatchSetting(key)) mapOf(key to value, "restart_unconfirmed" to "0")
-                    else mapOf(key to value))
-    }
-
     fun applyPreset(preset: MobilePreset) {
         val currentCatalog = catalog ?: return
         if (preset !in MobilePresets.available(currentCatalog)) return
@@ -150,7 +142,7 @@ internal fun HomeScreen(
         Spacer(Modifier.height(28.dp))
         LaunchButton(onStartGame)
         Spacer(Modifier.height(20.dp))
-        LaunchParameters(gameDir, updateDir, iniValues, ::save, onChooseGameFolder, onChooseUpdateFolder,
+        LaunchParameters(gameDir, updateDir, iniValues, onChooseGameFolder, onChooseUpdateFolder,
             catalog, catalogLoading, ::applyPreset)
         Spacer(Modifier.height(16.dp))
         // gow3port: LSFG 运行时能力已废除（Bionic 迁移，见 openspec change

@@ -10,6 +10,7 @@
 
     <!-- 导航 -->
     <string name="nav_home">HOME</string>
+    <string name="nav_settings">SETTINGS</string>
     <string name="nav_about">ABOUT</string>
 
     <!-- Home 页 -->
@@ -19,8 +20,7 @@
     <string name="home_removed_fmt">%1$s removed</string>
 
     <!-- 启动参数 -->
-    <string name="launch_parameters_title">LAUNCH PARAMETERS</string>
-    <string name="launch_parameters_group_game">GAME</string>
+    <string name="launch_setup_title">LAUNCH SETUP</string>
     <string name="game_folder_label">Game folder</string>
     <string name="game_folder_not_selected">Not selected</string>
     <string name="game_folder_hint">Tap to choose a different folder</string>
@@ -29,9 +29,6 @@
     <string name="update_folder_description">Optional: the game\'s update (patch) folder, e.g. CUSA01740-patch. Laid over the game at start.</string>
     <string name="change_button">CHANGE  ›</string>
     <string name="launch_parameters_footer">Changes are saved to gow3.ini immediately and take effect at the next launch.</string>
-    <string name="param_group_display">DISPLAY</string>
-    <string name="param_group_performance">PERFORMANCE</string>
-    <string name="param_group_startup">STARTUP</string>
     <string name="dialog_ok">OK</string>
 
     <!-- 启动参数：参数名 -->
@@ -43,9 +40,9 @@
     <string name="param_engine_fps">Engine FPS</string>
     <string name="param_vsync">VSync</string>
     <string name="param_frames_queued">Frames queued</string>
-    <string name="param_offline_start">Offline start</string>
-    <string name="param_skip_intros">Skip intros</string>
-    <string name="param_free_camera">Free camera</string>
+    <string name="param_sharpen">Sharpening</string>
+    <string name="param_sharpness">Sharpening strength</string>
+    <string name="param_show_fps">Show FPS</string>
 
     <!-- 启动参数：选项名 -->
     <string name="param_option_off_720p">Off (render at 1280×720)</string>
@@ -79,6 +76,14 @@
     <string name="param_option_off">OFF</string>
     <string name="param_option_frames_1">1 (lowest latency)</string>
     <string name="param_option_frames_2">2</string>
+    <!-- RCAS 锐化强度离散档位（数值标签，双语同值不翻译） -->
+    <string name="param_option_sharpness_000">0.00</string>
+    <string name="param_option_sharpness_025">0.25</string>
+    <string name="param_option_sharpness_050">0.50</string>
+    <string name="param_option_sharpness_075">0.75</string>
+    <string name="param_option_sharpness_100">1.00</string>
+    <string name="param_option_sharpness_150">1.50</string>
+    <string name="param_option_sharpness_200">2.00</string>
 
     <!-- 启动参数：说明 -->
     <string name="param_desc_upscaler">Uses FSR 3.1 to reconstruct the image. The game resolution is controlled separately by the resolution setting; turning FSR off does not disable the resolution patch.</string>
@@ -97,9 +102,23 @@
     <string name="mobile_preset_description">Tap a profile to apply its resolution, a 60 FPS target, and mobile graphics defaults. Disables SSAO, motion blur, depth of field, bloom, soft particles and dynamic shadows; enables intro skipping and X to skip videos. You can then adjust each setting here or in Patches. Experimental profiles: results depend on your phone. Changes take effect on the next launch.</string>
     <string name="param_desc_vsync">Syncs the game\'s frames with your screen\'s refresh rate to stop visual tearing. Leave it ON unless you see tearing or stutter.</string>
     <string name="param_desc_frames_queued">How many frames the game prepares ahead of what the screen shows. Lower numbers cut input lag; higher numbers can improve smoothness on weaker hardware.</string>
-    <string name="param_desc_free_camera">Lets you move the camera freely around the world for exploring or testing, instead of following the gameplay camera. Meant for experimentation, not normal play.</string>
     <string name="param_desc_anisotropy">Sharpens floors and walls viewed at an angle. Higher values may use a little more GPU bandwidth. Takes effect on the next launch.</string>
     <string name="param_desc_vibration">Scales the gamepad vibration strength. 0% disables vibration. Takes effect immediately while the game is running.</string>
+    <string name="param_desc_sharpen">Applies an RCAS sharpening pass after FSR upscaling. Has no effect while the upscaler is OFF.</string>
+    <string name="param_desc_sharpness">Strength of the sharpening pass (0.00–2.00). Only used when sharpening is ON.</string>
+    <string name="param_desc_show_fps">Shows a frames-per-second overlay while the game is running.</string>
+
+    <!-- Settings 页 -->
+    <string name="settings_title">SETTINGS</string>
+    <string name="settings_subtitle">Graphics, performance, controls, audio and driver settings.</string>
+    <string name="settings_no_settings">No settings in this category yet. More categories will arrive in future updates.</string>
+
+    <!-- Settings 页分类（分类栏顺序与 LaunchCategory 枚举声明顺序一致） -->
+    <string name="param_category_graphics">GRAPHICS</string>
+    <string name="param_category_performance">PERFORMANCE</string>
+    <string name="param_category_controls">CONTROLS</string>
+    <string name="param_category_audio">AUDIO</string>
+    <string name="param_category_driver">DRIVER</string>
 
     <!-- 帧生成卡片 -->
     <string name="frame_gen_title">FRAME GENERATION</string>

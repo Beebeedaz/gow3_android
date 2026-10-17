@@ -3,16 +3,31 @@ package com.gow3.android.data
 import com.gow3.android.R
 
 /**
- * 一个可编辑的启动参数：其 gow3.ini 键、显示标签、分组以及 Android 运行时
+ * 启动参数的顶层类别，驱动 Settings 配置页顶部的分类 tab 栏。
+ *
+ * 每个枚举值带标题字符串资源 id 与稳定的声明顺序；新增类别只需追加枚举值
+ * （如未来 FEX 的 TRANSLATOR），新增参数只需声明 [LaunchParam.category]，
+ * 均不影响 Home 页展示。音频 / 驱动为预留分类，当前没有参数，UI 显示「暂无配置」占位。
+ */
+internal enum class LaunchCategory(val titleRes: Int) {
+    GRAPHICS(R.string.param_category_graphics),
+    PERFORMANCE(R.string.param_category_performance),
+    CONTROLS(R.string.param_category_controls),
+    AUDIO(R.string.param_category_audio),
+    DRIVER(R.string.param_category_driver),
+}
+
+/**
+ * 一个可编辑的启动参数：其 gow3.ini 键、显示标签、类别以及 Android 运行时
  * 实际消费的取值域。`defaultValue` 是键缺失时 UI 显示的值。
  *
- * 显示标签、分组与说明使用字符串资源 id（labelRes / groupRes / descriptionRes），
+ * 显示标签、类别与说明使用字符串资源 id（labelRes / category / descriptionRes），
  * 由 UI 层通过 Context 解析，数据层保持纯 JVM 结构、不依赖 Android。
  */
 internal data class LaunchParam(
     val key: String,
     val labelRes: Int,
-    val groupRes: Int,
+    val category: LaunchCategory,
     val options: List<LaunchOption>,
     val defaultValue: String,
     val descriptionRes: Int? = null,
@@ -22,21 +37,24 @@ internal data class LaunchParam(
 internal data class LaunchOption(val value: String, val labelRes: Int)
 
 /**
- * launcher 编辑的启动参数，由 Android 运行时消费的 gow3.ini 键支撑。
- * 默认值与取值域遵循 `SettingsDialog.java` 的常量（UPSCALER_VALUES/FPS_VALUES …）
- * 以及 `gpu/shim/gow3_graphics.h` / `gpu/shim/gow3_settings.cpp` 中的运行时解析器；
- * 当两者不一致时（fps_limit：Java 前端提供 40/45，但 `ParseFpsLimit` 把它们映射为 0）
+ * launcher 编辑的启动参数，由 Bionic 运行链消费的 gow3.ini 键支撑。取值域以
+ * `gpu/shim/gow3_settings.cpp` 的运行时解析器与 `tools/android/device/run-bionic.sh`
+ * 的消费为准，只收录有实际消费方的键（`effect_*`、`skip_intro`、`mouse_look`、
+ * `debug_camera`、`debug_menu` 等无消费方键不得加入）；当取值域不一致时
+ * （fps_limit：Java 前端曾提供 40/45，但 `ParseFpsLimit` 把它们映射为 0）
  * 以运行时取值域为准，确保每个选项都实际生效。
  *
  * 各参数的默认值均为移动端优化值（render_resolution=720p、fps_limit=60、
- * engine_fps=60；display_mode 已从可编辑项移除，固定 fullscreen）。这些默认值
- * MUST 与 `tools/android/config/gow3-default.ini`（首启落盘为 gow3.ini 的基准）
- * 保持一致，避免 UI 展示默认与实际运行默认漂移。
+ * engine_fps=60、sharpen=0、sharpness=0.50、show_fps=1；display_mode 已从
+ * 可编辑项移除，固定 fullscreen）。这些默认值 MUST 与
+ * `tools/android/config/gow3-default.ini`（首启落盘为 gow3.ini 的基准）保持一致，
+ * 避免 UI 展示默认与实际运行默认漂移。分辨率维持既有 `render_resolution` 轨道，
+ * 不暴露 `preset` / `output_res` 双轨（见 change design D3）。
  */
 internal object LaunchParams {
     val all: List<LaunchParam> = listOf(
         LaunchParam(
-            key = "upscaler", labelRes = R.string.param_upscaler, groupRes = R.string.param_group_display,
+            key = "upscaler", labelRes = R.string.param_upscaler, category = LaunchCategory.GRAPHICS,
             options = listOf(
                 LaunchOption("off", R.string.param_option_off),
                 LaunchOption("fsr3", R.string.param_option_fsr31),
@@ -45,7 +63,7 @@ internal object LaunchParams {
             descriptionRes = R.string.param_desc_upscaler,
         ),
         LaunchParam(
-            key = "render_resolution", labelRes = R.string.param_resolution, groupRes = R.string.param_group_display,
+            key = "render_resolution", labelRes = R.string.param_resolution, category = LaunchCategory.GRAPHICS,
             options = listOf(
                 LaunchOption("native", R.string.param_option_native),
                 LaunchOption("480p", R.string.param_option_480p),
@@ -64,7 +82,7 @@ internal object LaunchParams {
             descriptionRes = R.string.param_desc_render_patch,
         ),
         LaunchParam(
-            key = "anisotropy", labelRes = R.string.param_anisotropy, groupRes = R.string.param_group_display,
+            key = "anisotropy", labelRes = R.string.param_anisotropy, category = LaunchCategory.GRAPHICS,
             options = listOf(
                 LaunchOption("0", R.string.param_option_game_default),
                 LaunchOption("2", R.string.param_option_2x),
@@ -76,7 +94,34 @@ internal object LaunchParams {
             descriptionRes = R.string.param_desc_anisotropy,
         ),
         LaunchParam(
-            key = "vibration", labelRes = R.string.param_vibration, groupRes = R.string.launch_parameters_group_game,
+            // FSR 后处理锐化开关；upscaler=off 时运行时安全忽略（不联动禁用，
+            // 避免 UI 引入跨参数状态依赖，见 change design Risks）。
+            key = "sharpen", labelRes = R.string.param_sharpen, category = LaunchCategory.GRAPHICS,
+            options = listOf(
+                LaunchOption("0", R.string.param_option_off),
+                LaunchOption("1", R.string.param_option_on),
+            ),
+            defaultValue = "0",
+            descriptionRes = R.string.param_desc_sharpen,
+        ),
+        LaunchParam(
+            // RCAS 锐化强度，运行时 Clamp 到 0.0–2.0；离散档位与 ParamRow 下拉交互一致，
+            // 连续 SeekBar 留待有真实需求再加（change design D3）。
+            key = "sharpness", labelRes = R.string.param_sharpness, category = LaunchCategory.GRAPHICS,
+            options = listOf(
+                LaunchOption("0.00", R.string.param_option_sharpness_000),
+                LaunchOption("0.25", R.string.param_option_sharpness_025),
+                LaunchOption("0.50", R.string.param_option_sharpness_050),
+                LaunchOption("0.75", R.string.param_option_sharpness_075),
+                LaunchOption("1.00", R.string.param_option_sharpness_100),
+                LaunchOption("1.50", R.string.param_option_sharpness_150),
+                LaunchOption("2.00", R.string.param_option_sharpness_200),
+            ),
+            defaultValue = "0.50",
+            descriptionRes = R.string.param_desc_sharpness,
+        ),
+        LaunchParam(
+            key = "vibration", labelRes = R.string.param_vibration, category = LaunchCategory.CONTROLS,
             options = listOf(
                 LaunchOption("0", R.string.param_option_off),
                 LaunchOption("25", R.string.param_option_25_percent),
@@ -88,7 +133,7 @@ internal object LaunchParams {
             descriptionRes = R.string.param_desc_vibration,
         ),
         LaunchParam(
-            key = "fps_limit", labelRes = R.string.param_fps_limit, groupRes = R.string.param_group_performance,
+            key = "fps_limit", labelRes = R.string.param_fps_limit, category = LaunchCategory.PERFORMANCE,
             options = listOf(
                 LaunchOption("30", R.string.param_option_30),
                 LaunchOption("60", R.string.param_option_60),
@@ -101,7 +146,7 @@ internal object LaunchParams {
             defaultValue = "60",
         ),
         LaunchParam(
-            key = "engine_fps", labelRes = R.string.param_engine_fps, groupRes = R.string.param_group_performance,
+            key = "engine_fps", labelRes = R.string.param_engine_fps, category = LaunchCategory.PERFORMANCE,
             options = listOf(
                 LaunchOption("60", R.string.param_option_engine_60),
                 LaunchOption("120", R.string.param_option_120),
@@ -113,7 +158,7 @@ internal object LaunchParams {
             descriptionRes = R.string.param_desc_engine_fps,
         ),
         LaunchParam(
-            key = "vsync", labelRes = R.string.param_vsync, groupRes = R.string.param_group_performance,
+            key = "vsync", labelRes = R.string.param_vsync, category = LaunchCategory.PERFORMANCE,
             options = listOf(
                 LaunchOption("0", R.string.param_option_off),
                 LaunchOption("1", R.string.param_option_on),
@@ -122,7 +167,7 @@ internal object LaunchParams {
             descriptionRes = R.string.param_desc_vsync,
         ),
         LaunchParam(
-            key = "frames_queued", labelRes = R.string.param_frames_queued, groupRes = R.string.param_group_performance,
+            key = "frames_queued", labelRes = R.string.param_frames_queued, category = LaunchCategory.PERFORMANCE,
             options = listOf(
                 LaunchOption("1", R.string.param_option_frames_1),
                 LaunchOption("2", R.string.param_option_frames_2),
@@ -131,7 +176,22 @@ internal object LaunchParams {
             defaultValue = "1",
             descriptionRes = R.string.param_desc_frames_queued,
         ),
+        LaunchParam(
+            key = "show_fps", labelRes = R.string.param_show_fps, category = LaunchCategory.PERFORMANCE,
+            options = listOf(
+                LaunchOption("0", R.string.param_option_off),
+                LaunchOption("1", R.string.param_option_on),
+            ),
+            defaultValue = "1",
+            descriptionRes = R.string.param_desc_show_fps,
+        ),
     )
+
+    /** Settings 顶部分类栏顺序：按枚举声明顺序取全集（含空分类）。 */
+    fun categories(): List<LaunchCategory> = LaunchCategory.entries
+
+    /** 某一分类下的参数（按声明顺序）；空分类返回空列表。 */
+    fun forCategory(category: LaunchCategory): List<LaunchParam> = all.filter { it.category == category }
 
     /** 补丁类快捷入口只展示当前目录真正提供的档位；无目录时禁止修改。 */
     fun forCatalog(catalog: PatchCatalog?): List<LaunchParam> = all.map { param ->
