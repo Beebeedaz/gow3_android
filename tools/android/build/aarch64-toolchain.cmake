@@ -1,5 +1,5 @@
 # Cross-build for the device's native ARM64 Linux userland (Debian trixie arm64) with Clang and lld.
-# The sysroot comes from tools/android/fetch_arm64_sysroot.py.
+# The sysroot comes from tools/android/inputs/fetch_arm64_sysroot.py.
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR aarch64)
 get_filename_component(GOW3_REPO "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)

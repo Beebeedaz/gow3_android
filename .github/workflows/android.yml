@@ -148,7 +148,7 @@ jobs:
             fi
             printf '::add-mask::%s\n' "${!name}"
           done
-          bash tools/android/prepare_signing.sh "$GOW3_KEYSTORE"
+          bash tools/android/inputs/prepare_signing.sh "$GOW3_KEYSTORE"
 
       - name: Fetch Steam libraries
         shell: bash
