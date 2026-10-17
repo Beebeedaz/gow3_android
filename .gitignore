@@ -31,6 +31,13 @@ local.properties
 .idea
 game
 
+# Machine-local: git worktree checkouts, editor/agent tooling and Finder droppings. None of these
+# belong in the index; a tracked .worktrees/ gitlink points only at the machine that created it.
+.worktrees/
+.DS_Store
+.agents/
+.opencode/
+
 # APK-side JNI libraries: built from android-launcher/app/src/main/jni by
 # tools/android/build_jni_libs.sh, which the APK build runs first. The two .so next to them
 # (libfxdisplay.so, libfxio.so) are not built here - they are extracted inputs recorded in

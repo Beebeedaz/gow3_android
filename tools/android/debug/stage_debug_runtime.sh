@@ -17,6 +17,6 @@ if [[ ${GOW3_BIONIC:-0} == 1 || -x out/bionic/bin/gow3-probe ]]; then
 fi
 
 echo "stage_debug_runtime: no Bionic runtime at out/bionic/bin/gow3-probe." >&2
-echo "  Build it first (tools/android/build/build_android_runtime.sh), or the Bionic debug APK" >&2
+echo "  Build it first (tools/android/build_bionic.sh), or the Bionic debug APK" >&2
 echo "  cannot be assembled." >&2
 exit 1
