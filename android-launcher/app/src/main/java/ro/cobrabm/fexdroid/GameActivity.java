@@ -126,14 +126,18 @@ public final class GameActivity extends Activity {
         screen.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> fitSurface(r-l,b-t));
         surface.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override public void surfaceCreated(SurfaceHolder h) {
-                if (shmid>=0) attach(h);
-                else if (!hasGame()) {
-                    // MainActivity owns the first-run game-folder check. Reaching this state means
-                    // the launcher was bypassed or the selected folder was removed while away.
+                // Surface 重建（熄屏、翻盖、旋转）只恢复画面连接，从不启动游戏：启动只发生在
+                // 用户动作的 startX 流程里。shmid 在游戏进程结束时复位，所以游戏退出后再熄屏
+                // 也不会在这里把整个游戏静默拉起来。
+                if (shmid>=0) attach(h, false);
+                else {
+                    // 不在这里启动游戏：surface 回调只记下 holder，等用户动作（LAUNCH/权限/选目录
+                    // -> startPending）发起 startX。否则游戏退出后一次熄屏/翻盖就会把整个游戏
+                    // 静默重启。MainActivity owns the first-run game-folder check；走到这说明
+                    // launcher 被绕过或所选目录已不在。
                     pendingHolder=h;
-                    error("Game folder is unavailable. Return to the launcher and choose it again.");
+                    if (!hasGame()) error("Game folder is unavailable. Return to the launcher and choose it again.");
                 }
-                else if (!startingX) { startingX=true; worker.execute(() -> startX(h)); }
             }
             @Override public void surfaceChanged(SurfaceHolder h,int format,int w,int height) {}
             @Override public void surfaceDestroyed(SurfaceHolder h) {
@@ -513,17 +517,19 @@ public final class GameActivity extends Activity {
                 throw new java.io.IOException("The Bionic runtime is missing. Install the runtime bundle.");
             new File(FILES,"home/gow3port").mkdirs();
             // present socket 由 Gow3Present 监听（run-bionic.sh 的 GOW3_PRESENT_SOCKET 指向它）。
-            main.post(() -> attach(holder));
+            main.post(() -> attach(holder, true));
         } catch (Exception ex) { error(ex.toString()); }
     }
-    private void attach(SurfaceHolder holder) {
+    /** @param launch true 仅当这是用户动作触发的 startX 流程；surface 重建传 false，只重连显示。 */
+    private void attach(SurfaceHolder holder, boolean launch) {
         if (destroyed || !holder.getSurface().isValid()) return;
         // Frames reach the Surface through the present socket and Gow3Present (AHardwareBuffer).
         String result=Gow3Present.start(holder, presentSocket());
         android.util.Log.i("God of War III",result);
         if (!result.startsWith("bridge running:")) { error(result); return; }
         shmid=1; // present 已连接
-        if (!displayOnly && game==null) worker.execute(() -> startGame());
+        startingX=false; // 启动流程走完，之后的 surface 重建都走纯重连
+        if (launch && !displayOnly && game==null) worker.execute(() -> startGame());
         pollFrames();
         if (!imePolling) { imePolling=true; pollIme(); }
     }
@@ -813,6 +819,8 @@ public final class GameActivity extends Activity {
                     int code=launched.waitFor();
                     if (game==launched) {
                         game=null;
+                        shmid=-1; // present 的对端（游戏进程）没了：surface 重建不得再算"已连接"
+                        Gow3Present.stop();
                         // run-gow3.sh exits 4 when Vulkan/Turnip cannot initialize: the driver
                         // failure must not be reported as validated texture integrity.
                         if (code==4) error("Graphics initialization failed (Vulkan/Turnip). See logs/android-game.log.");
@@ -833,7 +841,12 @@ public final class GameActivity extends Activity {
     }
     private void stopGame() {
         Process p=game; game=null;
-        if (p!=null) { p.destroyForcibly(); try { p.waitFor(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }
+        if (p!=null) {
+            p.destroyForcibly();
+            try { p.waitFor(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        shmid=-1; // 同上：游戏进程没了，surface 重建只能走完整的用户启动流程
+        Gow3Present.stop();
     }
     @Override protected void onDestroy() {
         destroyed=true; pad.reset(); audio.stop(); main.removeCallbacksAndMessages(null);
