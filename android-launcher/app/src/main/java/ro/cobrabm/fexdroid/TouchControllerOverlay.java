@@ -34,14 +34,13 @@ final class TouchControllerOverlay extends View {
     private final SparseArray<String> controls=new SparseArray<>();
     private final SparseArray<PointF> positions=new SparseArray<>();
     private final Set<String> pressed=new LinkedHashSet<>();
-    private boolean mouseDown,editing;
-    private final boolean mouseEnabled;
+    private boolean editing;
     private int editPointer=-1;
     private String dragged;
     private Runnable onEditDone;
 
-    TouchControllerOverlay(Context context,PadBridge pad,boolean mouseEnabled) {
-        super(context); this.pad=pad; this.mouseEnabled=mouseEnabled;
+    TouchControllerOverlay(Context context,PadBridge pad) {
+        super(context); this.pad=pad;
         preferences=context.getSharedPreferences("gow3",Context.MODE_PRIVATE);
         for (int i=0;i<NAMES.length;i++) {
             String name=NAMES[i];
@@ -89,7 +88,7 @@ final class TouchControllerOverlay extends View {
     private void publish() {
         pressed.clear();
         int lx=128,ly=128,rx=128,ry=128,l2=0,r2=0;
-        boolean left=false,right=false,mouse=false;
+        boolean left=false,right=false;
         for (int i=0;i<controls.size();i++) {
             String control=controls.valueAt(i);
             PointF p=positions.get(controls.keyAt(i));
@@ -111,13 +110,8 @@ final class TouchControllerOverlay extends View {
             } else if (control.equals("l2")) { l2=255; pressed.add(control); }
             else if (control.equals("r2")) { r2=255; pressed.add(control); }
             else if (control.equals("touchpad")) pressed.add("touchpad_right"); /* 右侧点击:打开游戏暂停菜单,进而可进存档列表 */
-            else if (control.equals("mouse")) {
-                if (!mouse) XInput.moveTo(Math.max(0,Math.min(1279,Math.round(p.x))),
-                                          Math.max(0,Math.min(719,Math.round(p.y))));
-                mouse=true;
-            } else pressed.add(control);
+            else pressed.add(control);
         }
-        if (mouse!=mouseDown) { XInput.button(1,mouse); mouseDown=mouse; }
         pad.virtual(pressed,lx,ly,rx,ry,left,right,l2,r2);
         invalidate();
     }
@@ -164,9 +158,12 @@ final class TouchControllerOverlay extends View {
         if (action==MotionEvent.ACTION_CANCEL) { release(); return true; }
         if (action==MotionEvent.ACTION_DOWN || action==MotionEvent.ACTION_POINTER_DOWN) {
             float x=layoutX(e,at),y=layoutY(e,at);
+            // A touch that misses every control is dropped: there is no pointer channel under
+            // Bionic (no X11, no XTEST), so it could not reach the game anyway. The right stick is
+            // anchored where the finger landed instead. This is what Bloodborne-Android does too.
             String name=hit(x,y);
-            if (name==null && !mouseEnabled) return true;
-            controls.put(id,name==null ? "mouse" : name);
+            if (name==null) return true;
+            controls.put(id,name);
             positions.put(id,new PointF(x,y));
         } else if (action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_POINTER_UP) {
             controls.remove(id); positions.remove(id);

@@ -155,7 +155,7 @@ public final class GameActivity extends Activity {
         screen.addView(status,frame(-1,-1,Gravity.CENTER));
         status.setClickable(false);
 
-        controllerOverlay=new TouchControllerOverlay(this,pad,"1".equals(setting("overlay_mouse")));
+        controllerOverlay=new TouchControllerOverlay(this,pad);
         controllerOverlay.setVisibility(controllerEnabled() ? View.VISIBLE : View.GONE);
         screen.addView(controllerOverlay,frame(-1,-1,Gravity.CENTER));
 

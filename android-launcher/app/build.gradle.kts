@@ -59,15 +59,18 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
-            // libfxdisplay.so is the fexdroid X11 display bridge: the glibc/proot runtime drew
-            // through it, Bionic renders through libgow3present, so nothing loads it and it must
-            // not ship. It stays in tools/android/bridges/ with provenance.json, which records
-            // where the extracted binary came from.
-            //
-            // libfxio.so stays in the APK on purpose: TouchControllerOverlay's "mouse" control
-            // still uses XInput to aim the pointer in the game's menus. Pad state covers the
-            // gamepad, not the pointer, so dropping this would lose the mouse.
-            excludes += listOf("**/libfxdisplay.so")
+            // The two fexdroid bridges belong to the glibc/proot runtime and must not ship under
+            // Bionic:
+            //   libfxdisplay.so - the X11 display bridge; Bionic renders through libgow3present.
+            //   libfxio.so      - XTEST input injection; it reaches the game through an X display
+            //                     (/tmp/.X11-unix/X<n>, per its own "connect @" string) and Bionic
+            //                     has no X server, so it was never connect()ed here.
+            // Input reaches the game through the pad-state file and the IME request file instead,
+            // and a touch that misses a control is dropped rather than aimed - the same decision
+            // Bloodborne-Android makes ("no mouse input; the game is played with a controller").
+            // Both files stay in tools/android/bridges/ with provenance.json, which records where
+            // the extracted binaries came from.
+            excludes += listOf("**/libfxdisplay.so", "**/libfxio.so")
         }
     }
     sourceSets {
