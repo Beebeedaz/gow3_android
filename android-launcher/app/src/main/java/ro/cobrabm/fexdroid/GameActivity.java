@@ -814,6 +814,55 @@ public final class GameActivity extends Activity {
             if (attrs.preferredDisplayModeId!=id) { attrs.preferredDisplayModeId=id; getWindow().setAttributes(attrs); }
         });
     }
+    /**
+     * The Bionic runtime needs the game's derived inputs before it starts: the patch blob, the
+     * AppContent profile and launch.env. The glibc build produced these with the Python scripts in
+     * a rootfs or on a host; here libgow3prepare compiles them from the installed game. Returns
+     * false and reports when the game cannot be prepared, so a stale run never starts.
+     */
+    private boolean prepareBionicGame() {
+        try {
+            File game=new File(gameDir);
+            File update=updateDir!=null && !updateDir.isEmpty() ? new File(updateDir) : null;
+            com.gow3.android.data.PatchCatalog catalog=
+                    com.gow3.android.data.PatchCatalog.Companion.load(game, update, getAssets());
+            java.util.Map<String,String> ini=readIni(new File(DATA,"gow3.ini"));
+            com.gow3.android.data.Gow3Prepare.Result result=
+                    com.gow3.android.data.Gow3Prepare.INSTANCE.prepare(this,game,update,catalog,ini);
+            android.util.Log.i("God of War III",
+                    "bionic prepare: "+result.getReason()+"; applied="+result.getApplied()
+                            +"; writes="+result.getWriteCount()+"; dmem="+result.getDmemMb()
+                            +"; vblank="+result.getVblankHz());
+            if (!result.getOk()) {
+                error("Game preparation failed ("+result.getReason()+"): "+result.getMessage());
+                return false;
+            }
+            return true;
+        } catch (com.gow3.android.data.PatchCatalogException ex) {
+            error("This game's patch set is not available: "+ex.getProblem());
+            return false;
+        } catch (java.io.IOException ex) {
+            android.util.Log.e("God of War III","bionic prepare: cannot read the patch catalogue",ex);
+            error("Game preparation failed: "+ex);
+            return false;
+        } catch (Exception ex) {
+            android.util.Log.e("God of War III","bionic prepare failed",ex);
+            error("Game preparation failed: "+ex);
+            return false;
+        }
+    }
+    /** gow3.ini as key -> value, the same shape the settings dialog edits and PatchCatalog reads. */
+    private static java.util.Map<String,String> readIni(File file) {
+        java.util.Map<String,String> values=new java.util.LinkedHashMap<>();
+        try (java.io.BufferedReader reader=new java.io.BufferedReader(new java.io.FileReader(file))) {
+            String line;
+            while ((line=reader.readLine())!=null) {
+                int eq=line.indexOf('=');
+                if (eq>0 && !line.startsWith("#")) values.put(line.substring(0,eq).trim(),line.substring(eq+1).trim());
+            }
+        } catch (java.io.IOException ignored) { /* a missing ini means the defaults */ }
+        return values;
+    }
     private void startGame() {
         if (destroyed) return;
         hadError=false;
@@ -822,6 +871,7 @@ public final class GameActivity extends Activity {
         new File(BASE,"lsfg-fallback.marker").delete();
         pickRefreshRate();
         new File(BASE,"ime.request").delete(); new File(BASE,"ime.request.result").delete();
+        if (bionic() && !prepareBionicGame()) return;
         // 上一轮日志保留一代：写新的 android-game.log 前把旧的轮转为 android-game.prev.log，
         // 使崩溃日志在重启后不丢，并随日志导出一起打包。轮转失败时忽略，照常写新日志。
         File logDir=new File(DATA,"logs");

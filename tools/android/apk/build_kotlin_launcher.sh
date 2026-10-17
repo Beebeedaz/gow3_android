@@ -21,7 +21,12 @@ aapt=${GOW3_AAPT:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}/build-tools/35.
     exit 1
 }
 
-"$project/gradlew" -p "$project" :app:assembleDebug
+# The jniLibs (tools/android/bridges) are build outputs, so Gradle cannot tell they changed by
+# looking at the tree - they are not sources it tracks. Merge them explicitly every time, or a
+# rebuilt .so would never reach the APK.
+# --rerun-tasks on the packaging chain: assembleDebug is otherwise UP-TO-DATE and leaves the APK
+# file older than the payload it should contain, which the Bionic build's freshness check catches.
+"$project/gradlew" -p "$project" :app:mergeDebugJniLibFolders :app:assembleDebug --rerun-tasks
 [[ -f $apk ]] || { echo "build_kotlin_launcher: APK was not generated" >&2; exit 1; }
 if [[ ${GOW3_BIONIC:-0} == 1 ]]; then
     # Bionic：glibc bridge（libfxdisplay/libfxio）与 glibc runtime-manifest 校验不适用；

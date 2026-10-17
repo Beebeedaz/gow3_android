@@ -8,6 +8,14 @@ set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "$0")" && pwd)
 cd -- "$script_dir/../../.."
 
+# The launcher's own JNI code (frame receiving, patch compilation). Built here rather than by Gradle
+# so the .so are never stale; see tools/android/build_jni_libs.sh. They are build outputs, not
+# sources, so Gradle does not track them as jniLibs inputs: stamp them afterwards to make a
+# rebuild of the APK happen even when nothing else changed.
+bash tools/android/build_jni_libs.sh
+touch tools/android/bridges/"$(uname -m)"/*.so 2>/dev/null || true
+touch tools/android/bridges/*/*.so 2>/dev/null || true
+
 GOW3_BIONIC=1 bash tools/android/debug/stage_debug_runtime.sh
 
 # Steam sign-in libraries（与 glibc 调试构建一致）。
@@ -40,7 +48,8 @@ import hashlib, pathlib, sys, zipfile
 apk, payload = sys.argv[1], sys.argv[2]
 with zipfile.ZipFile(apk) as z:
     names = set(z.namelist())
-    for name in ('assets/runtime.payload', 'assets/runtime.sha256', 'lib/arm64-v8a/libgow3present.so'):
+    for name in ('assets/runtime.payload', 'assets/runtime.sha256',
+                 'lib/arm64-v8a/libgow3present.so', 'lib/arm64-v8a/libgow3prepare.so'):
         assert name in names, 'missing %s' % name
     packed = z.read('assets/runtime.payload')
     declared = z.read('assets/runtime.sha256').decode().split()[0]

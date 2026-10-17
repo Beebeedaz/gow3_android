@@ -1,18 +1,48 @@
 package com.gow3.android.data
 
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
+import android.content.res.AssetManager
 
-internal enum class PatchGroup { RESOLUTION, FRAME_RATE, VIDEO, FIX, EFFECT }
+enum class PatchGroup { RESOLUTION, FRAME_RATE, VIDEO, FIX, EFFECT }
 
-internal data class GamePatch(
+/**
+ * One <Line> of a patch: the site it patches (a signature plus an offset inside the match, or the
+ * reference build's address) and the bytes to write there. [target] names a <Target> the line writes
+ * instead of patching a site, and [value] may hold {rel:NAME:TAIL} placeholders.
+ */
+data class PatchLine(
+    val type: String,
+    val address: String,
+    val value: String,
+    val at: String,
+    val target: String,
+    val pattern: String,
+)
+
+/** A <Target> a patch refers to: either a whole line's site, or a place found by signature. */
+data class PatchTarget(
+    val name: String,
+    val line: String,
+    val at: String,
+    val ref: Boolean,
+    val tail: String,
+    val pattern: String,
+)
+
+data class GamePatch(
     val name: String,
     val note: String,
     val author: String,
     val validation: String,
     val defaultEnabled: Boolean,
+    val appVersion: String,
+    val appElf: String,
+    val lines: List<PatchLine>,
+    val targets: List<PatchTarget>,
 ) {
     val resolution: String? get() = name.takeIf { it.startsWith("Resolution Patch - ") }?.removePrefix("Resolution Patch - ")
     val fps: String? get() = name.takeIf { it.startsWith("Frame Rate Patch - ") }?.removePrefix("Frame Rate Patch - ")?.removeSuffix(" FPS")
@@ -25,10 +55,41 @@ internal data class GamePatch(
     }
 }
 
-internal enum class CatalogProblem { NO_GAME, INVALID_GAME, INVALID_UPDATE, UNSUPPORTED, VERSION, READ_FAILED }
-internal class PatchCatalogException(val problem: CatalogProblem) : Exception(problem.name)
+/**
+ * The catalogue in the flat text format libgow3prepare reads (gow3_prepare.h): one P block per
+ * patch, then its Targets and Lines. Names and patterns contain spaces, so both take the rest of
+ * their line; empty fields are a single '-'.
+ */
+internal fun PatchCatalog.toNativeInput(): String = buildString {
+    val field = { value: String -> value.trim().ifEmpty { "-" } }
+    for (patch in patches) {
+        append("P ").append(field(patch.name)).append('\n')
+        append("N ").append(field(patch.note.replace("\\", "\\\\").replace("\n", "\\n"))).append('\n')
+        append("V ").append(field(patch.appVersion)).append('\n')
+        append("E ").append(field(patch.appElf)).append('\n')
+        for (target in patch.targets) {
+            append("T ").append(field(target.name)).append(' ')
+                .append(field(target.line)).append(' ')
+                .append(field(target.at)).append(' ')
+                .append(if (target.ref) "1" else "0").append(' ')
+                .append(field(target.tail)).append(' ')
+                .append(field(target.pattern)).append('\n')
+        }
+        for (line in patch.lines) {
+            append("L ").append(field(line.type)).append(' ')
+                .append(field(line.address)).append(' ')
+                .append(field(line.value)).append(' ')
+                .append(field(line.at)).append(' ')
+                .append(field(line.target)).append(' ')
+                .append(field(line.pattern)).append('\n')
+        }
+    }
+}
 
-internal data class PatchCatalog(val titleId: String, val appVersion: String, val patches: List<GamePatch>) {
+enum class CatalogProblem { NO_GAME, INVALID_GAME, INVALID_UPDATE, UNSUPPORTED, VERSION, READ_FAILED }
+class PatchCatalogException(val problem: CatalogProblem) : Exception(problem.name)
+
+data class PatchCatalog(val titleId: String, val appVersion: String, val patches: List<GamePatch>) {
     val selectionKey: String get() = "patches_${titleId}_${appVersion.replace('.', '_')}"
 
     /** 分辨率和帧率与首页共用设置，其余选择按 Title ID 和版本隔离。 */
@@ -76,6 +137,9 @@ internal data class PatchCatalog(val titleId: String, val appVersion: String, va
             "CUSA01720" to setOf("01.02"), "CUSA01740" to setOf("01.00", "01.02"),
         )
 
+        // The caller opens the asset, so a missing one surfaces as an IOException to Java callers.
+        @JvmStatic
+        @Throws(IOException::class)
         fun load(game: File?, update: File?, open: (String) -> InputStream): PatchCatalog {
             if (game == null) throw PatchCatalogException(CatalogProblem.NO_GAME)
             if (!File(game, "eboot.bin").isFile) throw PatchCatalogException(CatalogProblem.INVALID_GAME)
@@ -94,6 +158,46 @@ internal data class PatchCatalog(val titleId: String, val appVersion: String, va
             return open("God_of_War_III_Remastered_$title.xml").use { parse(it, title, version) }
         }
 
+        /**
+         * 供 Java 调用方使用（GameActivity）：asset 在这里打开，受检 IOException 由 load 自己声明。
+         * Java 的 lambda（Function1.invoke 没有 throws）不允许穿出受检异常，所以不能把
+         * AssetManager.open 直接交给调用方包成 lambda。
+         */
+        @JvmStatic
+        @Throws(IOException::class)
+        fun load(game: File?, update: File?, assets: AssetManager): PatchCatalog =
+            load(game, update) { assets.open(it) }
+
+        private fun readLines(meta: Element): List<PatchLine> {
+            val nodes = meta.getElementsByTagName("Line")
+            return (0 until nodes.length).map { index ->
+                val line = nodes.item(index) as Element
+                PatchLine(
+                    line.getAttribute("Type"),
+                    line.getAttribute("Address"),
+                    line.getAttribute("Value"),
+                    line.getAttribute("At"),
+                    line.getAttribute("Target"),
+                    line.getAttribute("Pattern"),
+                )
+            }
+        }
+
+        private fun readTargets(meta: Element): List<PatchTarget> {
+            val nodes = meta.getElementsByTagName("Target")
+            return (0 until nodes.length).map { index ->
+                val target = nodes.item(index) as Element
+                PatchTarget(
+                    target.getAttribute("Name"),
+                    target.getAttribute("Line"),
+                    target.getAttribute("At"),
+                    target.hasAttribute("Ref"),
+                    target.getAttribute("Tail"),
+                    target.getAttribute("Pattern"),
+                )
+            }
+        }
+
         /** 仅解析 APK 内随运行时一起打包的目录，不读取玩家的外部 XML。 */
         fun parse(input: InputStream, title: String, version: String): PatchCatalog {
             val root = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(input).documentElement
@@ -107,7 +211,9 @@ internal data class PatchCatalog(val titleId: String, val appVersion: String, va
                         (meta.getAttribute("Name") == "Bug Fix - Startup Black Screen").toString()
                     }.toBoolean()
                     GamePatch(meta.getAttribute("Name"), meta.getAttribute("Note"), meta.getAttribute("Author"),
-                        meta.getAttribute("Validation"), meta.getAttribute("isEnabled").toBoolean() || always)
+                        meta.getAttribute("Validation"), meta.getAttribute("isEnabled").toBoolean() || always,
+                        meta.getAttribute("AppVer"), meta.getAttribute("AppElf").ifEmpty { "eboot.bin" },
+                        readLines(meta), readTargets(meta))
                 }
             require(patches.isNotEmpty() && patches.map { it.name }.distinct().size == patches.size)
             return PatchCatalog(title, version, patches)
