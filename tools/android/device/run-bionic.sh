@@ -11,7 +11,7 @@
 # usage: run-bionic.sh [game|vulkan]   env from the app: GOW3_SCREEN_W/SCREEN_H、GOW3_GAME_DIR、
 #        GOW3_APP0_DIR、GOW3_ANDROID_INPUT=1
 set -eu
-files=${FXD_FILES:-/data/user/0/com.gow3.android/files}
+files=${FXD_FILES:-/data/user/0/com.gow3.android.bionic/files}
 base="$files/gow3port"
 bionic="$base/bionic"
 export FXD_FILES="$files"

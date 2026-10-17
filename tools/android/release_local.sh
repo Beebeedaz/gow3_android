@@ -362,7 +362,10 @@ else
 
     apply_version
 
-    bash tools/android/apk/build_release_apk.sh
+    # The glibc release packer went with the glibc runtime (tools/android/apk/build_release_apk.sh
+    # built a rootfs payload that no longer exists). The Bionic release entry point is still to be
+    # written - OpenSpec 8.2 - so fail here instead of calling a script that no longer exists.
+    die "no Bionic release packer yet (OpenSpec 8.2); use tools/android/debug/build_bionic_debug_apk.sh for a debug APK"
 
     [[ -f $apk_path ]] || die "release APK was not produced: $apk_path"
     [[ -f $checksum_path ]] || die "release checksum was not produced: $checksum_path"

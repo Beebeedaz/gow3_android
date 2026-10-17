@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
 
 /** God of War III-only Android player. Keeps the game surface alive beneath its sliding drawer. */
 public final class GameActivity extends Activity {
-    /** The app's files (application id com.gow3.android), its Linux rootfs and gow3port runtime.
+    /** The app's files (application id com.gow3.android.bionic) and its gow3port runtime tree.
      *  Rootfs programs are launched through the in-tree loader when their PT_INTERP slot cannot
      *  hold the app-private path. */
     private String FILES, ROOT, BASE, DATA;
@@ -219,7 +219,7 @@ public final class GameActivity extends Activity {
             closeDrawer();
             new SettingsDialog(this,new File(DATA,"gow3.ini"),this::restartGame).show();
         });
-        // Tuning only. Supplying Lossless.dll is the launcher Home page's job (com.gow3.android);
+        // Tuning only. Supplying Lossless.dll is the launcher Home page's job;
         // the drawer's row reports the multiplier, never where the DLL came from. LSFG 是唯一帧生成
         // 路径，FSR 3.1 帧生成未接通，不要在这里再加 FSR 帧生成入口。
         losslessItem=menuItem("ic_frames","Lossless Scaling","",() -> {

@@ -19,7 +19,6 @@ env:
   ANDROID_BUILD_TOOLS: '35.0.0'
   GOW3_BUILD_TYPE: Release
   # These paths are intentionally outside the checkout and are never uploaded.
-  GOW3_ROOTFS: /data/user/0/com.gow3.android/files/rootfs
 
 jobs:
   source-check:

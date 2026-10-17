@@ -40,7 +40,7 @@ apk="out/debug/God of War III-bionic-debug-$version.apk"
 sdk=${GOW3_ANDROID_SDK:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}
 bt="$sdk/build-tools/${GOW3_BUILD_TOOLS:-35.0.0}"
 "$bt/apksigner" verify "$apk"
-"$bt/aapt" dump badging "$apk" | grep -F com.gow3.android >/dev/null
+"$bt/aapt" dump badging "$apk" | grep -F com.gow3.android.bionic >/dev/null
 # Bionic：校验 payload 是 Bionic runtime 且 APK 带 libgow3present.so；glibc bridge 校验跳过。
 # 摘要比对证明包里的 payload 就是本次 staged 的那一份，而不是上次构建残留的。
 python3 - "$apk" "$payload" <<'PY'

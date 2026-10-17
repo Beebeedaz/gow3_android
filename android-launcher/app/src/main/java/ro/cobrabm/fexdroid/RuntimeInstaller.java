@@ -63,12 +63,14 @@ final class RuntimeInstaller {
             throw new IllegalStateException("Runtime archive is incomplete: directory " + relative);
     }
 
-    private static void validateRuntime(File root) throws Exception {
+    /** @param applicationId the running app's id, so a payload built for another one is refused
+     *  instead of silently writing into filesDir paths the payload's manifest disagrees with. */
+    private static void validateRuntime(File root, String applicationId) throws Exception {
         File manifest = path(root, "runtime-manifest.json");
         if (!manifest.isFile()) throw new IllegalStateException("Runtime archive is incomplete: manifest");
         String text = new String(Files.readAllBytes(manifest.toPath()), StandardCharsets.UTF_8);
         if (!text.contains("\"schema_version\": 1") ||
-                !text.contains("\"application_id\": \"com.gow3.android\"") ||
+                !text.contains("\"application_id\": \"" + applicationId + "\"") ||
                 !text.contains("\"java_package\": \"ro.cobrabm.fexdroid\""))
             throw new IllegalStateException("Runtime archive is incompatible: manifest identity");
         // Bionic 运行时（NDK/Bionic 原生进程，无 rootfs/X11/LSFG）：gow3port/bionic。
@@ -168,7 +170,7 @@ final class RuntimeInstaller {
             expected = new String(readAll(in), StandardCharsets.US_ASCII).trim();
         } catch (java.io.FileNotFoundException missing) {
             try {
-                validateRuntime(files);
+                validateRuntime(files, context.getPackageName());
                 Gow3Data.prepare(files, path(files, "gow3port/gow3.default.ini"));
                 return false;
             }
@@ -180,7 +182,7 @@ final class RuntimeInstaller {
         File marker = new File(files, ".runtime.sha256");
         if (marker.isFile() && expected.equals(new String(Files.readAllBytes(marker.toPath()), StandardCharsets.US_ASCII).trim())) {
             try {
-                validateRuntime(files);
+                validateRuntime(files, context.getPackageName());
                 Gow3Data.prepare(files, path(files, "gow3port/gow3.default.ini"));
                 return false;
             }
@@ -210,7 +212,7 @@ final class RuntimeInstaller {
             if (tar.waitFor() != 0)
                 throw new IllegalStateException("Runtime extraction failed: " +
                         new String(log, 0, Math.min(log.length, 2048), StandardCharsets.UTF_8));
-            validateRuntime(stage);
+            validateRuntime(stage, context.getPackageName());
             Gow3Data.prepare(files, path(stage, "gow3port/gow3.default.ini"));
             promote(files, stage, expected);
             return true;

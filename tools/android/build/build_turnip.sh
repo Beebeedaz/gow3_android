@@ -70,7 +70,7 @@ if [[ $variant == gen8 ]]; then
 else
     patches=("${common_patches[@]}")
 fi
-rootfs=/data/user/0/com.gow3.android/files/rootfs
+rootfs=/data/user/0/com.gow3.android.bionic/files/rootfs
 deps=$PWD/.local-deps/android
 sysroot=$deps/mesa-sysroot
 src=$deps/src/mesa${suffix/_/-}

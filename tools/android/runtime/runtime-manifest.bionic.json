@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "profile": "release-bionic",
-  "application_id": "com.gow3.android",
+  "application_id": "com.gow3.android.bionic",
   "java_package": "ro.cobrabm.fexdroid",
   "target_sdk": 28,
   "abi": "arm64-v8a",

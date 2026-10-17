@@ -69,12 +69,12 @@ if [[ -z $device ]]; then
     exit 0
 fi
 
-adb -s "$device" shell "run-as com.gow3.android mkdir -p files/gow3port/data"
+adb -s "$device" shell "run-as com.gow3.android.bionic mkdir -p files/gow3port/data"
 for f in boot-linked.bin content.bin patches.bin patch_status.json launch.env; do
     adb -s "$device" push "$out/$f" "/data/local/tmp/gow3-$f" >/dev/null
-    adb -s "$device" shell "run-as com.gow3.android sh -c 'cat /data/local/tmp/gow3-$f > files/gow3port/data/$f'"
+    adb -s "$device" shell "run-as com.gow3.android.bionic sh -c 'cat /data/local/tmp/gow3-$f > files/gow3port/data/$f'"
 done
-adb -s "$device" shell "run-as com.gow3.android ls -la files/gow3port/data"
+adb -s "$device" shell "run-as com.gow3.android.bionic ls -la files/gow3port/data"
 echo "Bionic game inputs deployed to $device: $(python3 -c "
 import json;r=json.load(open('$out/patch_status.json'))
 print(r['identity']['title_id'], r['identity']['app_version'], r['reason'], '%d writes' % r['write_count'])")"

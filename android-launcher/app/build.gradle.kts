@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.gow3.android"
+        applicationId = "com.gow3.android.bionic"
         minSdk = 28
         targetSdk = 28
         versionCode = 1

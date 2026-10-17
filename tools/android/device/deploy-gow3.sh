@@ -4,7 +4,7 @@ set -euo pipefail
 cd -- "$(dirname -- "$0")/../../.."
 serial=${1:?usage: deploy_gow3.sh ADB_SERIAL [bundle-directory]}
 bundle=${2:-out/thor/bundle}
-app=com.gow3.android
+app=com.gow3.android.bionic
 files=/data/data/$app/files
 adb_cmd=(adb -s "$serial")
 "${adb_cmd[@]}" shell run-as "$app" test -x "$files/rootfs/usr/bin/FEX"
