@@ -23,7 +23,11 @@ golden tests are what keep the C++ honest against them.
 | `patches.py` | `gow3_prepare.cpp` | reference for the G3PATCH2 blob |
 | `content_profile.py` | `gow3_prepare.cpp` (`ContentProfile`) | reference for `content.bin` |
 | `launch_env.py` | — (Kotlin writes `launch.env`) | desktop |
-| `game_identity.py`, `game_update.py`, `graphics_options.py`, `mods.py`, `save_backup.py`, `texture_diagnostics.py`, `verify_game_patches.py` | — | desktop |
+| `game_identity.py`, `game_update.py`, `graphics_options.py`, `mods.py`, `save_backup.py`, `verify_game_patches.py` | — | desktop |
+
+Removed 2026-10-17: `texture_diagnostics.py` — it only fed the retired glibc `run-gow3.sh`'s
+`texture_integrity.json` log line. Under Bionic the same facts live in `patch_status.json`
+(written by the device) and the game log. |
 
 Regenerating the parity evidence needs a game directory:
 

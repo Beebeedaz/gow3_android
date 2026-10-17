@@ -14,7 +14,6 @@ from launch_env import derive
 from patch_fixtures import make_game, RES720, TEXTURE, STARTUP, FPS120
 from prepare import parse_self
 from test_prepare import fixture
-from texture_diagnostics import record
 
 
 class Android1740Tests(unittest.TestCase):
@@ -66,8 +65,9 @@ class Android1740Tests(unittest.TestCase):
         self.assertEqual((result['dmem'], result['vblank']), (7104, 60))
         self.assertEqual(result['updates']['GOW3_ENGINE_FPS'], '60')
         self.assertEqual(before, verify.input_digests(self.game))
-        data = record(self.root / 'diagnostics.json', report, env={})
-        self.assertEqual(data['render_resolution'], '720p')
+        # 诊断文件（texture_integrity.json）已随 glibc 退役移除；分辨率来自 report 本身，
+        # 由 Gow3Prepare 写进 patch_status.json 供日志与排查消费。
+        self.assertEqual(report['effective']['render_resolution'], '720p')
 
     def test_native_restart_replaces_previous_720p(self):
         first = self.launch()
