@@ -41,9 +41,10 @@ import com.gow3.android.data.SaveManager
 import com.gow3.android.feature.about.AboutScreen
 import com.gow3.android.feature.home.HomeScreen
 import com.gow3.android.feature.mods.ModsScreen
+import com.gow3.android.feature.settings.SettingsScreen
 import com.gow3.android.ui.components.LauncherColors
 
-private enum class LauncherTab { HOME, MODS, ABOUT }
+private enum class LauncherTab { HOME, SETTINGS, MODS, ABOUT }
 
 @Composable
 internal fun LauncherScreen(
@@ -81,6 +82,7 @@ internal fun LauncherScreen(
             )
             when (tab) {
                 LauncherTab.HOME -> HomeScreen(onStartGame, losslessDlls, onGetFromSteam, onChooseGameFolder, onChooseUpdateFolder)
+                LauncherTab.SETTINGS -> SettingsScreen()
                 LauncherTab.MODS -> ModsScreen()
                 LauncherTab.ABOUT -> AboutScreen(saves, logs, onChangeLanguage)
             }
@@ -108,7 +110,8 @@ private fun BottomNavigation(selectedTab: LauncherTab, onTabSelected: (LauncherT
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             NavItem(LauncherTab.HOME, selectedTab == LauncherTab.HOME, stringResource(R.string.nav_home), "⌂", onTabSelected)
-            NavItem(LauncherTab.MODS, selectedTab == LauncherTab.MODS, stringResource(R.string.nav_mods), "⚙", onTabSelected)
+            NavItem(LauncherTab.SETTINGS, selectedTab == LauncherTab.SETTINGS, stringResource(R.string.nav_settings), "⚙", onTabSelected)
+            NavItem(LauncherTab.MODS, selectedTab == LauncherTab.MODS, stringResource(R.string.nav_mods), "☰", onTabSelected)
             NavItem(LauncherTab.ABOUT, selectedTab == LauncherTab.ABOUT, stringResource(R.string.nav_about), "ⓘ", onTabSelected)
         }
     }

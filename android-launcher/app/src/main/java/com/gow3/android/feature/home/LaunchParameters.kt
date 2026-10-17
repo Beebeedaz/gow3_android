@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,36 +22,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.gow3.android.R
-import com.gow3.android.data.LaunchParam
-import com.gow3.android.data.LaunchParams
-import com.gow3.android.data.PatchCatalog
 import com.gow3.android.data.MobilePreset
 import com.gow3.android.data.MobilePresets
+import com.gow3.android.data.PatchCatalog
 import com.gow3.android.ui.components.LauncherColors
 
+/**
+ * Home 页的「启动配置」卡片：只承载游戏目录/更新目录选择与默认配置（DEFAULT PROFILE）
+ * 预设选择。启动参数的就地编辑全部位于 Settings tab（见 change add-android-launcher-config-tab）。
+ */
 @Composable
 internal fun LaunchParameters(
     gameDir: String?,
     updateDir: String?,
     ini: Map<String, String>,
-    save: (String, String) -> Unit,
     onChooseGameFolder: () -> Unit,
     onChooseUpdateFolder: () -> Unit,
     catalog: PatchCatalog?,
     catalogLoading: Boolean,
     applyPreset: (MobilePreset) -> Unit,
 ) {
-    val context = LocalContext.current
-    val groups = LaunchParams.forCatalog(catalog).groupBy { it.groupRes }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -63,9 +58,8 @@ internal fun LaunchParameters(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(R.string.launch_parameters_title), color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+        Text(stringResource(R.string.launch_setup_title), color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
         Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Text(stringResource(R.string.launch_parameters_group_game), color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -117,13 +111,6 @@ internal fun LaunchParameters(
             color = LauncherColors.textMuted, fontSize = 11.sp, lineHeight = 16.sp,
         )
         MobilePresetSelector(catalog, ini, applyPreset)
-        groups.forEach { (titleRes, params) ->
-            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text(context.getString(titleRes), color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                params.forEach { param -> ParamRow(param, ini, save) }
-            }
-        }
-        Text(stringResource(R.string.launch_parameters_footer), color = LauncherColors.textMuted, fontSize = 11.sp, lineHeight = 16.sp)
     }
 }
 
@@ -161,119 +148,5 @@ private fun MobilePresetSelector(catalog: PatchCatalog?, ini: Map<String, String
         }
         Text(stringResource(R.string.mobile_preset_description), color = LauncherColors.textMuted,
             fontSize = 11.sp, lineHeight = 16.sp)
-    }
-}
-
-@Composable
-private fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (String, String) -> Unit) {
-    val context = LocalContext.current
-    var showInfo by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(context.getString(param.labelRes), color = LauncherColors.textMuted, fontSize = 13.sp)
-            if (param.descriptionRes != null) {
-                Text(
-                    "ⓘ",
-                    color = LauncherColors.gold,
-                    fontSize = 13.sp,
-                    lineHeight = 13.sp,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable { showInfo = true }
-                        .padding(2.dp),
-                )
-            }
-        }
-        if (param.options.size == 2 && param.options[0].value == "0" && param.options[1].value == "1") {
-            Switch(
-                checked = LaunchParams.valueOf(values, param) == "1",
-                onCheckedChange = { save(param.key, if (it) "1" else "0") },
-                enabled = param.enabled,
-            )
-        } else {
-            var expanded by remember(param.options, param.enabled) { mutableStateOf(false) }
-            Box {
-                Text(
-                    selectedLabel(context, values, param) + "  ▾",
-                    color = if (param.enabled) LauncherColors.textPrimary else LauncherColors.textMuted,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(LauncherColors.navSurface)
-                        .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)), RoundedCornerShape(8.dp))
-                        .clickable(enabled = param.enabled) { expanded = true }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                )
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    param.options.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(context.getString(option.labelRes)) },
-                            onClick = {
-                                expanded = false
-                                save(param.key, option.value)
-                            },
-                        )
-                    }
-                }
-            }
-        }
-    }
-    if (showInfo && param.descriptionRes != null) {
-        ParamInfoDialog(
-            title = context.getString(param.labelRes),
-            message = context.getString(param.descriptionRes),
-            onDismiss = { showInfo = false },
-        )
-    }
-}
-
-/** 当前值对应的本地化展示名；未知值回退到原始值。 */
-private fun selectedLabel(context: android.content.Context, values: Map<String, String>, param: LaunchParam): String {
-    val option = LaunchParams.selectedOption(values, param)
-    if (option == null && param.enabled && LaunchParams.isPatchSetting(param.key)) {
-        return context.getString(R.string.home_patch_unavailable_value, LaunchParams.valueOf(values, param))
-    }
-    return option?.let { context.getString(it.labelRes) } ?: LaunchParams.valueOf(values, param)
-}
-
-@Composable
-private fun ParamInfoDialog(title: String, message: String, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .widthIn(max = 340.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(LauncherColors.surface)
-                .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.5f)), RoundedCornerShape(14.dp))
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(title, color = LauncherColors.gold, fontFamily = FontFamily.Serif, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
-            Text(message, color = LauncherColors.textMuted, fontSize = 13.sp, lineHeight = 19.sp)
-            Text(
-                stringResource(R.string.dialog_ok),
-                color = LauncherColors.textPrimary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.4.sp,
-                modifier = Modifier
-                    .align(Alignment.End)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(LauncherColors.navSurface)
-                    .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.45f)), RoundedCornerShape(8.dp))
-                    .clickable(onClick = onDismiss)
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
-            )
-        }
     }
 }
