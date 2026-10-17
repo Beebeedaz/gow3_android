@@ -922,7 +922,29 @@ public final class GameActivity extends Activity {
     }
     @Override protected void onDestroy() {
         destroyed=true; pad.reset(); audio.stop(); main.removeCallbacksAndMessages(null);
-        DisplayBridge.stop(); stopGame(); if (xvfb!=null) xvfb.destroyForcibly();
-        worker.shutdownNow(); super.onDestroy();
+        worker.shutdownNow();
+        // The teardown used to run here on the main thread, which is what turned every quit into an
+        // ANR. Two things in it block: DisplayBridge.stop() is a native call into the legacy X11
+        // bridge, and Bionic never starts that bridge - calling it anyway hung the quit before
+        // stopGame() ever ran, so the game process survived the exit as well - and
+        // Process.waitFor() blocks until the game is gone. Both move to their own thread; the
+        // activity goes away at once and the game is reaped behind it.
+        final Process p=game; game=null;
+        final Process display=xvfb; xvfb=null;
+        final boolean legacy=!bionic();
+        new Thread(() -> {
+            try {
+                // Only the bridge that is actually running may be stopped.
+                if (legacy) DisplayBridge.stop(); else Gow3Present.stop();
+                if (p!=null) {
+                    p.destroyForcibly();
+                    try { p.waitFor(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                }
+                if (display!=null) display.destroyForcibly();
+            } catch (RuntimeException ignored) {
+                // Teardown is best effort: the activity is already going away.
+            }
+        },"gow3-teardown").start();
+        super.onDestroy();
     }
 }
