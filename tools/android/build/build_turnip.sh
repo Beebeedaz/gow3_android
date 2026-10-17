@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
-# Turnip (Mesa's Adreno Vulkan driver) for the Thor's Debian trixie arm64 rootfs, KGSL only,
-# cross-compiled with Clang, in one of two variants (README in tools/android/mesa-patches):
+# Turnip (Mesa's Adreno Vulkan driver) for Android, KGSL only, cross-compiled with Clang,
+# in one of two variants (README in tools/android/mesa-patches):
 #   main: Mesa at the pinned commit + mesa-patches/*.patch -> out/arm64/turnip
 #         (libvulkan_freedreno.so, freedreno_icd.aarch64.json, drirc.d/)
 #   gen8: the turnip/gen8 branch (Adreno 8xx) + mesa-patches/gen8/*.patch (upstream KGSL fixes it
 #         predates) + mesa-patches/*.patch -> out/arm64/turnip-gen8 (libvulkan_freedreno_gen8.so,
-#         freedreno_gen8_icd.aarch64.json); run-gow3.sh picks it on Adreno 8xx.
-# build_release_runtime.py ships both.
+#         freedreno_gen8_icd.aarch64.json)
+# The Bionic runtime payload ships no driver at all. These outputs are a source for
+# adrenotools-style driver packs: install them on the device into files/drivers/<name>/
+# (DriverManager in the launcher, or tools/android/device/install_bionic_driver.sh), and
+# run-bionic.sh loads whichever gow3.ini's gpu_driver selects (or "system" for the vendor driver).
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../../.."
 die() { echo "build_turnip: $*" >&2; exit 1; }
-# Per-stage progress (same style as build_android_runtime.sh). ninja output stays in build.log
+# Per-stage progress, one line per stage. ninja output stays in build.log
 # to avoid the 600+ line compile scroll; only the stage name and elapsed time surface.
 step=0; total=6; _t0=0
 begin()    { step=$((step + 1)); _t0=$(date +%s); printf '\n==> [%d/%d] %s\n' "$step" "$total" "$*"; }
