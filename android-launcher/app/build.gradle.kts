@@ -59,11 +59,15 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
-            // The fexdroid X11 display and input bridges belonged to the glibc/proot runtime. Bionic
-            // renders through libgow3present and injects input from Java, so nothing loads these and
-            // they must not ship. They stay in tools/android/bridges/ with provenance.json, which
-            // records where the extracted binaries came from.
-            excludes += listOf("**/libfxdisplay.so", "**/libfxio.so")
+            // libfxdisplay.so is the fexdroid X11 display bridge: the glibc/proot runtime drew
+            // through it, Bionic renders through libgow3present, so nothing loads it and it must
+            // not ship. It stays in tools/android/bridges/ with provenance.json, which records
+            // where the extracted binary came from.
+            //
+            // libfxio.so stays in the APK on purpose: TouchControllerOverlay's "mouse" control
+            // still uses XInput to aim the pointer in the game's menus. Pad state covers the
+            // gamepad, not the pointer, so dropping this would lose the mouse.
+            excludes += listOf("**/libfxdisplay.so")
         }
     }
     sourceSets {
