@@ -90,7 +90,12 @@ if [[ $stale == 1 ]]; then
 fi
 
 mkdir -p "$payload_dir"
-cp -f "$archive" "$payload_dir/runtime.payload"
-# 运行时摘要：RuntimeInstaller 校验用（sha256 与 payload 一致）。
-shasum -a 256 "$archive" | awk '{print $1}' > "$payload_dir/runtime.sha256"
+# 内容感知复制：archive 未变时不触碰 payload 的 mtime。Gradle（externalNativeBuild 之后）
+# 会正确地 up-to-date 跳过 APK 重建，build_bionic_debug_apk.sh 的 freshness 检查
+# （APK 必须比 payload 新）依赖这里不再无意义地刷新时间戳——否则每次 debug 构建都会误报。
+if [[ ! -f $payload_dir/runtime.payload ]] || ! cmp -s "$archive" "$payload_dir/runtime.payload"; then
+    cp -f "$archive" "$payload_dir/runtime.payload"
+    # 运行时摘要：RuntimeInstaller 校验用（sha256 与 payload 一致）。
+    shasum -a 256 "$archive" | awk '{print $1}' > "$payload_dir/runtime.sha256"
+fi
 echo "Bionic runtime payload: $payload_dir/runtime.payload ($(du -h "$archive" | cut -f1))"

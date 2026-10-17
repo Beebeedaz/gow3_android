@@ -8,14 +8,8 @@ set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "$0")" && pwd)
 cd -- "$script_dir/../../.."
 
-# The launcher's own JNI code (frame receiving, patch compilation). Built here rather than by Gradle
-# so the .so are never stale; see tools/android/build_jni_libs.sh. They are build outputs, not
-# sources, so Gradle does not track them as jniLibs inputs: stamp them afterwards to make a
-# rebuild of the APK happen even when nothing else changed.
-bash tools/android/build_jni_libs.sh
-touch tools/android/bridges/"$(uname -m)"/*.so 2>/dev/null || true
-touch tools/android/bridges/*/*.so 2>/dev/null || true
-
+# The launcher's own JNI code（帧接收、补丁编译）由 Gradle externalNativeBuild 在
+# assembleDebug 中直接从 app/src/main/cpp 产出，无需（也无法）在此先行构建 .so。
 GOW3_BIONIC=1 bash tools/android/debug/stage_debug_runtime.sh
 
 # Steam sign-in libraries（与 glibc 调试构建一致）。
@@ -27,14 +21,11 @@ version=$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' android-launcher/app/b
 mkdir -p out/debug
 apk_src=android-launcher/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
 [[ -f $apk_src ]] || { echo "build_bionic_debug_apk: gradle produced no APK" >&2; exit 1; }
-# Freshness: the packaged APK must be newer than the staged payload. Without this a previous
-# build's APK survives a failed rebuild and still passes every check below, so the reported
-# artifact does not come from the current tree.
+# Freshness：不再比较 mtime。JNI 与 assets 都由 Gradle 内容敏感的任务追踪
+# （externalNativeBuild 源码、assets.srcDir 文件内容），up-to-date 的 APK 必然已包含
+# 当前输入；真正的「包里 payload 是不是这份」由下方 python 摘要比对逐字节证明。
+# 构建失败时 set -e 直接退出，不存在旧 APK 蒙混过关的路径。
 payload=out/android-debug/assets/runtime.payload
-if [[ ! $apk_src -nt $payload ]]; then
-    echo "build_bionic_debug_apk: $apk_src is older than the staged payload; the build did not package the current runtime" >&2
-    exit 1
-fi
 cp "$apk_src" "out/debug/God of War III-bionic-debug-$version.apk"
 apk="out/debug/God of War III-bionic-debug-$version.apk"
 sdk=${GOW3_ANDROID_SDK:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}

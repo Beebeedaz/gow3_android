@@ -26,7 +26,27 @@ android {
         versionName = "2.1.7-bionic-v1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // 静态 libc++：launcher 不带 libc++_shared.so，不为两个小库多塞一份运行时。
+        // NDK 与 runtime 工具链（tools/android/build_bionic.sh）保持同一个版本。
+        externalNativeBuild {
+            cmake {
+                arguments += "-DANDROID_STL=c++_static"
+                abiFilters += "arm64-v8a"
+            }
+        }
     }
+
+    // launcher 自己的 JNI 桥库（libgow3present / libgow3prepare）由 CMake 在 APK
+    // 构建中直接产出：src/main/cpp 是 Android Studio 原生识别的目录，AS 的 Run 与
+    // 命令行 gradlew 走同一条 native 构建路径，不再有脚本旁路与过期 .so。
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+    ndkVersion = "29.0.14206865"
 
     buildTypes {
         release {
@@ -65,7 +85,6 @@ android {
         getByName("main") {
             // 页面与运行时共用按 ID 的 XML 目录，不维护第二份补丁名单。
             assets.srcDir("../../patches")
-            jniLibs.srcDir("../../tools/android/bridges")
             // Steam real implementation vs. no-Steam fallback, gated on the fetched libraries.
             java.srcDir(if (steamAvailable) "src/steam/java" else "src/steamStub/java")
             if (steamAvailable) {
