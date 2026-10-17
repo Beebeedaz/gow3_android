@@ -269,4 +269,59 @@
     <string name="mods_details">Details</string>
     <string name="mods_hide_details">Hide details</string>
     <string name="mods_author">Author: %1$s</string>
+
+    <!-- 驱动管理卡片（Home 选择 + Settings DRIVER 分类） -->
+    <string name="driver_card_title">GPU DRIVER</string>
+    <string name="driver_card_system">System driver</string>
+    <string name="driver_card_footer">Switching takes effect the next time the game starts. Download more drivers in Settings → DRIVER.</string>
+    <string name="driver_card_needs_game_folder">Select your game folder first — driver switching stays disabled until then.</string>
+    <string name="driver_pick_selected_fmt">Selected %1$s. Takes effect on the next launch.</string>
+
+    <string name="driver_manager_title">GPU DRIVER</string>
+    <string name="driver_manager_system_fmt">System driver (%1$s)</string>
+    <string name="driver_manager_stock">stock</string>
+    <string name="driver_manager_version_fmt">Version %1$s</string>
+    <string name="driver_manager_author_fmt">Author: %1$s</string>
+    <string name="driver_manager_library_fmt">Library: %1$s</string>
+    <string name="driver_manager_invalid">Unusable — the driver library is missing</string>
+    <string name="driver_manager_delete">DELETE</string>
+    <string name="driver_manager_confirm_delete_fmt">Delete %1$s? The pack is removed from the launcher\'s private folder.</string>
+    <string name="driver_manager_deleted_fmt">Deleted %1$s.</string>
+    <string name="driver_manager_deleted_fallback_fmt">Deleted %1$s. Switched back to the system driver.</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="driver_manager_download">DOWNLOAD DRIVERS</string>
+    <string name="driver_manager_import">IMPORT DRIVERS</string>
+    <string name="driver_manager_network">DOWNLOAD ACCELERATION</string>
+    <string name="driver_manager_needs_game_folder">Select your game folder before changing drivers.</string>
+    <string name="driver_manager_footer">Driver packs live in the launcher\'s private storage and are resolved through gow3.ini at the next launch.</string>
+
+    <string name="driver_dl_title">Download drivers</string>
+    <string name="driver_dl_sources_unavailable">The built-in driver source list could not be loaded.</string>
+    <string name="driver_dl_loading">Loading…</string>
+    <string name="driver_dl_empty">No downloadable driver packs in this source.</string>
+    <string name="driver_dl_failed_network">Could not reach GitHub. Check your connection and retry.</string>
+    <string name="driver_dl_failed_rate_limit">GitHub rate limit reached. Try again later.</string>
+    <string name="driver_dl_failed_http_fmt">Request failed (HTTP %1$d).</string>
+    <string name="driver_dl_retry">RETRY</string>
+    <string name="driver_dl_downloaded">Downloaded</string>
+    <string name="driver_dl_download">DOWNLOAD</string>
+    <string name="driver_dl_downloading_fmt">Downloading %1$s… %2$s / %3$s</string>
+    <string name="driver_dl_unknown_size">unknown size</string>
+    <string name="driver_dl_cancel">CANCEL</string>
+    <string name="driver_dl_done_fmt">Installed %1$s. It now appears in the driver list.</string>
+    <string name="driver_dl_failed_install">The downloaded package is not a usable driver pack and was discarded.</string>
+    <string name="driver_dl_failed_download">The download failed. Try again.</string>
+    <string name="driver_dl_close">CLOSE</string>
+
+    <string name="driver_px_title">Download acceleration</string>
+    <string name="driver_px_direct">Direct connection</string>
+    <string name="driver_px_custom">Custom mirror prefix</string>
+    <string name="driver_px_active_fmt">Active: %1$s</string>
+    <string name="driver_px_direct_label">direct connection</string>
+    <string name="driver_px_save">SAVE</string>
+    <string name="driver_px_speedtest">SPEED TEST</string>
+    <string name="driver_px_testing">Testing…</string>
+    <string name="driver_px_ms_fmt">%1$d ms</string>
+    <string name="driver_px_failed">failed</string>
+    <string name="driver_px_note">GitHub is accessed directly first; if that fails and a mirror is configured, the download retries once through it. The speed test only measures latency of the built-in mirrors.</string>
 </resources>

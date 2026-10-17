@@ -73,6 +73,8 @@ public final class GameActivity extends Activity {
     /** Bionic 下 app 侧 present socket（run-bionic.sh 的 GOW3_PRESENT_SOCKET 同一个）。 */
     private String presentSocket() { return FILES+"/gow3present.sock"; }
     private boolean drawerOpen, displayOnly, startingX, hadError, swipeConsumed;
+    /** 主页 LAUNCH 传入的单次启动踢动标记：消费一次后即失效（防 Surface 重建静默重启）。 */
+    private boolean launchOnReady;
     private float touchX, touchY;
     private boolean edgeGesture, imeOpen, imePolling;
     private final AtomicBoolean imeAnswered=new AtomicBoolean();
@@ -92,6 +94,10 @@ public final class GameActivity extends Activity {
             getWindow().setAttributes(attrs);
         }
         displayOnly="x".equals(getIntent().getStringExtra("action"));
+        // 主页 LAUNCH 的单次启动踢动标记：读到后立刻从 intent 里移除，保证它不跨
+        // Activity 重建（旋转/翻盖）存活——重建后 surfaceCreated 不得静默重启游戏。
+        launchOnReady=!displayOnly && "launch".equals(getIntent().getStringExtra("action"));
+        if (launchOnReady) getIntent().removeExtra("action");
         pad=new PadBridge(new File(BASE,"android-pad.state"),
             getSharedPreferences("gow3",MODE_PRIVATE).getBoolean("swap_square_triangle",false));
         audio=new AudioBridge(new File(BASE,"audio.fifo"));
@@ -137,6 +143,12 @@ public final class GameActivity extends Activity {
                     // launcher 被绕过或所选目录已不在。
                     pendingHolder=h;
                     if (!hasGame()) error("Game folder is unavailable. Return to the launcher and choose it again.");
+                    else if (launchOnReady) {
+                        // 主页 LAUNCH 带来的单次踢动：目录可用即开始启动流程（runtime
+                        // 解包 → bridge → 游戏进程）。只踢一次，之后回到「等用户动作」。
+                        launchOnReady=false;
+                        startPending();
+                    }
                 }
             }
             @Override public void surfaceChanged(SurfaceHolder h,int format,int w,int height) {}

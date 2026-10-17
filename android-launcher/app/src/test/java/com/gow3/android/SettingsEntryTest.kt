@@ -19,7 +19,16 @@ class SettingsEntryTest {
 
     @Test fun `reserved categories assemble to empty lists`() {
         assertTrue(settingsEntries(LaunchCategory.AUDIO, params).isEmpty())
-        assertTrue(settingsEntries(LaunchCategory.DRIVER, params).isEmpty())
+    }
+
+    /** DRIVER 分类由 add-android-launcher-driver-manager 落位：driver_manager 卡片 slot 在参数行之前。 */
+    @Test fun `driver category renders the driver manager card slot`() {
+        val entries = settingsEntries(LaunchCategory.DRIVER, params)
+        assertEquals(1, entries.size)
+        val card = entries.single()
+        assertTrue(card is SettingsEntry.Card)
+        assertEquals("driver_manager", (card as SettingsEntry.Card).slotId)
+        assertEquals("card:driver_manager", card.id)
     }
 
     @Test fun `entry ids are stable and unique per category`() {

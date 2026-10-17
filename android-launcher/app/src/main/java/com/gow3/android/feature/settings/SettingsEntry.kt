@@ -31,10 +31,12 @@ internal sealed interface SettingsEntry {
 
 /**
  * 各分类的功能卡 slot 声明，顺序即渲染顺序（渲染在参数行之前）。
- * 首版五个分类均无激活 slot；落位示例见 change design D2：
- *   DRIVER -> listOf("driver_manager")、CONTROLS -> listOf("pad_mapping")。
+ * `driver_manager` 由 add-android-launcher-driver-manager 落位（design D2），
+ * 由 [DriverManagerCard] 提供内容；CONTROLS -> "pad_mapping" 等仍为预留示例。
  */
-private val categoryCards: Map<LaunchCategory, List<String>> = emptyMap()
+private val categoryCards: Map<LaunchCategory, List<String>> = mapOf(
+    LaunchCategory.DRIVER to listOf("driver_manager"),
+)
 
 /** 按分类组装条目列表：先声明顺序的功能卡 slot，再按声明顺序排该分类的参数。 */
 internal fun settingsEntries(category: LaunchCategory, params: List<LaunchParam>): List<SettingsEntry> =
