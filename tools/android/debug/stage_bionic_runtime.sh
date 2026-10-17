@@ -77,10 +77,14 @@ if [[ $stale == 1 ]]; then
     # runtime 与补丁规则 XML（APK assets），玩家游戏准备与补丁实例化在运行前完成。
     # 顶部级 roots：gow3port、home；payload 里带 Bionic runtime-manifest。
     cp -f tools/android/runtime/runtime-manifest.bionic.json "$bionic_tree/runtime-manifest.json"
-    # macOS 会在拷贝时生成 ._* AppleDouble / .DS_Store 元数据；tar 会把它们当独立成员打包，
-    # 每个还带着原文件内容副本，payload 因此虚胖几倍（还出现 186MB 的 zip 数据残留）。
-    # 这里显式排除，保证 payload 只含真实内容。
-    tar --exclude='._*' --exclude='.DS_Store' -czf "$archive" -C "$bionic_tree" gow3port home runtime-manifest.json
+    # macOS 的 two-layer 元数据问题，两层都要挡：
+    #   1. cp 会在目标上留下 com.apple.provenance 等扩展属性；bsdtar 打包时把每个带 xattr 的
+    #      文件写成一对成员（真实文件 + ._同名 AppleDouble），payload 因此多出近一倍成员。
+    #      COPYFILE_DISABLE=1 让 bsdtar 不生成这些 AppleDouble 成员。
+    #   2. 树里若真出现 ._* / .DS_Store 常规文件，--exclude 兜底。
+    # （--no-xattrs 对此无效：那些成员是 tar 自己生成的，不是树里的文件。）
+    COPYFILE_DISABLE=1 tar --exclude='._*' --exclude='.DS_Store' \
+        -czf "$archive" -C "$bionic_tree" gow3port home runtime-manifest.json
     printf '%s\n' "$current" > "$stamp"
     echo "stage_bionic_runtime: rebuilt $archive"
 fi
