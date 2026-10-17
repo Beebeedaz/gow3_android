@@ -45,7 +45,7 @@ strip=$bin/llvm-strip
 jni=android-launcher/app/src/main/jni
 out=tools/android/bridges/$abi
 # gow3present.c includes the wire format by name, the way it is built today.
-includes=(-I "$jni/gow3present" -I tools/android/present)
+includes=(-I "$jni/gow3present" -I "$jni/gow3prepare" -I "$jni/gow3link" -I tools/android/present)
 mkdir -p "$out"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -81,7 +81,7 @@ build() {
 }
 
 build gow3present gow3present/gow3present.c
-build gow3prepare gow3prepare/gow3_prepare.cpp gow3prepare/gow3_prepare_jni.cpp
+build gow3prepare gow3prepare/gow3_prepare.cpp gow3link/gow3_link.cpp gow3prepare/gow3_prepare_jni.cpp
 
 ls -la "$out/libgow3present.so" "$out/libgow3prepare.so"
 echo "build_jni_libs: the APK picks these up from tools/android/bridges ($abi)"

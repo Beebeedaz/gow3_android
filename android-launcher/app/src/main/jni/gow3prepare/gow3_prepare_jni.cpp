@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "gow3_link.h"
 #include "gow3_prepare.h"
 
 namespace {
@@ -171,6 +172,73 @@ JNIEXPORT jboolean JNICALL Java_com_gow3_android_data_Gow3Prepare_nativeContentP
                      gow3_prepare::ContentProfile(static_cast<u32>(sku), params))
                ? JNI_TRUE
                : JNI_FALSE;
+}
+
+} // extern "C"
+
+// ---------------------------------------------------------------- gow3_link
+// The boot image is built here too so the launcher needs one native library, and because it is the
+// same eboot the patches are compiled against: one parse, one set of segment checks.
+
+extern "C" {
+
+namespace {
+
+void ThrowPrepare(JNIEnv* env, const std::string& what) {
+    jclass failure = env->FindClass("java/lang/RuntimeException");
+    if (failure) {
+        env->ThrowNew(failure, what.c_str());
+    }
+}
+
+} // namespace
+
+JNIEXPORT jboolean JNICALL Java_com_gow3_android_data_Gow3Prepare_nativeBootLinked(
+    JNIEnv* env, jclass, jstring game_dir, jstring out_dir, jobjectArray module_files) {
+    const std::string game = ToStdString(env, game_dir);
+    const std::string out = ToStdString(env, out_dir);
+    std::vector<u8> eboot, libc;
+    if (!ReadFile(game + "/eboot.bin", eboot)) {
+        ThrowPrepare(env, "cannot read " + game + "/eboot.bin");
+        return JNI_FALSE;
+    }
+    const jsize count = module_files ? env->GetArrayLength(module_files) : 0;
+    std::vector<std::vector<u8>> modules;
+    std::string first = "libc.prx";
+    for (jsize i = 0; i < count; ++i) {
+        auto element = static_cast<jstring>(env->GetObjectArrayElement(module_files, i));
+        const std::string name = ToStdString(env, element);
+        env->DeleteLocalRef(element);
+        std::vector<u8> bytes;
+        if (!ReadFile(game + "/sce_module/" + name, bytes)) {
+            ThrowPrepare(env, "cannot read " + game + "/sce_module/" + name);
+            return JNI_FALSE;
+        }
+        if (i == 0) {
+            first = name;
+            libc = bytes;
+        }
+        modules.push_back(std::move(bytes));
+    }
+    if (libc.empty()) {
+        ThrowPrepare(env, "the first module has to be the game's libc");
+        return JNI_FALSE;
+    }
+    std::string error;
+    std::vector<u8> boot, linked;
+    if (!gow3_link::PrepareBoot(eboot.data(), eboot.size(), libc.data(), libc.size(), boot, error)) {
+        ThrowPrepare(env, "cannot prepare " + game + "/eboot.bin: " + error);
+        return JNI_FALSE;
+    }
+    if (!gow3_link::LinkBoot(boot, eboot, modules, linked, error)) {
+        ThrowPrepare(env, "cannot link " + first + ": " + error);
+        return JNI_FALSE;
+    }
+    if (!WriteFile(out + "/boot-linked.bin", linked)) {
+        ThrowPrepare(env, "cannot write boot-linked.bin into " + out);
+        return JNI_FALSE;
+    }
+    return JNI_TRUE;
 }
 
 } // extern "C"

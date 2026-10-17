@@ -37,7 +37,7 @@ export GOW3_USER_DIR="${GOW3_USER_DIR:-$data_root/user}"
 export GOW3_LOG_DIR="${GOW3_LOG_DIR:-$data_root/logs}"
 mkdir -p "$data_root" "$GOW3_USER_DIR" "$GOW3_LOG_DIR" "$GOW3_LOG_DIR/failed-shaders"
 
-# ---- 派生运行参数（运行前由宿主机 launch_env.py --shell 生成 launch.env）----
+# ---- 派生运行参数（launcher 启动前写入 launch.env，与 launch_env.py --shell 同格式）----
 # 与 run-gow3.sh 同一来源：DMEM/VBlank/补丁集是 compile_plan() 从实际补丁和设备预算推导出来的，
 # 不能再由启动脚本猜。launch.env 缺失时退回下面的默认值。
 launch_env="$base/data/launch.env"
@@ -87,7 +87,7 @@ export GOW3_OUTPUT_RES=$output GOW3_LIVE_RES=0
 if [ -n "$render" ]; then export GOW3_RENDER_RES=$render; else unset GOW3_RENDER_RES; fi
 # GPU 内存是手机的系统 RAM，和游戏的 DMEM 及 Android 共享；纹理收集器按预算工作，
 # 空闲的游戏内存拷贝延后回收。
-# DMEM 基线与 launch_env.py --base-dmem 7104 一致（release 补丁要求 7104MiB）；运行前派生出的
+# DMEM 基线与 launch_env.py --base-dmem 7104 一致（launcher 同样用 7104）（release 补丁要求 7104MiB）；运行前派生出的
 # patch_status.json effective.dmem_mb 是权威值，启动方应显式传 GOW3_DMEM_MB 覆盖。
 export GOW3_DMEM_MB=${GOW3_DMEM_MB:-7104}
 export GOW3_GC_BUDGET_MB=${GOW3_GC_BUDGET_MB:-4096} GOW3_VRAM_IDLE_SECONDS=${GOW3_VRAM_IDLE_SECONDS:-20}
@@ -147,7 +147,7 @@ cd "$base"
 [ -x "$bionic/bin/gow3-probe" ] || { echo "The Bionic runtime is missing: $bionic" >&2; exit 2; }
 
 # ---- 游戏文件和补丁 ----
-# 选中的游戏目录（GOW3_GAME_DIR），默认 runtime 自带的。补丁按 launch_env.py → patches.py 的
+# 选中的游戏目录（GOW3_GAME_DIR），默认 runtime 自带的。补丁是 launcher 按 patches.py 的
 # compile_plan()/publish_plan() 链路，在**运行前**（宿主机或设备）对玩家游戏生成单个
 # G3PATCH2 patches.bin（probe 只消费这一个文件，不再拼接多个 --patches）。构建期只打包
 # runtime 与补丁规则 XML（assets/God_of_War_III_Remastered_*.xml）。玩家游戏派生产物
@@ -156,8 +156,8 @@ if [ "${1:-game}" = game ]; then
     game_dir=${GOW3_GAME_DIR:-$base/game}
     [ -f "$game_dir/eboot.bin" ] || { echo "Game missing: $game_dir" >&2; exit 2; }
     app0_dir=${GOW3_APP0_DIR:-$game_dir}
-    # 运行前由 launch_env.py 派生（compile_plan/publish_plan）的单个补丁文件。
-    [ -f "$base/data/patches.bin" ] || { echo "The patches are missing: $base/data/patches.bin (run launch_env.py first)" >&2; exit 2; }
+    # launcher 启动前由 libgow3prepare 编译（compile_plan/publish_plan 的等价物）的单个补丁文件。
+    [ -f "$base/data/patches.bin" ] || { echo "The patches are missing: $base/data/patches.bin (the launcher prepares them on launch)" >&2; exit 2; }
     # 身份校验：boot-linked.bin / content.bin / patches.bin 是针对某一个 eboot 派生的。换了游戏
     # 目录或游戏版本后旧产物仍会被原样加载（app0 却指向另一个版本），所以比对摘要不符即拒绝启动，
     # 而不是把 A 的映像配 B 的 app0 用。

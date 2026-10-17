@@ -23,6 +23,9 @@ object Gow3Prepare {
     private const val TAG = "God of War III"
     private const val BASE_DMEM_MB = 7104 // the same base run-gow3.sh passes on Android
 
+    /** link_modules.py's DEFAULT_MODULES. libc.prx first: it becomes module id 2. */
+    private val DEFAULT_LINKED_MODULES = listOf("libc.prx", "libSceFios2.prx")
+
     @Volatile private var loaded = false
 
     private fun load(): Boolean {
@@ -51,6 +54,17 @@ object Gow3Prepare {
     ): String
 
     private external fun nativeContentProfile(outDir: String, sku: Int, userParams: IntArray): Boolean
+
+    /**
+     * Builds boot-linked.bin (G3PROBE5) from the game's own files: the eboot's load segments
+     * flattened, then libc.prx and libSceFios2.prx appended and their imports bound to each other's
+     * exports. A port of scripts/prepare.py and scripts/link_modules.py, checked byte for byte
+     * against them by tools/migration/run_link_golden.sh.
+     *
+     * [moduleFiles] is in link order and must start with libc.prx: it becomes module id 2, which
+     * every later module's TLS relocations refer to.
+     */
+    private external fun nativeBootLinked(gameDir: String, outDir: String, moduleFiles: Array<String>): Boolean
 
     /** The result of one preparation, as the patch page shows it. */
     data class Result(
@@ -156,6 +170,20 @@ object Gow3Prepare {
         }
         if (!nativeContentProfile(outDir.absolutePath, 3, userParams)) {
             Log.w(TAG, "cannot write content.bin into ${outDir.path}")
+        }
+        // The boot image itself: what probe.c actually executes. Without it run-bionic.sh has
+        // nothing to start, which is why this used to need scripts/prepare.py on a host.
+        // The list is link_modules.py's DEFAULT_MODULES unless linked_modules overrides it, the
+        // same way --modules overrides it there. libc.prx has to come first: it becomes module 2.
+        val modules = (ini["linked_modules"]?.split(' ', ',', ';')?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?: DEFAULT_LINKED_MODULES)
+        try {
+            nativeBootLinked(gameDir.absolutePath, outDir.absolutePath, modules.toTypedArray())
+        } catch (error: Exception) {
+            Log.e(TAG, "boot image linking failed", error)
+            return Result(false, "prepare-failed", emptyList(), emptyMap(), BASE_DMEM_MB, 60, "native", 0,
+                error.message ?: error.javaClass.simpleName)
         }
         // run-bionic.sh reads these; the identity in it is what it checks the folder against.
         val launchEnv = buildString {
