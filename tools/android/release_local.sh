@@ -236,15 +236,14 @@ resolve_repo() {
 
 check_inputs() {
     local missing=0 d
-    for d in out/arm64/bundle out/arm64/turnip out/arm64/turnip-gen8 \
-        out/arm64/lsfg .local-deps/android/turnip .local-deps/android/turnip-gen8 \
-        .local-deps/android/lsfg .local-deps/android/migration/x/rootfs; do
+    for d in out/bionic/bin/gow3-probe out/bionic/lib/libgow3cpu.so \
+        out/bionic/lib/libgow3gpu.so; do
         [[ -e $d ]] && continue
         log "release_local: missing build input: $d"
         missing=1
     done
     ((missing == 0)) ||
-        die 'required ARM64 build inputs are missing; build them before packaging a release'
+        die 'required Bionic build inputs are missing; run tools/android/build_bionic.sh before packaging a release'
 }
 
 check_version_file_clean() {
@@ -262,7 +261,7 @@ upstream_line=$(git ls-remote "$upstream_remote" HEAD 2>/dev/null | cut -f1)
 upstream_line=${upstream_line:-unknown}
 # tag 带 v 前缀，versionName 不带：APK 内部版本与 tag 保持同一个版本串
 version=${android_tag#v}
-apk_name="God of War III-$version.apk"
+apk_name="God of War III-bionic-$version.apk"
 apk_path="$release_dir/$apk_name"
 checksum_path="$apk_path.sha256"
 
@@ -362,10 +361,9 @@ else
 
     apply_version
 
-    # The glibc release packer went with the glibc runtime (tools/android/apk/build_release_apk.sh
-    # built a rootfs payload that no longer exists). The Bionic release entry point is still to be
-    # written - OpenSpec 8.2 - so fail here instead of calling a script that no longer exists.
-    die "no Bionic release packer yet (OpenSpec 8.2); use tools/android/debug/build_bionic_debug_apk.sh for a debug APK"
+    # OpenSpec 8.2 的 Bionic packer：stage payload -> assembleRelease -> 签名 -> 校验 -> sha256，
+    # 产物名 God of War III-bionic-<version>.apk，落在本脚本上面约定的 apk_path。
+    bash tools/android/apk/build_release_apk.sh
 
     [[ -f $apk_path ]] || die "release APK was not produced: $apk_path"
     [[ -f $checksum_path ]] || die "release checksum was not produced: $checksum_path"
