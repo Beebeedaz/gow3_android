@@ -486,10 +486,23 @@ public final class GameActivity extends Activity {
     @Override protected void onResume() { super.onResume(); if (audio!=null) audio.resume(); }
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        setIntent(intent);
         // Deterministic UI checks over ADB, using the same handlers as the actual controls.
         String action=intent.getStringExtra("ui_action");
         if ("open-menu".equals(action)) openDrawer();
         if ("close-menu".equals(action)) closeDrawer();
+        // singleTask：主页 LAUNCH 复用已有实例。带 action=launch 的新 intent 表示「用户要（重）
+        // 进游戏」：消费标记并走 startPending —— surface 仍在则直接重启启动流程，surface 已随
+        // 退到后台销毁则由 surfaceCreated 的 launchOnReady 分支接力。绝不叠加第二个实例，避免
+        // 新旧两套 bridge 竞争同一个 audio.fifo.ready（旧实例清理会删掉新会话的标记，
+        // run-bionic 误报 exit 12）。
+        if ("launch".equals(intent.getStringExtra("action"))) {
+            intent.removeExtra("action");
+            if (!displayOnly) {
+                launchOnReady=true;
+                startPending();
+            }
+        }
     }
 
     private Process process(String... args) throws java.io.IOException {
