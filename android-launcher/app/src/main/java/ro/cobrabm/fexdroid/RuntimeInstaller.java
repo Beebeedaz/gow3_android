@@ -16,8 +16,6 @@ import java.util.function.Consumer;
 
 /** Installs the signed APK's Linux runtime transactionally in this app's private data directory. */
 final class RuntimeInstaller {
-    private static final String LOADER = "rootfs/usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1";
-
     private static void deleteTree(File root) throws Exception {
         if (!root.exists()) return;
         Files.walkFileTree(root.toPath(), new SimpleFileVisitor<java.nio.file.Path>() {
@@ -65,7 +63,7 @@ final class RuntimeInstaller {
 
     /** @param applicationId the running app's id, so a payload built for another one is refused
      *  instead of silently writing into filesDir paths the payload's manifest disagrees with. */
-    private static void validateRuntime(File root, String applicationId) throws Exception {
+    static void validateRuntime(File root, String applicationId) throws Exception {
         File manifest = path(root, "runtime-manifest.json");
         if (!manifest.isFile()) throw new IllegalStateException("Runtime archive is incomplete: manifest");
         String text = new String(Files.readAllBytes(manifest.toPath()), StandardCharsets.UTF_8);
@@ -73,36 +71,22 @@ final class RuntimeInstaller {
                 !text.contains("\"application_id\": \"" + applicationId + "\"") ||
                 !text.contains("\"java_package\": \"ro.cobrabm.fexdroid\""))
             throw new IllegalStateException("Runtime archive is incompatible: manifest identity");
-        // Bionic 运行时（NDK/Bionic 原生进程，无 rootfs/X11/LSFG）：gow3port/bionic。
-        if (path(root, "gow3port/bionic/bin/gow3-probe").isFile()) {
-            requireExecutable(root, "gow3port/bionic/bin/gow3-probe");
-            requireExecutable(root, "gow3port/bionic/bin/kgsl-chip-id");
-            requireExecutable(root, "gow3port/run-bionic.sh");
-            requireDirectory(root, "home/gow3port");
-            if (path(root, "bbport/rootfs").exists() || path(root, "gow3port/rootfs").exists())
-                throw new IllegalStateException("Runtime archive has an invalid nested rootfs layout");
-            if (!path(root, "gow3port/bionic/lib/libgow3cpu.so").isFile() ||
-                    !path(root, "gow3port/bionic/lib/libgow3gpu.so").isFile())
-                throw new IllegalStateException("Runtime archive is incomplete: Bionic ARM64 libraries");
-            return;
+        if (!path(root, "gow3port/bionic/bin/gow3-probe").isFile()) {
+            // Bionic 是这个 app 唯一能启动的 runtime（GameActivity 只有 run-bionic.sh 一条启动路）。
+            // 一个 glibc/rootfs 形状的 payload 即使完整，装上也跑不了，所以必须在这里拒绝，
+            // 而不是像以前那样回落去校验 glibc 布局然后把它装进设备。
+            throw new IllegalStateException(
+                    "Runtime archive is not a Bionic runtime (missing gow3port/bionic/bin/gow3-probe)");
         }
-        requireExecutable(root, "rootfs/bin/sh");
-        requireExecutable(root, "rootfs/usr/bin/Xvfb");
-        requireExecutable(root, "rootfs/usr/libexec/fxshmd");
-        requireExecutable(root, "rootfs/usr/bin/FEX");
-        requireExecutable(root, "rootfs/usr/bin/python3.13");
-        requireExecutable(root, "gow3port/arm64/bin/gow3-probe");
-        requireExecutable(root, "gow3port/arm64/bin/kgsl-chip-id");
-        requireExecutable(root, LOADER);
+        requireExecutable(root, "gow3port/bionic/bin/gow3-probe");
+        requireExecutable(root, "gow3port/bionic/bin/kgsl-chip-id");
+        requireExecutable(root, "gow3port/run-bionic.sh");
         requireDirectory(root, "home/gow3port");
         if (path(root, "bbport/rootfs").exists() || path(root, "gow3port/rootfs").exists())
             throw new IllegalStateException("Runtime archive has an invalid nested rootfs layout");
-        if (!path(root, "gow3port/arm64/lib/libgow3cpu.so").isFile() ||
-                !path(root, "gow3port/arm64/lib/libgow3gpu.so").isFile())
-            throw new IllegalStateException("Runtime archive is incomplete: ARM64 libraries");
-        if (!path(root, "gow3port/arm64/lsfg/liblsfg-vk.so").isFile() ||
-                !path(root, "gow3port/arm64/lsfg/VkLayer_LS_frame_generation.json").isFile())
-            throw new IllegalStateException("Runtime archive is incomplete: LSFG layer");
+        if (!path(root, "gow3port/bionic/lib/libgow3cpu.so").isFile() ||
+                !path(root, "gow3port/bionic/lib/libgow3gpu.so").isFile())
+            throw new IllegalStateException("Runtime archive is incomplete: Bionic ARM64 libraries");
     }
 
     private static void renameRequired(File source, File target, String label) throws Exception {
@@ -110,7 +94,7 @@ final class RuntimeInstaller {
         if (!source.renameTo(target)) throw new IllegalStateException("Cannot stage old " + label);
     }
 
-    private static void promote(File files, File stage, String expected) throws Exception {
+    static void promote(File files, File stage, String expected) throws Exception {
         File previous = new File(files, ".runtime-previous");
         deleteTree(previous);
         if (!previous.mkdirs()) throw new IllegalStateException("Cannot create runtime rollback directory");
