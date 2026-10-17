@@ -26,6 +26,7 @@
         <activity
             android:name="ro.cobrabm.fexdroid.GameActivity"
             android:exported="false"
+            android:launchMode="singleTask"
             android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|density" />
     </application>
