@@ -73,6 +73,8 @@ public final class GameActivity extends Activity {
     /** Bionic 下 app 侧 present socket（run-bionic.sh 的 GOW3_PRESENT_SOCKET 同一个）。 */
     private String presentSocket() { return FILES+"/gow3present.sock"; }
     private boolean drawerOpen, displayOnly, startingX, hadError, swipeConsumed;
+    /** gow3.ini 的 display_stretch：开启时 Surface 铺满整屏（画面拉伸，不留 16:9 黑边）。 */
+    private boolean displayStretch;
     /** 主页 LAUNCH 传入的单次启动踢动标记：消费一次后即失效（防 Surface 重建静默重启）。 */
     private boolean launchOnReady;
     private float touchX, touchY;
@@ -114,6 +116,14 @@ public final class GameActivity extends Activity {
     }
     private void fitSurface(int width,int height) {
         if (width<=0 || height<=0) return;
+        // display_stretch=1：跳过 16:9 适配，Surface 铺满整屏（缓冲被拉伸，消除左右黑边）。
+        if (displayStretch) {
+            FrameLayout.LayoutParams full=(FrameLayout.LayoutParams)surface.getLayoutParams();
+            if (full.width==-1 && full.height==-1) return;
+            full.width=-1; full.height=-1;
+            surface.post(() -> surface.setLayoutParams(full));
+            return;
+        }
         int w=width, h=height;
         if ((long)w*9>(long)h*16) w=h*16/9; else h=w*9/16;
         FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)surface.getLayoutParams();
@@ -549,7 +559,8 @@ public final class GameActivity extends Activity {
     private void attach(SurfaceHolder holder, boolean launch) {
         if (destroyed || !holder.getSurface().isValid()) return;
         // Frames reach the Surface through the present socket and Gow3Present (AHardwareBuffer).
-        String result=Gow3Present.start(holder, presentSocket());
+        // display_stretch=1 时把画面拉伸铺满 SurfaceView（配置页显示选项），其余值都按保持宽高比处理。
+        String result=Gow3Present.start(holder, presentSocket(), "1".equals(setting("display_stretch")));
         android.util.Log.i("God of War III",result);
         if (!result.startsWith("bridge running:")) { error(result); return; }
         shmid=1; // present 已连接
@@ -818,6 +829,9 @@ public final class GameActivity extends Activity {
     private void startGame() {
         if (destroyed) return;
         hadError=false;
+        // display_stretch 每次启动从 gow3.ini 读取（launcher 的「拉伸铺满屏幕」开关）。
+        displayStretch="1".equals(readIni(new File(DATA,"gow3.ini")).get("display_stretch"));
+        screen.post(() -> fitSurface(screen.getWidth(), screen.getHeight()));
         // 清掉上一轮的回退标记，并重置「LSFG 已被回退关闭」状态；刷新率按当前 launchability 选。
         lsfgFallbackOff=false;
         new File(BASE,"lsfg-fallback.marker").delete();

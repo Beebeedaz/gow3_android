@@ -121,6 +121,17 @@ internal object LaunchParams {
             descriptionRes = R.string.param_desc_sharpness,
         ),
         LaunchParam(
+            // 显示拉伸全屏：应用侧显示桥（GameActivity 启动 Gow3Present 时读取）消费；
+            // 关=保持宽高比居中适配（默认），开=把帧拉伸铺满 SurfaceView。
+            key = "display_stretch", labelRes = R.string.param_display_stretch, category = LaunchCategory.GRAPHICS,
+            options = listOf(
+                LaunchOption("0", R.string.param_option_off),
+                LaunchOption("1", R.string.param_option_on),
+            ),
+            defaultValue = "0",
+            descriptionRes = R.string.param_desc_display_stretch,
+        ),
+        LaunchParam(
             key = "vibration", labelRes = R.string.param_vibration, category = LaunchCategory.CONTROLS,
             options = listOf(
                 LaunchOption("0", R.string.param_option_off),

@@ -4,8 +4,10 @@ import com.gow3.android.R
 
 internal data class MobilePreset(val resolution: String, val labelRes: Int) {
     // JSON 提供分辨率、60 帧目标和补丁组合；其余图形项采用启动器的移动端默认值。
+    // vibration 与 display_stretch 是个人偏好（振动强度、显示端拉伸），不属于预设
+    // 管理的渲染项：预设不写它们，匹配时也不要求它们等于默认值。
     val settings: Map<String, String> get() = LaunchParams.all
-        .filter { it.key != "vibration" }
+        .filter { it.key != "vibration" && it.key != "display_stretch" }
         .associate { it.key to it.defaultValue } + ("render_resolution" to resolution)
 }
 

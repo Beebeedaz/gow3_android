@@ -26,7 +26,7 @@ class LaunchParamsTest {
 
     @Test fun `graphics category holds the image quality params`() {
         assertEquals(
-            setOf("upscaler", "render_resolution", "anisotropy", "sharpen", "sharpness"),
+            setOf("upscaler", "render_resolution", "anisotropy", "sharpen", "sharpness", "display_stretch"),
             LaunchParams.forCategory(LaunchCategory.GRAPHICS).map { it.key }.toSet(),
         )
     }
@@ -68,6 +68,7 @@ class LaunchParamsTest {
         assertEquals("0", LaunchParams.valueOf(empty, byKey.getValue("anisotropy")))
         assertEquals("0", LaunchParams.valueOf(empty, byKey.getValue("sharpen")))
         assertEquals("0.50", LaunchParams.valueOf(empty, byKey.getValue("sharpness")))
+        assertEquals("0", LaunchParams.valueOf(empty, byKey.getValue("display_stretch")))
         assertEquals("60", LaunchParams.valueOf(empty, byKey.getValue("fps_limit")))
         assertEquals("60", LaunchParams.valueOf(empty, byKey.getValue("engine_fps")))
         assertEquals("1", LaunchParams.valueOf(empty, byKey.getValue("vsync")))
@@ -100,9 +101,11 @@ class LaunchParamsTest {
         assertEquals(setOf("native", "480p", "540p", "720p", "900p", "1080p"),
             gated.getValue("render_resolution").options.map { it.value }.toSet())
         assertEquals(setOf("60"), gated.getValue("engine_fps").options.map { it.value }.toSet())
-        // 非补丁参数不受 catalog 影响。
+        // 非补丁参数不受 catalog 影响（含无目录时保持可编辑的 display_stretch）。
+        assertTrue(noCatalog.getValue("display_stretch").enabled)
         assertTrue(gated.getValue("upscaler").enabled)
         assertTrue(gated.getValue("sharpness").enabled)
+        assertTrue(gated.getValue("display_stretch").enabled)
 
         // CUSA01715：带 120/240 帧率补丁，档位应随目录出现。
         val c1715 = File(File(requireNotNull(System.getProperty("gow3.patchCatalogDir"))),

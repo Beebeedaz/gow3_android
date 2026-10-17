@@ -40,6 +40,7 @@
     <string name="param_frames_queued">排队帧数</string>
     <string name="param_sharpen">锐化</string>
     <string name="param_sharpness">锐化强度</string>
+    <string name="param_display_stretch">画面拉伸全屏</string>
     <string name="param_show_fps">显示 FPS</string>
 
     <!-- 启动参数：选项名 -->
@@ -85,6 +86,7 @@
     <string name="param_desc_frames_queued">游戏在屏幕上显示之前预先准备多少帧。数值越低越能降低输入延迟；数值越高在较弱的硬件上可能更流畅。</string>
     <string name="param_desc_sharpen">在 FSR 升采样之后追加 RCAS 锐化。升采样器为 OFF 时无效果。</string>
     <string name="param_desc_sharpness">锐化强度（0.00–2.00）。仅在锐化开启时生效。</string>
+    <string name="param_desc_display_stretch">把画面拉伸铺满整个屏幕（不保持宽高比，消除宽屏下的左右黑边，画面会变形）。下次启动生效。</string>
     <string name="param_desc_show_fps">游戏运行时显示每秒帧数叠加层。</string>
 
     <!-- Settings 页分类 -->

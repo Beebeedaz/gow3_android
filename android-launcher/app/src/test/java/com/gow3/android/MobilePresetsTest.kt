@@ -33,6 +33,7 @@ class MobilePresetsTest {
             "vibration" to "25", "lsfg_enabled" to "1", "pad.cross" to "a",
             "patches_CUSA01715_01_02" to "Skip Intro", "restart_unconfirmed" to "1",
             "render_resolution" to "480p", "engine_fps" to "120",
+            "display_stretch" to "1",
             c.selectionKey to "Bug Fix - Startup Black Screen;Resolution Patch - 480p",
         )))
         for (preset in MobilePresets.available(c)) {
@@ -46,10 +47,13 @@ class MobilePresetsTest {
             assertEquals("0", ini["restart_unconfirmed"])
             assertEquals("60", ini["engine_fps"])
             assertEquals("60", ini["fps_limit"])
+            // display_stretch 是显示端个人偏好：预设不重置它（用户开的宽屏保持开启），
+            // 也不会因它不等于默认值而让预设匹配失败。
+            assertEquals("1", ini["display_stretch"])
             assertEquals(setOf("Resolution Patch - ${preset.resolution}", "Disable SSAO", "Disable Motion Blur",
                 "Disable Depth of Field", "Disable Bloom", "Disable Soft Particles", "Disable Dynamic Shadows",
                 "Skip Intro", "Skip Any Video With X Button", "Bug Fix - Startup Black Screen"), c.selected(ini))
-            for (param in LaunchParams.forCatalog(c).filter { it.key != "vibration" }) {
+            for (param in LaunchParams.forCatalog(c).filter { it.key != "vibration" && it.key != "display_stretch" }) {
                 assertEquals(preset.settings[param.key], LaunchParams.selectedOption(ini, param)?.value)
             }
         }
