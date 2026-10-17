@@ -211,7 +211,14 @@ JNIEXPORT jboolean JNICALL Java_com_gow3_android_data_Gow3Prepare_nativeBootLink
         env->DeleteLocalRef(element);
         std::vector<u8> bytes;
         if (!ReadFile(game + "/sce_module/" + name, bytes)) {
-            ThrowPrepare(env, "cannot read " + game + "/sce_module/" + name);
+            // 常见误选：把 -patch 升级目录当成游戏目录（它也有 eboot.bin，能过选择器校验），
+            // 但 sce_module 只在基础游戏目录里。给出可行动的提示而不是裸路径。
+            std::string hint;
+            if (game.size() > 6 && game.compare(game.size() - 6, 6, "-patch") == 0)
+                hint = " (this looks like the -patch update folder: select the base game folder, e.g. CUSA01740, as the game folder)";
+            else if (name != "libc.prx")
+                hint = " (check the linked_modules setting in gow3.ini)";
+            ThrowPrepare(env, "cannot read " + game + "/sce_module/" + name + hint);
             return JNI_FALSE;
         }
         if (i == 0) {
