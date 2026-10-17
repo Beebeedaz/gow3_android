@@ -318,8 +318,8 @@ final class SettingsDialog {
     /* showCheats() 与 writeCheatState() 已注释掉（入口也随之在 GameActivity 里隐藏）：作弊在
      * Android 上根本不生效，属于误导入口。原因是 hook 根本没装上——
      * src/probe.c 的 install_cheats() 被 `#if defined(GUEST_CPU_NATIVE)` 包着，而
-     * GUEST_CPU_NATIVE 只在 `__x86_64__` 时定义（src/guest_cpu.h:12）。Android 是 aarch64 交叉
-     * 编译（tools/android/build/aarch64-toolchain.cmake 的 CMAKE_C_COMPILER_TARGET），x86-64
+     * GUEST_CPU_NATIVE 只在 `__x86_64__` 时定义（src/guest_cpu.h:12）。Android 是 aarch64
+     * 交叉编译（NDK/Bionic 工具链），x86-64
      * guest 跑在 FEXCore JIT 上，所以 probe.c 那段连调用带定义一起被编译掉了，源码注释写得很
      * 直接："Under the JIT ... the game runs without cheats, the health bar and the orb
      * multipliers"。gow3.ini 里的 cheat_health / cheat_item 会被 gow3_settings.cpp 读进
