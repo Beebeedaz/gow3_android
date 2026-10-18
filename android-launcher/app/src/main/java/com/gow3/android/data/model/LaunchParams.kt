@@ -51,8 +51,9 @@ internal data class LaunchOption(val value: String, val labelRes: Int)
  * 以运行时取值域为准，确保每个选项都实际生效。
  *
  * 各参数的默认值均为移动端优化值（render_resolution=720p、fps_limit=60、
- * engine_fps=60、sharpen=0、sharpness=0.50、show_fps=1；display_mode 已从
- * 可编辑项移除，固定 fullscreen）。这些默认值 MUST 与
+ * engine_fps=60、sharpen=0、sharpness=0.50；display_mode 已从
+ * 可编辑项移除，固定 fullscreen；show_fps 已退役——引擎 FPS 叠加层由 launcher
+ * 侧性能 HUD 取代，不再属于启动参数）。这些默认值 MUST 与
  * `tools/android/config/gow3-default.ini`（首启落盘为 gow3.ini 的基准）保持一致，
  * 避免 UI 展示默认与实际运行默认漂移。分辨率维持既有 `render_resolution` 轨道，
  * 不暴露 `preset` / `output_res` 双轨（见 change design D3）。
@@ -193,15 +194,9 @@ internal object LaunchParams {
             defaultValue = "1",
             descriptionRes = R.string.param_desc_frames_queued,
         ),
-        LaunchParam(
-            key = "show_fps", labelRes = R.string.param_show_fps, category = LaunchCategory.PERFORMANCE,
-            options = listOf(
-                LaunchOption("0", R.string.param_option_off),
-                LaunchOption("1", R.string.param_option_on),
-            ),
-            defaultValue = "1",
-            descriptionRes = R.string.param_desc_show_fps,
-        ),
+        // show_fps（引擎自带 FPS 叠加层）已退役：帧率显示统一由 launcher 侧性能 HUD
+        // （PerfHudOverlay）提供，历史残留的 show_fps=1 由 Gow3Data.prepare 归零，
+        // 这里不再提供参数行（change design D7）。
     )
 
     /** Settings 顶部分类栏顺序：按枚举声明顺序取全集（含空分类）。 */

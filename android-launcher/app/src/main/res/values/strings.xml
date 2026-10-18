@@ -43,7 +43,6 @@
     <string name="param_sharpen">Sharpening</string>
     <string name="param_sharpness">Sharpening strength</string>
     <string name="param_display_stretch">Stretch to fullscreen</string>
-    <string name="param_show_fps">Show FPS</string>
 
     <!-- 启动参数：选项名 -->
     <string name="param_option_off_720p">Off (render at 1280×720)</string>
@@ -154,7 +153,6 @@
     <string name="param_desc_sharpen">Applies an RCAS sharpening pass after FSR upscaling. Has no effect while the upscaler is OFF.</string>
     <string name="param_desc_sharpness">Strength of the sharpening pass (0.00–2.00). Only used when sharpening is ON.</string>
     <string name="param_desc_display_stretch">Stretches the picture to fill the whole screen, ignoring the aspect ratio (removes the side black bars on wide screens). The image will look horizontally stretched. Takes effect on the next launch.</string>
-    <string name="param_desc_show_fps">Shows a frames-per-second overlay while the game is running.</string>
 
     <!-- Settings 页 -->
     <string name="settings_title">SETTINGS</string>

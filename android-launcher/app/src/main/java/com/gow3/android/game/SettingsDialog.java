@@ -189,7 +189,9 @@ final class SettingsDialog {
         sharpness.setOnSeekBarChangeListener(sharpText); sharpText.onProgressChanged(sharpness,sharpness.getProgress(),false);
         box.addView(sharpness);
         sharpen.setOnCheckedChangeListener((b,on) -> sharpness.setEnabled(on)); sharpness.setEnabled(sharpen.isChecked());
-        final Switch fps=toggle(box,"Show FPS","1".equals(get("show_fps","0")));
+        // 引擎自带的「Show FPS」（gow3.ini 的 show_fps）已退役：帧率显示统一由
+        // launcher 侧性能 HUD（PerfHudOverlay）提供，历史残留的 show_fps=1 由
+        // Gow3Data.prepare 在数据准备时归零，这里不再提供开关入口（design D7）。
 
         // FPS 上限入口：取值域必须与运行时 FPS_LIMITS（gow3_graphics.h 的 FpsLimits：30/60/120/
         // 240/0）完全一致——ParseFpsLimit 把表外的值（例如旧版提供的 40/45）一律当成 0（不限制），
@@ -244,7 +246,7 @@ final class SettingsDialog {
                 changed.put("preset",String.valueOf(Math.max(0,checkedIndex(presets))));
                 changed.put("sharpen",sharpen.isChecked() ? "1" : "0");
                 changed.put("sharpness",String.format(Locale.ROOT,"%.2f",sharpness.getProgress()/100f));
-                changed.put("show_fps",fps.isChecked() ? "1" : "0");
+                // show_fps 随引擎 FPS 退役不再写回（见上方注释）。
                 // thor_cpus / effect_* / model_lod 随上面三段一起注释掉了，这里也不写。
                 apply(changed);
             }).show();

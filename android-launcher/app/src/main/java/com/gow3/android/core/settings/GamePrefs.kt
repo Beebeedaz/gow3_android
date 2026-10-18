@@ -16,10 +16,13 @@ import android.content.SharedPreferences
  * 键名与默认值是持久化契约：历史 APK 升级安装后必须读到原值，MUST NOT 改名或
  * 改默认值。新增键一律加在本类并在这里登记。
  */
-class GamePrefs(context: Context) {
+class GamePrefs internal constructor(private val prefs: SharedPreferences) {
 
-    private val prefs: SharedPreferences =
+    /** 应用入口使用的构造：经 Gow3App 容器注入 Context。internal 主构造同时允许
+     *  同模块宿主单测直接注入 SharedPreferences 替身（无 Robolectric 的替代方案）。 */
+    constructor(context: Context) : this(
         context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+    )
 
     /**
      * 平台监听器的注册通道（`game_dir`/`update_dir` 变化驱动 UI 重扫）。
@@ -82,6 +85,35 @@ class GamePrefs(context: Context) {
         editor.apply()
     }
 
+    // ---- 性能 HUD（android-perf-hud-overlay） ----
+
+    /** 性能 HUD 开关；默认关闭，与 spec「默认关闭」一致。 */
+    fun perfHudEnabled(): Boolean = prefs.getBoolean(KEY_PERF_HUD_ENABLED, false)
+
+    fun setPerfHudEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_PERF_HUD_ENABLED, enabled).apply()
+    }
+
+    /**
+     * HUD 左上角 X 坐标；从未拖动过时返回 null（由 PerfHudOverlay 按默认右上角回退，
+     * NaN/越界的兜底校验在 PerfHudMetrics.resolvePosition，两处共同构成 spec 的
+     * 「异常位置数据不致丢失 HUD」契约）。
+     */
+    fun perfHudX(): Float? =
+        if (prefs.contains(KEY_PERF_HUD_X)) prefs.getFloat(KEY_PERF_HUD_X, 0f) else null
+
+    /** HUD 左上角 Y 坐标；语义同 [perfHudX]。 */
+    fun perfHudY(): Float? =
+        if (prefs.contains(KEY_PERF_HUD_Y)) prefs.getFloat(KEY_PERF_HUD_Y, 0f) else null
+
+    /** 拖动松手时持久化 HUD 位置（x/y 成对写入）。 */
+    fun setPerfHudPosition(x: Float, y: Float) {
+        prefs.edit()
+            .putFloat(KEY_PERF_HUD_X, x)
+            .putFloat(KEY_PERF_HUD_Y, y)
+            .apply()
+    }
+
     // ---- 界面语言 ----
 
     /** 语言覆盖值；未设置时为 [LANGUAGE_FOLLOW_SYSTEM]。 */
@@ -121,6 +153,9 @@ class GamePrefs(context: Context) {
         const val KEY_UPDATE_DIR = "update_dir"
         const val KEY_CONTROLLER_OVERLAY = "controller_overlay"
         const val KEY_SWAP_SQUARE_TRIANGLE = "swap_square_triangle"
+        const val KEY_PERF_HUD_ENABLED = "perf_hud_enabled"
+        const val KEY_PERF_HUD_X = "perf_hud_x"
+        const val KEY_PERF_HUD_Y = "perf_hud_y"
         const val KEY_LANGUAGE = "language"
         const val KEY_DRIVER_PROXY_PREFIX = "driver_proxy_prefix"
         const val KEY_DRIVER_DOWNLOADED_URLS = "driver_downloaded_urls"
