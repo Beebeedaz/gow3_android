@@ -34,7 +34,8 @@ class LaunchParamsTest {
 
     @Test fun `performance and controls categories hold the remaining params`() {
         assertEquals(
-            setOf("fps_limit", "engine_fps", "vsync", "frames_queued", "show_fps"),
+            // show_fps 已随引擎 FPS 显示退役移出可编辑集（change design D7）
+            setOf("fps_limit", "engine_fps", "vsync", "frames_queued"),
             LaunchParams.forCategory(LaunchCategory.PERFORMANCE).map { it.key }.toSet(),
         )
         assertEquals(
@@ -58,6 +59,8 @@ class LaunchParamsTest {
             "effect_game_aa", "effect_dynamic_shadows", "effect_ssr",
             "skip_intro", "mouse_look", "debug_camera", "debug_menu", "overlay_mouse",
             "preset", "output_res", "display_mode",
+            // show_fps 已随引擎 FPS 显示退役（change design D7）：引擎叠加层由 launcher HUD 取代
+            "show_fps",
         )) {
             assertFalse("no UI for unconsumed key $dead", dead in keys)
         }
@@ -76,7 +79,6 @@ class LaunchParamsTest {
         assertEquals("60", LaunchParams.valueOf(empty, byKey.getValue("engine_fps")))
         assertEquals("1", LaunchParams.valueOf(empty, byKey.getValue("vsync")))
         assertEquals("1", LaunchParams.valueOf(empty, byKey.getValue("frames_queued")))
-        assertEquals("1", LaunchParams.valueOf(empty, byKey.getValue("show_fps")))
         assertEquals("100", LaunchParams.valueOf(empty, byKey.getValue("vibration")))
     }
 

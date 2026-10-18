@@ -63,8 +63,9 @@ public final class GameActivity extends Activity {
     private LinearLayout drawerItems;
     private TextView status;
     private View resume;
-    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem, swapFaceItem;
+    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem, swapFaceItem, perfHudItem;
     private TouchControllerOverlay controllerOverlay;
+    private PerfHudOverlay perfHud;
     private PadBridge pad;
     private AudioBridge audio;
     private volatile Process game;
@@ -192,6 +193,12 @@ public final class GameActivity extends Activity {
         controllerOverlay.setVisibility(controllerEnabled() ? View.VISIBLE : View.GONE);
         screen.addView(controllerOverlay,frame(-1,-1,Gravity.CENTER));
 
+        // 性能 HUD（android-perf-hud-overlay）：叠在 controllerOverlay 之上、scrim/drawer 之下。
+        // 抽屉打开时 scrim 全屏盖住 HUD，触摸到不了 HUD（spec「抽屉打开时不可穿透误触」）。
+        perfHud=new PerfHudOverlay(this,prefs);
+        perfHud.setActive(perfHudEnabled());
+        screen.addView(perfHud,frame(-1,-1,Gravity.CENTER));
+
         handle=new View(this);
         GradientDrawable grip=new GradientDrawable(); grip.setColor(0x80c6ad76); grip.setCornerRadius(dp(4));
         handle.setBackground(grip); handle.setContentDescription("Open game menu");
@@ -244,7 +251,9 @@ public final class GameActivity extends Activity {
 
         section("Graphics");
         // Graphics 入口只保留运行时真正消费的那几项：upscaler / preset / sharpen / sharpness /
-        // show_fps / fps_limit。原来的 CPU 核心（thor_cpus）、特效（effect_*）、模型细节
+        // fps_limit。show_fps（引擎 FPS 叠加层）已退役——帧率显示由本 Activity 的性能 HUD
+        // （PerfHudOverlay）提供，历史残留的 show_fps=1 由 Gow3Data.prepare 归零。原来的 CPU
+        // 核心（thor_cpus）、特效（effect_*）、模型细节
         // （model_lod）在本仓库启动链路没有消费方，已在 SettingsDialog.show() 里注释掉。
         // fps_limit 的摘要取值域与 SettingsDialog.FPS_VALUES 和运行时 FPS_LIMITS
         // （30/60/120/240/0）对齐。
@@ -261,6 +270,14 @@ public final class GameActivity extends Activity {
                 // 运行中改倍率时 layer 会热更新 toml，但设备显示模式不会自动跟着变：让对话框在
                 // 生效后回调这里重选 display mode（4.3 复评）。
                 .showLossless(() -> { Process p=game; return p!=null && p.isAlive(); }, this::pickRefreshRate);
+        });
+        // 性能 HUD 开关行：launcher 侧悬浮层，即时生效（不重启游戏进程、不重建 Surface），
+        // 交互模式与「On-screen controller」一致——点击切换、写 prefs、收起抽屉。
+        perfHudItem=menuItem("ic_tune","Performance HUD","",() -> {
+            boolean on=!perfHudEnabled();
+            prefs.setPerfHudEnabled(on);
+            perfHud.setActive(on);
+            closeDrawer();
         });
 
         section("Controls");
@@ -394,6 +411,7 @@ public final class GameActivity extends Activity {
             +(Gow3Settings.read(configIni(), "lsfg_flow_scale")==null ? "1.0" : Gow3Settings.read(configIni(), "lsfg_flow_scale")) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
         setDetail(swapFaceItem,swapFaceEnabled() ? "On" : "Off");
+        setDetail(perfHudItem,perfHudEnabled() ? "On" : "Off");
     }
 
     private void openDrawer() {
@@ -493,6 +511,9 @@ public final class GameActivity extends Activity {
     }
     private boolean swapFaceEnabled() {
         return prefs.swapSquareTriangle();
+    }
+    private boolean perfHudEnabled() {
+        return prefs.perfHudEnabled();
     }
     @Override protected void onPause() {
         if (controllerOverlay!=null) controllerOverlay.release();
@@ -877,6 +898,8 @@ public final class GameActivity extends Activity {
     }
     @Override protected void onDestroy() {
         destroyed=true; pad.reset(); audio.stop(); main.removeCallbacksAndMessages(null);
+        // 性能 HUD 先于其余清理停止采样线程（spec「退出游戏停止采样」），对照 controllerOverlay.release() 先例。
+        if (perfHud!=null) perfHud.release();
         worker.shutdownNow();
         // The teardown used to run here on the main thread, which is what turned every quit into an
         // ANR. Process.waitFor() blocks until the game is gone, so the teardown runs on its own
