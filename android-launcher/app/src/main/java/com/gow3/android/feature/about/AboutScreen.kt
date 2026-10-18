@@ -1,5 +1,17 @@
 package com.gow3.android.feature.about
 
+import com.gow3.android.ui.components.ScreenColumn
+
+import com.gow3.android.core.settings.LanguageManager
+import com.gow3.android.data.UpdateChecker
+import com.gow3.android.data.archive.LogArchive
+import com.gow3.android.data.archive.SaveArchive
+import com.gow3.android.data.session.LogManager
+import com.gow3.android.data.session.LogResult
+import com.gow3.android.data.session.SaveManager
+import com.gow3.android.data.session.SaveResult
+import com.gow3.android.ui.components.LauncherColors
+
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -36,16 +48,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.gow3.android.BuildConfig
 import com.gow3.android.R
-import com.gow3.android.data.LanguageManager
-import com.gow3.android.data.LogArchive
-import com.gow3.android.data.LogManager
-import com.gow3.android.data.LogResult
-import com.gow3.android.data.SaveArchive
-import com.gow3.android.data.SaveManager
-import com.gow3.android.data.SaveResult
-import com.gow3.android.data.UpdateChecker
-import com.gow3.android.ui.components.LauncherColors
-import com.gow3.android.ui.components.ScreenColumn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

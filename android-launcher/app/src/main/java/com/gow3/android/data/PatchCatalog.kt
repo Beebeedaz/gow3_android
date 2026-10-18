@@ -1,5 +1,8 @@
 package com.gow3.android.data
 
+import com.gow3.android.data.model.GameSfo
+
+
 import java.io.File
 import java.io.IOException
 import java.io.InputStream

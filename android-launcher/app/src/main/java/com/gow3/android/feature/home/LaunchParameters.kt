@@ -1,5 +1,13 @@
 package com.gow3.android.feature.home
 
+import com.gow3.android.data.PatchCatalog
+import com.gow3.android.data.driver.DriverEntry
+import com.gow3.android.data.driver.DriverManager
+import com.gow3.android.data.model.MobilePreset
+import com.gow3.android.data.model.MobilePresets
+import com.gow3.android.ui.components.LauncherColors
+
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,11 +37,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gow3.android.R
-import com.gow3.android.data.DriverEntry
-import com.gow3.android.data.MobilePreset
-import com.gow3.android.data.MobilePresets
-import com.gow3.android.data.PatchCatalog
-import com.gow3.android.ui.components.LauncherColors
 
 /**
  * Home 页的「启动配置」卡片：承载游戏目录/更新目录选择、默认配置（DEFAULT PROFILE）
@@ -172,7 +175,7 @@ private fun DriverSelector(
 ) {
     val valid = entries.filter { it.valid }
     // 指向失效/已删除包的选择按「系统驱动」回退展示（spec：驱动包失效后显示回退）。
-    val selectedId = com.gow3.android.data.DriverManager.selectedId(ini)
+    val selectedId = DriverManager.selectedId(ini)
     val selectedEntry = valid.firstOrNull { it.id == selectedId }
     var expanded by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

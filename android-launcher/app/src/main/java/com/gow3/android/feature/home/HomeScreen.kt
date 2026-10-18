@@ -1,5 +1,22 @@
 package com.gow3.android.feature.home
 
+import com.gow3.android.ui.components.ScreenColumn
+import com.gow3.android.ui.components.formatBytes
+
+import com.gow3.android.core.settings.GamePrefs
+import com.gow3.android.core.settings.Gow3Settings
+import com.gow3.android.data.Gow3Data
+import com.gow3.android.data.PatchCatalog
+import com.gow3.android.data.driver.DriverEntry
+import com.gow3.android.data.driver.DriverManager
+import com.gow3.android.data.model.MobilePreset
+import com.gow3.android.data.model.MobilePresets
+import com.gow3.android.data.session.ImportResult
+import com.gow3.android.data.session.LosslessDllManager
+import com.gow3.android.data.session.RemoveResult
+import com.gow3.android.ui.components.LauncherColors
+
+
 import android.content.Context
 import android.content.SharedPreferences
 import android.widget.Toast
@@ -38,19 +55,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.gow3.android.R
-import com.gow3.android.data.Gow3Data
-import com.gow3.android.data.Gow3Ini
-import com.gow3.android.data.DriverManager
-import com.gow3.android.data.DriverEntry
-import com.gow3.android.data.ImportResult
-import com.gow3.android.data.LosslessDllManager
-import com.gow3.android.data.RemoveResult
-import com.gow3.android.data.PatchCatalog
-import com.gow3.android.data.MobilePreset
-import com.gow3.android.data.MobilePresets
-import com.gow3.android.ui.components.LauncherColors
-import com.gow3.android.ui.components.ScreenColumn
-import com.gow3.android.ui.components.formatBytes
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -76,7 +80,7 @@ internal fun HomeScreen(
     var driverRevision by remember { mutableIntStateOf(0) }
     // 启动配置卡驱动下拉的数据：每次 revision 递增（前台/目录变化/本页写入）重扫磁盘。
     var driverEntries by remember { mutableStateOf(emptyList<DriverEntry>()) }
-    val prefs = remember(context) { context.getSharedPreferences("gow3", Context.MODE_PRIVATE) }
+    val prefs = remember(context) { GamePrefs(context) }
 
     fun refreshDll() {
         dllState = losslessDlls.resolve()
@@ -110,10 +114,10 @@ internal fun HomeScreen(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        prefs.registerOnSharedPreferenceChangeListener(listener)
+        prefs.raw.registerOnSharedPreferenceChangeListener(listener)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+            prefs.raw.unregisterOnSharedPreferenceChangeListener(listener)
         }
     }
 
@@ -133,7 +137,7 @@ internal fun HomeScreen(
     }
 
     fun saveUpdates(updates: Map<String, String>): Boolean {
-        return if (Gow3Ini.write(gow3IniFile(context), updates)) {
+        return if (Gow3Settings.update(gow3IniFile(context), updates)) {
             iniValues = loadIni(context)
             true
         } else {
@@ -221,13 +225,13 @@ internal fun HomeScreen(
 /** launcher 的 gow3.ini 路径，即游戏、run-gow3.sh 和 GameActivity 读取的同一个文件。 */
 private fun gow3IniFile(context: Context): File = Gow3Data.config(context)
 
-private fun loadIni(context: Context): Map<String, String> = Gow3Ini.read(gow3IniFile(context))
+private fun loadIni(context: Context): Map<String, String> = Gow3Settings.read(gow3IniFile(context))
 
 private fun currentGameDir(context: Context): String? =
-    context.getSharedPreferences("gow3", Context.MODE_PRIVATE).getString("game_dir", null)
+    GamePrefs(context).gameDir()
 
 private fun currentUpdateDir(context: Context): String? =
-    context.getSharedPreferences("gow3", Context.MODE_PRIVATE).getString("update_dir", null)
+    GamePrefs(context).updateDir()
 
 @Composable
 private fun LaunchButton(onClick: () -> Unit) {

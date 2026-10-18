@@ -1,5 +1,16 @@
 package com.gow3.android.feature.settings
 
+import com.gow3.android.ui.components.ScreenColumn
+
+import com.gow3.android.core.settings.GamePrefs
+import com.gow3.android.core.settings.Gow3Settings
+import com.gow3.android.data.Gow3Data
+import com.gow3.android.data.PatchCatalog
+import com.gow3.android.data.model.LaunchCategory
+import com.gow3.android.data.model.LaunchParams
+import com.gow3.android.ui.components.LauncherColors
+
+
 import android.content.Context
 import android.content.SharedPreferences
 import android.widget.Toast
@@ -38,13 +49,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.gow3.android.R
-import com.gow3.android.data.Gow3Data
-import com.gow3.android.data.Gow3Ini
-import com.gow3.android.data.LaunchCategory
-import com.gow3.android.data.LaunchParams
-import com.gow3.android.data.PatchCatalog
-import com.gow3.android.ui.components.LauncherColors
-import com.gow3.android.ui.components.ScreenColumn
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -66,7 +70,8 @@ internal fun SettingsScreen() {
     var catalogLoading by remember { mutableStateOf(true) }
     var catalogRevision by remember { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf(LaunchCategory.GRAPHICS) }
-    val prefs = remember(context) { context.getSharedPreferences("gow3", Context.MODE_PRIVATE) }
+    // prefs 只用于键变化监听；读写一律走 GamePrefs（core/settings 单一真源）。
+    val prefs = remember(context) { GamePrefs(context) }
 
     // 玩家可能在其他 tab 或游戏运行期间改目录，回到前台时重新读取目录与 ini。
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -86,10 +91,10 @@ internal fun SettingsScreen() {
             if (event == Lifecycle.Event.ON_RESUME) refreshSettings()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        prefs.registerOnSharedPreferenceChangeListener(listener)
+        prefs.raw.registerOnSharedPreferenceChangeListener(listener)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+            prefs.raw.unregisterOnSharedPreferenceChangeListener(listener)
         }
     }
 
@@ -105,7 +110,7 @@ internal fun SettingsScreen() {
     }
 
     fun saveUpdates(updates: Map<String, String>) {
-        if (Gow3Ini.write(gow3IniFile(context), updates)) {
+        if (Gow3Settings.update(gow3IniFile(context), updates)) {
             iniValues = loadIni(context)
         } else {
             Toast.makeText(context, context.getString(R.string.settings_save_failed), Toast.LENGTH_SHORT).show()
@@ -197,10 +202,10 @@ private fun CategoryTabs(selected: LaunchCategory, onSelect: (LaunchCategory) ->
 /** launcher 的 gow3.ini 路径，即游戏、run-bionic.sh 和 GameActivity 读取的同一个文件。 */
 private fun gow3IniFile(context: Context): File = Gow3Data.config(context)
 
-private fun loadIni(context: Context): Map<String, String> = Gow3Ini.read(gow3IniFile(context))
+private fun loadIni(context: Context): Map<String, String> = Gow3Settings.read(gow3IniFile(context))
 
 private fun currentGameDir(context: Context): String? =
-    context.getSharedPreferences("gow3", Context.MODE_PRIVATE).getString("game_dir", null)
+    GamePrefs(context).gameDir()
 
 private fun currentUpdateDir(context: Context): String? =
-    context.getSharedPreferences("gow3", Context.MODE_PRIVATE).getString("update_dir", null)
+    GamePrefs(context).updateDir()

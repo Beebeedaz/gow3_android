@@ -1,7 +1,8 @@
 package com.gow3.android.feature.settings
 
-import com.gow3.android.data.LaunchCategory
-import com.gow3.android.data.LaunchParam
+import com.gow3.android.data.model.LaunchCategory
+import com.gow3.android.data.model.LaunchParam
+
 
 /**
  * Settings 分类页的一条可渲染条目：参数行或功能卡 slot。

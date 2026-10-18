@@ -535,7 +535,7 @@ static void* server_thread(void* unused) {
 
 /* ---- JNI ---- */
 
-JNIEXPORT jstring JNICALL Java_ro_cobrabm_fexdroid_Gow3Present_nativeStart(JNIEnv* env, jclass cls,
+JNIEXPORT jstring JNICALL Java_com_gow3_android_game_Gow3Present_nativeStart(JNIEnv* env, jclass cls,
         jstring jpath, jboolean jstretch) {
     (void)cls;
     const char* path = (*env)->GetStringUTFChars(env, jpath, NULL);
@@ -582,7 +582,7 @@ fail:
     return (*env)->NewStringUTF(env, msg);
 }
 
-JNIEXPORT void JNICALL Java_ro_cobrabm_fexdroid_Gow3Present_nativeSetSurface(JNIEnv* env, jclass cls,
+JNIEXPORT void JNICALL Java_com_gow3_android_game_Gow3Present_nativeSetSurface(JNIEnv* env, jclass cls,
         jobject surface) {
     (void)cls;
     pthread_mutex_lock(&S.lock);
@@ -595,12 +595,12 @@ JNIEXPORT void JNICALL Java_ro_cobrabm_fexdroid_Gow3Present_nativeSetSurface(JNI
     pthread_mutex_unlock(&S.lock);
 }
 
-JNIEXPORT jlong JNICALL Java_ro_cobrabm_fexdroid_Gow3Present_nativeFrames(JNIEnv* env, jclass cls) {
+JNIEXPORT jlong JNICALL Java_com_gow3_android_game_Gow3Present_nativeFrames(JNIEnv* env, jclass cls) {
     (void)env; (void)cls;
     return (jlong)atomic_load(&S.frames);
 }
 
-JNIEXPORT void JNICALL Java_ro_cobrabm_fexdroid_Gow3Present_nativeShutdown(JNIEnv* env, jclass cls) {
+JNIEXPORT void JNICALL Java_com_gow3_android_game_Gow3Present_nativeShutdown(JNIEnv* env, jclass cls) {
     (void)env; (void)cls;
     pthread_mutex_lock(&S.lock);
     drop_surface_control();

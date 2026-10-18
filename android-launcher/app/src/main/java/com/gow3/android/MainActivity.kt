@@ -1,5 +1,17 @@
 package com.gow3.android
 
+import com.gow3.android.ui.LauncherScreen
+import com.gow3.android.ui.theme.Gow3LauncherTheme
+
+import com.gow3.android.core.settings.LanguageManager
+import com.gow3.android.data.session.GameFolderManager
+import com.gow3.android.data.session.LogManager
+import com.gow3.android.data.session.LosslessDllManager
+import com.gow3.android.data.session.SaveManager
+import com.gow3.android.game.GameActivity
+import com.gow3.android.game.SteamDllDialog
+import com.gow3.android.ui.components.LauncherColors
+
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -7,14 +19,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.view.WindowCompat
-import com.gow3.android.data.GameFolderManager
-import com.gow3.android.data.LanguageManager
-import com.gow3.android.data.LogManager
-import com.gow3.android.data.LosslessDllManager
-import com.gow3.android.data.SaveManager
-import com.gow3.android.ui.LauncherScreen
-import com.gow3.android.ui.components.LauncherColors
-import com.gow3.android.ui.theme.Gow3LauncherTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var gameFolderManager: GameFolderManager
@@ -53,14 +57,14 @@ class MainActivity : ComponentActivity() {
                             // surfaceCreated 只记录 holder、等一个永不到来的用户动作，
                             // 启动流程（runtime 解包 → 游戏进程）不会开始。
                             startActivity(
-                                Intent(this, ro.cobrabm.fexdroid.GameActivity::class.java)
+                                Intent(this, GameActivity::class.java)
                                     .putExtra("action", "launch"),
                             )
                         }
                     },
                     losslessDlls = losslessDllManager,
                     onGetFromSteam = { onDownloaded ->
-                        ro.cobrabm.fexdroid.SteamDllDialog(this, losslessDllManager.appCopy()) { ok, msg ->
+                        SteamDllDialog(this, losslessDllManager.appCopy()) { ok, msg ->
                             onDownloaded(ok, msg)
                         }.show()
                     },

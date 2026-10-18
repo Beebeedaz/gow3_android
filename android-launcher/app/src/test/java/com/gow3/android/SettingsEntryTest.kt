@@ -1,9 +1,11 @@
 package com.gow3.android
 
-import com.gow3.android.data.LaunchCategory
-import com.gow3.android.data.LaunchParams
-import com.gow3.android.feature.settings.SettingsEntry
 import com.gow3.android.feature.settings.settingsEntries
+
+import com.gow3.android.data.model.LaunchCategory
+import com.gow3.android.data.model.LaunchParams
+import com.gow3.android.feature.settings.SettingsEntry
+
 import org.junit.Assert.*
 import org.junit.Test
 

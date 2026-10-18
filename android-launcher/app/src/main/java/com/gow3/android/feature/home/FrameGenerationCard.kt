@@ -1,5 +1,13 @@
 package com.gow3.android.feature.home
 
+import com.gow3.android.ui.components.ActionButton
+import com.gow3.android.ui.components.formatBytes
+
+import com.gow3.android.data.session.LosslessDllManager
+import com.gow3.android.data.session.LosslessDllSource
+import com.gow3.android.data.session.LosslessDllState
+import com.gow3.android.ui.components.LauncherColors
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,12 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gow3.android.R
-import com.gow3.android.data.LosslessDllManager
-import com.gow3.android.data.LosslessDllSource
-import com.gow3.android.data.LosslessDllState
-import com.gow3.android.ui.components.ActionButton
-import com.gow3.android.ui.components.LauncherColors
-import com.gow3.android.ui.components.formatBytes
 
 /**
  * 提供 Lossless.dll，即 lsfg-vk 帧生成所加载的玩家自备文件。LSFG 倍率、
