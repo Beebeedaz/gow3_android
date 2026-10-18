@@ -11,16 +11,33 @@ import com.gow3.android.R
  * 每个枚举值带标题字符串资源 id 与稳定的声明顺序；新增类别只需追加枚举值
  * （如未来 FEX 的 TRANSLATOR），新增参数只需声明 [LaunchParam.category]，
  * 均不影响 Home 页展示。音频为预留分类，当前没有参数，UI 显示「暂无配置」占位；
- * 驱动由 DriverManagerCard 落位；存储（change redesign-android-launcher-home）
- * 承载游戏目录与升级补丁目录行，是首启之后目录修改的常驻位置。
+ * 驱动由 DriverManagerCard 落位；常规（原存储分类，redesign-android-launcher-home）
+ * 排在第一位，承载游戏目录与升级补丁目录行（StorageSection）与语言入口（LanguageCard），
+ * 是首启之后目录与语言修改的常驻位置。
  */
 internal enum class LaunchCategory(val titleRes: Int) {
+    GENERAL(R.string.param_category_general),
     GRAPHICS(R.string.param_category_graphics),
     PERFORMANCE(R.string.param_category_performance),
     CONTROLS(R.string.param_category_controls),
     AUDIO(R.string.param_category_audio),
     DRIVER(R.string.param_category_driver),
-    STORAGE(R.string.param_category_storage),
+    ;
+
+    companion object {
+        /** Settings 页的默认分类：首次打开 Settings、以及持久化值失效时的落点。 */
+        val DEFAULT: LaunchCategory get() = GENERAL
+
+        /**
+         * 从 rememberSaveable 持久化的枚举名恢复分类。
+         *
+         * LauncherScreen 把分类名以字符串存进 saved instance state（Bundle 契约下
+         * 最稳的形态），因此恢复时可能遇到改名前的旧值（如 STORAGE）、空值或脏值：
+         * 一律回落 [DEFAULT]，绝不抛异常。声明顺序（[entries]）即分类栏渲染顺序。
+         */
+        fun fromSaved(name: String?): LaunchCategory =
+            entries.firstOrNull { it.name == name } ?: DEFAULT
+    }
 }
 
 /**

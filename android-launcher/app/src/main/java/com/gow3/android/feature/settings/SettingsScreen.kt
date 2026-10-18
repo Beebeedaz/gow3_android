@@ -65,10 +65,14 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun SettingsScreen(
     initialCategory: LaunchCategory,
+    losslessDlls: com.gow3.android.data.session.LosslessDllManager,
     onChooseGameFolder: () -> Unit,
     onChooseUpdateFolder: () -> Unit,
+    onChangeLanguage: (String) -> Unit,
 ) {
     val context = LocalContext.current
+    // 玩家自备 Lossless.dll 状态（常规分类的导入行；change add-native-frame-generation）。
+    var dllState by remember { mutableStateOf(losslessDlls.resolve()) }
     var iniValues by remember { mutableStateOf(loadIni(context)) }
     var gameDir by remember { mutableStateOf(currentGameDir(context)) }
     var updateDir by remember { mutableStateOf(currentUpdateDir(context)) }
@@ -86,6 +90,7 @@ internal fun SettingsScreen(
             gameDir = currentGameDir(context)
             updateDir = currentUpdateDir(context)
             iniValues = loadIni(context)
+            dllState = losslessDlls.resolve()
             identity = GameIdentityState.Loading
             catalogRevision++
         }
@@ -166,12 +171,33 @@ internal fun SettingsScreen(
                                     onIniChanged = { iniValues = loadIni(context) },
                                 )
                             }
-                            // 存储分类（redesign-android-launcher-home）：目录修改的常驻位置。
+                            // 存储行（redesign-android-launcher-home）：目录修改的常驻位置。
                             if (entry.slotId == "storage") {
                                 StorageSection(gameDir, updateDir, identity, onChooseGameFolder, onChooseUpdateFolder)
                             }
+                            // 语言入口：点击切换后由 MainActivity 持久化并重建 Activity。
+                            if (entry.slotId == "language") {
+                                LanguageCard(onChangeLanguage)
+                            }
                         }
                     }
+                }
+                if (selected == LaunchCategory.GENERAL) {
+                    LosslessImportRow(
+                        installed = dllState is com.gow3.android.data.session.LosslessDllState.Installed,
+                        onImport = {
+                            losslessDlls.launchPicker { result ->
+                                dllState = losslessDlls.resolve()
+                                when (result) {
+                                    is com.gow3.android.data.session.ImportResult.Failed ->
+                                        Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                                    is com.gow3.android.data.session.ImportResult.Success ->
+                                        Toast.makeText(context, context.getString(R.string.frame_gen_import_done), Toast.LENGTH_SHORT).show()
+                                    com.gow3.android.data.session.ImportResult.Cancelled -> {}
+                                }
+                            }
+                        },
+                    )
                 }
             }
         }
@@ -217,7 +243,7 @@ private fun currentUpdateDir(context: Context): String? =
     GamePrefs(context).updateDir()
 
 /**
- * 存储分类（spec：android-kotlin-launcher-first-run-game-select「Directory modification
+ * 存储行（spec：android-kotlin-launcher-first-run-game-select「Directory modification
  * after first run lives in Settings」）：就地承载游戏目录与升级补丁目录两行，展示当前
  * 路径（未设置态）与有效性状态，点击走既有目录选择流程（含权限前置）。
  */
@@ -314,6 +340,50 @@ private fun StorageRow(
         }
         if (path != null && !statusValid) {
             Text(status, color = LauncherColors.textMuted, fontSize = 11.sp, lineHeight = 16.sp)
+        }
+    }
+}
+
+
+/**
+ * 常规分类的 Lossless.dll 导入行（change add-native-frame-generation）：状态 + IMPORT
+ * 按钮。帧生成的供给入口只在设置页（Home 卡片是开关，游戏内抽屉是调参）。
+ */
+@Composable
+private fun LosslessImportRow(installed: Boolean, onImport: () -> Unit) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        com.gow3.android.ui.components.SectionLabel(stringResource(R.string.lossless_row_title))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(LauncherColors.navSurface)
+                .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)), RoundedCornerShape(10.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Text(
+                if (installed) stringResource(R.string.lossless_row_installed)
+                else stringResource(R.string.lossless_row_missing),
+                color = if (installed) LauncherColors.textPrimary else LauncherColors.gold.copy(alpha = 0.85f),
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                stringResource(R.string.lossless_row_import),
+                color = LauncherColors.gold,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(LauncherColors.crimson)
+                    .clickable { onImport() }
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            )
         }
     }
 }

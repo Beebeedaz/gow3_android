@@ -10,13 +10,19 @@ adrenotools-style driver pack the player installs under files/drivers/<name>
 phone's own driver, gow3.ini: gpu_driver). No Mesa/Turnip code is built or
 distributed with this app.
 
-Frame generation: not part of this app. The Bionic runtime loads no LSFG layer
-and the launcher's FRAME GENERATION entry is disabled; no lsfg-vk component is
-built or shipped. Lossless Scaling and its Lossless.dll are not included and
-are never redistributed with this app: the player supplies their own copy,
-either by importing the file on the launcher Home page (FRAME GENERATION,
-IMPORT .DLL) or by signing in to Steam below. The app only stores it in its
-own private folder.
+Frame generation (LSFG, change add-native-frame-generation): the Bionic game
+process loads libbloodframe.so (MIT, https://github.com/ducvd89/bloodframe,
+pinned commit c29027555cfa8c9fc73c20f03816230becb9f469; it carries the history
+of GameNative's MIT lsfg-vk Android fork, based on lsfg-vk 1.0 by PancakeTAS).
+The library is built by tools/android/build_framegen.sh into the runtime
+payload (gow3port/bionic/lib/) and is dlopen()ed by libgow3gpu only while
+frame generation is on. Lossless Scaling and its Lossless.dll are NOT included
+and are never redistributed with this app: the player supplies their own copy
+(launcher Home, IMPORT .DLL on the FRAME GENERATION card, or Settings →
+General → IMPORT, or Steam below); the engine reads it as data (never
+executes it) and the file stays in the player's folders.
+
+(Former note "Frame generation: not part of this app" is superseded above.)
 
 Steam sign-in (downloads Lossless.dll from the player's own Lossless Scaling):
 JavaSteam 1.8.0 (MIT, https://github.com/Longi94/JavaSteam), with Kotlin and

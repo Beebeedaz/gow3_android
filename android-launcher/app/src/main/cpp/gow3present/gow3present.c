@@ -271,6 +271,10 @@ static void on_commit(void* ctx_, ASurfaceTransactionStats* stats) {
  * the acquire fence (taken). Needs S.sc and the API; the frame's buffer is checked by the callers. */
 static void show_frame(uint32_t generation, uint32_t index, uint64_t frame, uint32_t width, uint32_t height,
                        int acquire_fd) {
+    static uint64_t dbg_shown = 0;
+    if (++dbg_shown <= 6 || dbg_shown % 120 == 0)
+        LOGI("show_frame #%llu: gen %u idx %u acquire_fd %d", (unsigned long long)dbg_shown,
+             generation, index, acquire_fd);
     int w = ANativeWindow_getWidth(S.window), h = ANativeWindow_getHeight(S.window);
     if (w <= 0 || h <= 0) { w = (int)width; h = (int)height; }
     ARect dst;

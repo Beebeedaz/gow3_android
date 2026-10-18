@@ -23,8 +23,10 @@ public class RuntimeInstallerTest {
     @Rule public TemporaryFolder tmp = new TemporaryFolder();
 
     private static final String MANIFEST =
+            // java_package 必须是统一后的 bridge 包（consolidate-android-launcher-architecture：
+            // ro.cobrabm.fexdroid → com.gow3.android.game），validateRuntime 按它拒绝异包 payload。
             "{\"schema_version\": 1, \"application_id\": \"com.gow3.android.bionic\","
-            + " \"java_package\": \"ro.cobrabm.fexdroid\"}";
+            + " \"java_package\": \"com.gow3.android.game\"}";
 
     /** A minimal but complete Bionic runtime tree, the shape the installer accepts. */
     private File bionicTree(File root) throws IOException {

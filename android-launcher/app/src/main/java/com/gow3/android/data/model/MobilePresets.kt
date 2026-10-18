@@ -23,9 +23,12 @@ internal object MobilePresets {
         MobilePreset("900p", R.string.mobile_preset_clear),
         MobilePreset("1080p", R.string.mobile_preset_hd),
     )
+    // 预设只挂钩分辨率档位（经 render_resolution 联动选择分辨率补丁）与六项画面
+    // 特效关闭补丁；视频跳过类补丁（Skip Intro、按 X 跳过视频）是玩家个人选择，
+    // 不被预设连带开启，也不参与预设匹配判定（跳过开场动画由首页专用开关管理）。
     private val patchNames = setOf(
         "Disable SSAO", "Disable Motion Blur", "Disable Depth of Field", "Disable Bloom",
-        "Disable Soft Particles", "Disable Dynamic Shadows", "Skip Intro", "Skip Any Video With X Button",
+        "Disable Soft Particles", "Disable Dynamic Shadows",
     )
 
     fun available(catalog: PatchCatalog?): List<MobilePreset> {

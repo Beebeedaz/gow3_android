@@ -251,4 +251,20 @@ public class PerfHudMetricsTest {
         assertEquals(0f, p[0], 0.01f);
         assertEquals(0f, p[1], 0.01f);
     }
+
+    // ---- 帧生成双帧率段（change add-native-frame-generation，spec「HUD 区分源/上屏」）----
+
+    @Test public void fpsSegment_fgActiveShowsSourceArrowPresented() {
+        assertEquals("59→118 LSFG 2x", PerfHudMetrics.fpsSegment(59, 118, 2));
+        assertEquals("40→120 LSFG 3x", PerfHudMetrics.fpsSegment(40, 120, 3));
+        assertEquals("30→120 LSFG 4x", PerfHudMetrics.fpsSegment(30, 120, 4));
+    }
+
+    @Test public void fpsSegment_fgInactiveFallsBackToSingleRate() {
+        // 关闭/未生效（multiplier 0/1）与 warm-up（presented==source）都退回单一帧率，
+        // 语义与无帧生成能力时一致。
+        assertEquals("60", PerfHudMetrics.fpsSegment(60, 60, 0));
+        assertEquals("60", PerfHudMetrics.fpsSegment(60, 60, 1));
+        assertEquals("59", PerfHudMetrics.fpsSegment(59, 59, 2)); // warm-up：上屏==源
+    }
 }

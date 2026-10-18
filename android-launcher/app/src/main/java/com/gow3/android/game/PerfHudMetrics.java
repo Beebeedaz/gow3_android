@@ -109,6 +109,18 @@ final class PerfHudMetrics {
     }
 
     /**
+     * 帧生成生效时的帧率段（change add-native-frame-generation，spec「HUD 区分源/上屏」）：
+     * multiplier>=2 且上屏率与源率不同（插帧确实在产出）时「源→上屏 LSFG Nx」
+     * （如 59→118 LSFG 2x）；否则退回单一帧率——warm-up 期（上屏==源）与关闭/未生效
+     * 的显示语义与无帧生成能力时一致。纯字符串函数，宿主 JUnit 直接覆盖。
+     */
+    static String fpsSegment(int sourceFps, int presentedFps, int multiplier) {
+        if (multiplier < 2 || presentedFps <= 0 || presentedFps == sourceFps)
+            return String.valueOf(sourceFps);
+        return sourceFps + "→" + presentedFps + " LSFG " + multiplier + "x";
+    }
+
+    /**
      * 解析 `/proc/stat` 首行（"cpu  user nice system idle iowait irq softirq steal …"）
      * 为 {total, idle}，idle = idle + iowait。字段缺失或没有任何数字时返回 null。
      */

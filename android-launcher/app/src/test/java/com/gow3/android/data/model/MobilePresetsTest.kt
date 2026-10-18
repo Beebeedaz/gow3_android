@@ -25,7 +25,7 @@ class MobilePresetsTest {
         assertTrue(MobilePresets.available(c.copy(patches = c.patches.filter { it.name != "Disable SSAO" })).isEmpty())
     }
 
-    @Test fun `profiles persist graphics and nine patches together without changing personal settings`() {
+    @Test fun `profiles persist graphics and seven patches together without changing personal settings`() {
         val c = catalog()
         val file = temp.newFile("gow3.ini")
         assertTrue(Gow3Settings.update(file, mapOf(
@@ -49,20 +49,53 @@ class MobilePresetsTest {
             // display_stretch 是显示端个人偏好：预设不重置它（用户开的宽屏保持开启），
             // 也不会因它不等于默认值而让预设匹配失败。
             assertEquals("1", ini["display_stretch"])
+            // 预设只强制分辨率补丁与六项特效补丁，不再连带开启视频跳过补丁。
             assertEquals(setOf("Resolution Patch - ${preset.resolution}", "Disable SSAO", "Disable Motion Blur",
                 "Disable Depth of Field", "Disable Bloom", "Disable Soft Particles", "Disable Dynamic Shadows",
-                "Skip Intro", "Skip Any Video With X Button", "Bug Fix - Startup Black Screen"), c.selected(ini))
+                "Bug Fix - Startup Black Screen"), c.selected(ini))
             for (param in LaunchParams.forCatalog(c).filter { it.key != "vibration" && it.key != "display_stretch" }) {
                 assertEquals(preset.settings[param.key], LaunchParams.selectedOption(ini, param)?.value)
             }
         }
     }
 
+    @Test fun `video and fix patch switches stay independent of the preset match`() {
+        val c = catalog()
+        val preset = MobilePresets.available(c).first { it.resolution == "720p" }
+        var ini = MobilePresets.updates(preset, c, emptyMap())
+        assertEquals(preset, MobilePresets.matching(c, ini))
+        val xVideo = c.patches.first { it.name == "Skip Any Video With X Button" }
+        val blackScreen = c.patches.first { it.name == "Bug Fix - Startup Black Screen" }
+        // 补丁页单独开启视频跳过/修复补丁：保存正常，预设匹配不受影响。
+        ini += c.toggle(ini, xVideo, true)
+        ini += c.toggle(ini, blackScreen, true)
+        assertTrue(xVideo.name in c.selected(ini))
+        assertTrue(blackScreen.name in c.selected(ini))
+        assertEquals(preset, MobilePresets.matching(c, ini))
+        // 再单独关闭它们：预设匹配同样不受影响。
+        ini += c.toggle(ini, xVideo, false)
+        ini += c.toggle(ini, blackScreen, false)
+        assertEquals(preset, MobilePresets.matching(c, ini))
+    }
+
+    @Test fun `preset keeps an already enabled Skip Intro`() {
+        val c = catalog()
+        val preset = MobilePresets.available(c).first { it.resolution == "720p" }
+        val skipIntro = c.patches.first { it.name == "Skip Intro" }
+        val enabled = c.toggle(emptyMap(), skipIntro, true)
+        val ini = MobilePresets.updates(preset, c, enabled)
+        // 已开启的 Skip Intro 不被预设关闭，预设仍正常匹配。
+        assertTrue(skipIntro.name in c.selected(ini))
+        assertEquals(preset, MobilePresets.matching(c, ini))
+    }
+
     @Test fun `single settings and patch switches remain editable and show custom`() {
         val c = catalog()
         val preset = MobilePresets.available(c).first { it.resolution == "720p" }
         val ini = MobilePresets.updates(preset, c, emptyMap())
-        assertEquals(9, c.selected(ini).size)
+        assertEquals(setOf("Resolution Patch - 720p", "Disable SSAO", "Disable Motion Blur",
+            "Disable Depth of Field", "Disable Bloom", "Disable Soft Particles", "Disable Dynamic Shadows"),
+            c.selected(ini))
         assertNull(MobilePresets.matching(c, ini + ("fps_limit" to "30")))
         assertNull(MobilePresets.matching(c, ini + ("render_resolution" to "1440p")))
         val bloom = c.patches.first { it.name == "Disable Bloom" }

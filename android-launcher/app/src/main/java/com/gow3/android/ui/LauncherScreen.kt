@@ -74,7 +74,7 @@ internal fun LauncherScreen(
     // tab 与 Settings 初始分类用 rememberSaveable：旋转/分屏重建 Activity 后状态不丢
     //（design 决策 3——横竖屏自适应落地后这是从隐性变显性的既有缺陷）。
     var selectedTab by rememberSaveable { mutableIntStateOf(LauncherTab.HOME.ordinal) }
-    var settingsCategory by rememberSaveable { mutableStateOf(LaunchCategory.GRAPHICS.name) }
+    var settingsCategory by rememberSaveable { mutableStateOf(LaunchCategory.DEFAULT.name) }
     val tab = LauncherTab.entries[selectedTab]
 
     // Home 异常态 / 驱动面板的深链：切到 Settings tab 并选中指定分类。
@@ -109,7 +109,7 @@ internal fun LauncherScreen(
                         saves = saves,
                         logs = logs,
                         onChangeLanguage = onChangeLanguage,
-                        onOpenStorageCategory = { openSettings(LaunchCategory.STORAGE) },
+                        onOpenStorageCategory = { openSettings(LaunchCategory.GENERAL) },
                         onManageDrivers = { openSettings(LaunchCategory.DRIVER) },
                     )
                 }
@@ -137,7 +137,7 @@ internal fun LauncherScreen(
                         saves = saves,
                         logs = logs,
                         onChangeLanguage = onChangeLanguage,
-                        onOpenStorageCategory = { openSettings(LaunchCategory.STORAGE) },
+                        onOpenStorageCategory = { openSettings(LaunchCategory.GENERAL) },
                         onManageDrivers = { openSettings(LaunchCategory.DRIVER) },
                     )
                 }
@@ -188,12 +188,14 @@ private fun TabContent(
             wide = wide,
         )
         LauncherTab.SETTINGS -> SettingsScreen(
-            initialCategory = LaunchCategory.valueOf(settingsCategory),
+            initialCategory = LaunchCategory.fromSaved(settingsCategory),
+            losslessDlls = losslessDlls,
             onChooseGameFolder = onChooseGameFolder,
             onChooseUpdateFolder = onChooseUpdateFolder,
+            onChangeLanguage = onChangeLanguage,
         )
         LauncherTab.MODS -> ModsScreen()
-        LauncherTab.ABOUT -> AboutScreen(saves, logs, onChangeLanguage)
+        LauncherTab.ABOUT -> AboutScreen(saves, logs)
     }
 }
 

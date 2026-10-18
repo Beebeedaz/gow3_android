@@ -110,6 +110,15 @@ final class RuntimeInstaller {
         boolean stagedRoot = new File(stage, "rootfs").exists();
         boolean movedRoot = false, movedPort = false, movedHome = false, movedManifest = false;
         boolean installedRoot = false, installedPort = false, installedHome = false, installedManifest = false;
+        // 玩家自备的 Lossless.dll（Home 页导入/Steam 下载）放在 gow3port/ 内，但不属于
+        // runtime payload——替换 runtime 树时必须保全它，否则一次升级就吃掉玩家的文件
+        // （change add-native-frame-generation 的供给契约）。
+        File dllKeep = new File(files, ".lsfg-dll-keep");
+        deleteTree(dllKeep);
+        File oldDll = new File(port, "Lossless.dll");
+        final boolean keptDll = oldDll.isFile();
+        if (keptDll && !oldDll.renameTo(dllKeep))
+            throw new IllegalStateException("Cannot preserve Lossless.dll");
         try {
             if (root.exists()) { renameRequired(root, oldRoot, "rootfs"); movedRoot = true; }
             if (port.exists()) { renameRequired(port, oldPort, "gow3port"); movedPort = true; }
@@ -134,6 +143,11 @@ final class RuntimeInstaller {
             Files.write(markerPart.toPath(), (expected + "\n").getBytes(StandardCharsets.US_ASCII));
             if (marker.exists() && !marker.delete()) throw new IllegalStateException("Cannot replace runtime marker");
             if (!markerPart.renameTo(marker)) throw new IllegalStateException("Cannot publish runtime marker");
+            if (keptDll && !new File(port, "Lossless.dll").exists()) {
+                if (!dllKeep.renameTo(new File(port, "Lossless.dll")))
+                    throw new IllegalStateException("Cannot restore Lossless.dll");
+            }
+            deleteTree(dllKeep);
             deleteTree(previous);
         } catch (Exception error) {
             if (installedManifest) deleteTree(manifest);
@@ -141,7 +155,11 @@ final class RuntimeInstaller {
             if (installedRoot) deleteTree(root);
             if (installedHome) deleteTree(home);
             if (movedManifest && oldManifest.exists()) oldManifest.renameTo(manifest);
-            if (movedPort && oldPort.exists()) oldPort.renameTo(port);
+            if (movedPort && oldPort.exists()) {
+                oldPort.renameTo(port);
+                if (keptDll && dllKeep.isFile() && !new File(port, "Lossless.dll").exists())
+                    dllKeep.renameTo(new File(port, "Lossless.dll"));
+            }
             if (movedRoot && oldRoot.exists()) oldRoot.renameTo(root);
             if (movedHome && oldHome.exists()) oldHome.renameTo(home);
             throw error;

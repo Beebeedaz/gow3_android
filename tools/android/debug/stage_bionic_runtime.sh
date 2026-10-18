@@ -29,6 +29,7 @@ inputs=(
     "$out/bin/kgsl-chip-id"
     "$out/lib/libgow3cpu.so"
     "$out/lib/libgow3gpu.so"
+    "$out/lib/libbloodframe.so"
     "$out/lib/libc++_shared.so"
     "$out/lib/libSDL3.so"
     tools/android/device/run-bionic.sh
@@ -66,7 +67,7 @@ if [[ $stale == 1 ]]; then
     rm -rf "$bionic_tree"
     mkdir -p "$staging/bionic/bin" "$staging/bionic/lib" "$staging/home/gow3port" "$bionic_tree/home/gow3port"
     cp -f "$out/bin/gow3-probe" "$out/bin/kgsl-chip-id" "$staging/bionic/bin/"
-    cp -f "$out/lib/libgow3cpu.so" "$out/lib/libgow3gpu.so" \
+    cp -f "$out/lib/libgow3cpu.so" "$out/lib/libgow3gpu.so" "$out/lib/libbloodframe.so" \
           "$out/lib/libc++_shared.so" "$out/lib/libSDL3.so" "$staging/bionic/lib/"
     cp -f tools/android/device/run-bionic.sh "$staging/run-bionic.sh"
     # 默认设置与 FEX Config 输入（run-bionic.sh 从 gow3port/ 读取），与 glibc 打包同名。

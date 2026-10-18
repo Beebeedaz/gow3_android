@@ -127,7 +127,7 @@ private fun selectedLabel(context: Context, values: Map<String, String>, param: 
 }
 
 @Composable
-private fun ParamInfoDialog(title: String, message: String, onDismiss: () -> Unit) {
+internal fun ParamInfoDialog(title: String, message: String, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier

@@ -37,8 +37,8 @@ internal sealed interface SettingsEntry {
  * 落位，提供游戏目录与升级补丁目录行；CONTROLS -> "pad_mapping" 等仍为预留示例。
  */
 private val categoryCards: Map<LaunchCategory, List<String>> = mapOf(
+    LaunchCategory.GENERAL to listOf("storage", "language"),
     LaunchCategory.DRIVER to listOf("driver_manager"),
-    LaunchCategory.STORAGE to listOf("storage"),
 )
 
 /** 按分类组装条目列表：先声明顺序的功能卡 slot，再按声明顺序排该分类的参数。 */

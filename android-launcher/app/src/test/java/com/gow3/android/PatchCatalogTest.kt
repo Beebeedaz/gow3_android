@@ -64,6 +64,29 @@ class PatchCatalogTest {
         assertFalse(c.selected(native + ("patches_CUSA01715_01_00" to "")).isEmpty())
     }
 
+    @Test fun `skip animations toggle enables and disables both skip patches`() {
+        val c = catalog()
+        assertEquals(setOf("Skip Intro", "Skip Any Video With X Button"), c.skipVideoPatches.map { it.name }.toSet())
+        var ini = native + c.toggleAll(native, c.skipVideoPatches, true)
+        assertEquals(c.skipVideoPatches.map { it.name }.toSet(), c.selected(ini))
+        assertEquals("0", ini["restart_unconfirmed"])
+        ini += c.toggleAll(ini, c.skipVideoPatches, false)
+        assertTrue(c.selected(ini).isEmpty())
+    }
+
+    @Test fun `skip animations toggle keeps unrelated patches and re-enables both after partial off`() {
+        val c = catalog()
+        val bloom = c.patches.first { it.name == "Disable Bloom" }
+        var ini = native + c.toggle(native, bloom, true)
+        ini += c.toggleAll(ini, c.skipVideoPatches, true)
+        assertEquals(setOf(bloom.name) + c.skipVideoPatches.map { it.name }.toSet(), c.selected(ini))
+        // 玩家在补丁页单独关掉其一 → 开关回落为关；重新打开则两个一起启用。
+        ini += c.toggle(ini, c.patches.first { it.name == "Skip Intro" }, false)
+        assertFalse(c.skipVideoPatches.all { it.name in c.selected(ini) })
+        ini += c.toggleAll(ini, c.skipVideoPatches, true)
+        assertEquals(setOf(bloom.name) + c.skipVideoPatches.map { it.name }.toSet(), c.selected(ini))
+    }
+
     @Test fun `texture fix and resolution replace each other and fps switches stay exclusive`() {
         val c = catalog("CUSA01715", "01.02")
         val texture = c.patches.first { it.name == "Bug Fix - Texture Corruption Fix" }

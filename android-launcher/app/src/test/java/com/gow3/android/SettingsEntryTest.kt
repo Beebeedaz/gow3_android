@@ -23,14 +23,13 @@ class SettingsEntryTest {
         assertTrue(settingsEntries(LaunchCategory.AUDIO, params).isEmpty())
     }
 
-    /** 存储分类由 redesign-android-launcher-home 落位：storage 卡片 slot 在参数行之前。 */
-    @Test fun `storage category renders the storage card slot`() {
-        val entries = settingsEntries(LaunchCategory.STORAGE, params)
-        assertEquals(1, entries.size)
-        val card = entries.single()
-        assertTrue(card is SettingsEntry.Card)
-        assertEquals("storage", (card as SettingsEntry.Card).slotId)
-        assertEquals("card:storage", card.id)
+    /** 常规分类（原存储分类）排第一位：storage 卡片在前，language 语言入口随后。 */
+    @Test fun `general category renders storage card then language card`() {
+        val entries = settingsEntries(LaunchCategory.GENERAL, params)
+        assertEquals(2, entries.size)
+        assertEquals(listOf("storage", "language"), entries.map { (it as SettingsEntry.Card).slotId })
+        assertEquals("card:storage", entries[0].id)
+        assertEquals("card:language", entries[1].id)
     }
 
     /** DRIVER 分类由 add-android-launcher-driver-manager 落位：driver_manager 卡片 slot 在参数行之前。 */
