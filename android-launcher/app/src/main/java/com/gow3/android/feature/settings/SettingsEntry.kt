@@ -1,7 +1,8 @@
 package com.gow3.android.feature.settings
 
-import com.gow3.android.data.LaunchCategory
-import com.gow3.android.data.LaunchParam
+import com.gow3.android.data.model.LaunchCategory
+import com.gow3.android.data.model.LaunchParam
+
 
 /**
  * Settings 分类页的一条可渲染条目：参数行或功能卡 slot。
@@ -32,10 +33,12 @@ internal sealed interface SettingsEntry {
 /**
  * 各分类的功能卡 slot 声明，顺序即渲染顺序（渲染在参数行之前）。
  * `driver_manager` 由 add-android-launcher-driver-manager 落位（design D2），
- * 由 [DriverManagerCard] 提供内容；CONTROLS -> "pad_mapping" 等仍为预留示例。
+ * 由 [DriverManagerCard] 提供内容；`storage` 由 redesign-android-launcher-home
+ * 落位，提供游戏目录与升级补丁目录行；CONTROLS -> "pad_mapping" 等仍为预留示例。
  */
 private val categoryCards: Map<LaunchCategory, List<String>> = mapOf(
     LaunchCategory.DRIVER to listOf("driver_manager"),
+    LaunchCategory.STORAGE to listOf("storage"),
 )
 
 /** 按分类组装条目列表：先声明顺序的功能卡 slot，再按声明顺序排该分类的参数。 */

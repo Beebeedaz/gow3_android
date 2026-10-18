@@ -1,9 +1,11 @@
 package com.gow3.android
 
-import com.gow3.android.data.LaunchCategory
-import com.gow3.android.data.LaunchParams
-import com.gow3.android.feature.settings.SettingsEntry
 import com.gow3.android.feature.settings.settingsEntries
+
+import com.gow3.android.data.model.LaunchCategory
+import com.gow3.android.data.model.LaunchParams
+import com.gow3.android.feature.settings.SettingsEntry
+
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -19,6 +21,16 @@ class SettingsEntryTest {
 
     @Test fun `reserved categories assemble to empty lists`() {
         assertTrue(settingsEntries(LaunchCategory.AUDIO, params).isEmpty())
+    }
+
+    /** 存储分类由 redesign-android-launcher-home 落位：storage 卡片 slot 在参数行之前。 */
+    @Test fun `storage category renders the storage card slot`() {
+        val entries = settingsEntries(LaunchCategory.STORAGE, params)
+        assertEquals(1, entries.size)
+        val card = entries.single()
+        assertTrue(card is SettingsEntry.Card)
+        assertEquals("storage", (card as SettingsEntry.Card).slotId)
+        assertEquals("card:storage", card.id)
     }
 
     /** DRIVER 分类由 add-android-launcher-driver-manager 落位：driver_manager 卡片 slot 在参数行之前。 */

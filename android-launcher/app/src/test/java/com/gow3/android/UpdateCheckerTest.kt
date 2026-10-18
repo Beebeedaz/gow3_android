@@ -5,6 +5,7 @@ import com.gow3.android.data.GitHubRelease
 import com.gow3.android.data.NotComparableReason
 import com.gow3.android.data.UpdateCheckResult
 import com.gow3.android.data.UpdateChecker
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

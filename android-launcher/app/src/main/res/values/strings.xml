@@ -102,6 +102,51 @@
     <string name="mobile_preset_custom">Custom</string>
     <string name="mobile_preset_unavailable">No compatible profile</string>
     <string name="mobile_preset_description">Tap a profile to apply its resolution, a 60 FPS target, and mobile graphics defaults. Disables SSAO, motion blur, depth of field, bloom, soft particles and dynamic shadows; enables intro skipping and X to skip videos. You can then adjust each setting here or in Patches. Experimental profiles: results depend on your phone. Changes take effect on the next launch.</string>
+
+    <!-- 首页游戏身份卡（redesign-android-launcher-home） -->
+    <string name="home_identity_patches_loaded_fmt">Patches loaded · %1$d available</string>
+    <string name="home_identity_problem_title">Game info unavailable</string>
+    <string name="home_problem_no_game">Select your game folder in Settings → STORAGE to start.</string>
+    <string name="home_problem_invalid_game">The selected folder has no eboot.bin or readable game info.</string>
+    <string name="home_problem_invalid_update">The update patch folder is invalid or does not match the game.</string>
+    <string name="home_problem_unsupported">This game (TITLE ID) is not supported.</string>
+    <string name="home_problem_version">The game version does not match the patch catalog.</string>
+    <string name="home_problem_read_failed">Could not read the game folder. Check the path and storage permission.</string>
+    <string name="home_identity_open_storage">OPEN SETTINGS · STORAGE  ›</string>
+
+    <!-- 首页预设分段选择器 -->
+    <string name="preset_caption_custom">Custom — settings no longer match any preset</string>
+    <string name="preset_disabled_no_catalog">No compatible presets — check the game and update folders in Settings → STORAGE.</string>
+
+    <!-- 首页 GPU 驱动底部面板 -->
+    <string name="driver_sheet_title">GPU DRIVER</string>
+    <string name="driver_sheet_manage">MANAGE DRIVERS · DOWNLOAD / DELETE  ›</string>
+
+    <!-- 首页用户/存档区（占位：多用户能力随 add-android-launcher-user-profiles 落地） -->
+    <string name="user_zone_title">PLAYER</string>
+    <string name="user_zone_default_name">Hunter</string>
+    <string name="user_zone_saves_ready">Save data ready</string>
+    <string name="user_zone_saves_empty">No saves yet</string>
+    <string name="user_zone_note">Profiles and save management arrive in a future update.</string>
+
+    <!-- 首启游戏选择页（一次性硬门控） -->
+    <string name="first_run_title">SELECT YOUR GAME</string>
+    <string name="first_run_subtitle">Point the launcher to your game files to begin.</string>
+    <string name="first_run_game_folder">GAME FOLDER</string>
+    <string name="first_run_update_folder">UPDATE PATCH FOLDER</string>
+    <string name="first_run_required">REQUIRED</string>
+    <string name="first_run_optional">OPTIONAL</string>
+    <string name="first_run_tap_to_select">Tap to select</string>
+    <string name="first_run_update_desc">Optional: the update (patch) folder of the game, e.g. CUSA01740-patch, laid over the game at start.</string>
+    <string name="first_run_confirm">CONFIRM</string>
+    <string name="first_run_confirm_locked">Select a game folder first</string>
+
+    <!-- 设置存储分类（首启之后目录修改的常驻位置） -->
+    <string name="param_category_storage">STORAGE</string>
+    <string name="storage_section_title">GAME FOLDERS</string>
+    <string name="storage_valid">VALID</string>
+    <string name="storage_game_desc">Tap to choose the extracted game folder (must contain eboot.bin).</string>
+    <string name="storage_update_desc">Optional: the update (patch) folder laid over the game at start.</string>
     <string name="param_desc_vsync">Syncs the game\'s frames with your screen\'s refresh rate to stop visual tearing. Leave it ON unless you see tearing or stutter.</string>
     <string name="param_desc_frames_queued">How many frames the game prepares ahead of what the screen shows. Lower numbers cut input lag; higher numbers can improve smoothness on weaker hardware.</string>
     <string name="param_desc_anisotropy">Sharpens floors and walls viewed at an angle. Higher values may use a little more GPU bandwidth. Takes effect on the next launch.</string>

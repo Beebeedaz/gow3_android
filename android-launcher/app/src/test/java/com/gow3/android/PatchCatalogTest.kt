@@ -1,10 +1,12 @@
 package com.gow3.android
 
+import com.gow3.android.core.settings.Gow3Settings
 import com.gow3.android.data.CatalogProblem
 import com.gow3.android.data.PatchCatalog
 import com.gow3.android.data.PatchCatalogException
-import com.gow3.android.data.Gow3Ini
-import com.gow3.android.data.LaunchParams
+import com.gow3.android.data.model.LaunchParams
+import com.gow3.android.data.model.MobilePresets
+
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -46,8 +48,8 @@ class PatchCatalogTest {
         var ini = native + c.toggle(native, bloom, true)
         ini += c.toggle(ini, fix, true)
         val file = temp.newFile("gow3.ini")
-        assertTrue(Gow3Ini.write(file, ini))
-        assertEquals(setOf(bloom.name, fix.name), c.selected(Gow3Ini.read(file)))
+        assertTrue(Gow3Settings.update(file, ini))
+        assertEquals(setOf(bloom.name, fix.name), c.selected(Gow3Settings.read(file)))
         ini += c.toggle(ini, bloom, false)
         ini += c.toggle(ini, fix, false)
         assertEquals("", ini[c.selectionKey])
@@ -109,15 +111,15 @@ class PatchCatalogTest {
         val resolution = LaunchParams.forCatalog(c).first { it.key == "render_resolution" }
         val file = temp.newFile("shared.ini")
         for (option in resolution.options) {
-            assertTrue(Gow3Ini.write(file, native + ("render_resolution" to option.value)))
-            val ini = Gow3Ini.read(file)
+            assertTrue(Gow3Settings.update(file, native + ("render_resolution" to option.value)))
+            val ini = Gow3Settings.read(file)
             val patch = c.patches.firstOrNull { it.resolution == option.value }
             assertEquals(setOfNotNull(patch?.name), c.selected(ini))
             if (patch != null) {
-                assertTrue(Gow3Ini.write(file, c.toggle(ini, patch, false)))
-                assertEquals("native", LaunchParams.selectedOption(Gow3Ini.read(file), resolution)?.value)
-                assertTrue(Gow3Ini.write(file, c.toggle(Gow3Ini.read(file), patch, true)))
-                assertEquals(option.value, LaunchParams.selectedOption(Gow3Ini.read(file), resolution)?.value)
+                assertTrue(Gow3Settings.update(file, c.toggle(ini, patch, false)))
+                assertEquals("native", LaunchParams.selectedOption(Gow3Settings.read(file), resolution)?.value)
+                assertTrue(Gow3Settings.update(file, c.toggle(Gow3Settings.read(file), patch, true)))
+                assertEquals(option.value, LaunchParams.selectedOption(Gow3Settings.read(file), resolution)?.value)
             }
         }
     }
@@ -187,7 +189,7 @@ class PatchCatalogTest {
         assertEquals(14, loaded.patches.size)
         assertEquals(catalog().patches.map { it.name }, loaded.patches.map { it.name })
         assertTrue(loaded.patches.all { it.validation == "offline-matched" })
-        assertEquals(5, com.gow3.android.data.MobilePresets.available(loaded).size)
+        assertEquals(5, com.gow3.android.data.model.MobilePresets.available(loaded).size)
         assertTrue(loaded.selected(native + ("patches_CUSA01740_01_00" to "Skip Intro")).isEmpty())
         assertEquals(setOf("Skip Intro"), loaded.selected(native + (loaded.selectionKey to "Skip Intro")))
     }

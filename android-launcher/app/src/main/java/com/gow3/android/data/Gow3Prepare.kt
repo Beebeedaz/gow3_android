@@ -1,5 +1,8 @@
 package com.gow3.android.data
 
+import com.gow3.android.data.model.GameSfo
+
+
 import android.content.Context
 import android.util.Log
 import org.json.JSONObject
