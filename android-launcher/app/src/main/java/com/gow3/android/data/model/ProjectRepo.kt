@@ -5,7 +5,8 @@ package com.gow3.android.data.model
  *
  * About 页的 star / issues 入口与检测更新的 release 查询都从这里取值，避免出现两份
  * 互相独立、可能指向不同仓库的常量。检测更新依赖该仓库确实发布 Android release：
- * tag 形如 `v<PC版本>-android<N>`，资产为 `God.of.War.III-<version>.apk` 与同名
+ * tag 形如 `v<PC版本>-bionic-v<N>`（历史 release 为 `v<PC版本>-android<N>`），
+ * 资产为 `God.of.War.III-<version>.apk` 与同名
  * `.apk.sha256`。发布目标由 `tools/android/release_local.sh` 的 `--repo` /
  * `GOW3_RELEASE_REPO` 决定，若改指向其它仓库，这里的取值必须同步。
  */

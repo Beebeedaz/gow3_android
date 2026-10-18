@@ -167,6 +167,9 @@ internal fun HomeScreen(
         saveUpdates(MobilePresets.updates(preset, catalog, loadIni(context)))
     }
 
+    // 跳过动画快捷开关与预设共用同一份目录解析；目录未就绪时开关自身置灰。
+    val homeCatalog = (identity as? GameIdentityState.Ready)?.catalog
+
     /** 驱动选择：写 `gpu_driver=` 键（系统驱动写 auto），与 run-bionic.sh 的解析契约一致。 */
     fun selectDriver(id: String?, displayName: String) {
         if (saveUpdates(mapOf(DriverManager.INI_KEY to (id ?: DriverManager.SYSTEM_VALUE)))) {
@@ -218,12 +221,11 @@ internal fun HomeScreen(
                     },
                     onManageDrivers,
                 )
+                SkipAnimationsCard(homeCatalog, iniValues, ::saveUpdates)
                 // gow3port: LSFG 运行时能力已废除（Bionic 迁移，见 openspec change
                 // migrate-android-runtime-to-bionic）。「Steam 下载 LSFG / 导入 LSFG」入口
                 // 保留代码、仅隐藏（不删除文件、不产生帧生成行为），供未来插帧方案复用。
-                if (false) {
-                    HiddenFrameGenerationCard(losslessDlls, dllState, notice, onGetFromSteam, ::refreshDll, ::toast, context)
-                }
+                FrameGenerationSection(losslessDlls, dllState, iniValues, context) { iniValues = loadIni(context) }
             }
         }
     } else {
@@ -241,6 +243,7 @@ internal fun HomeScreen(
                 },
                 onManageDrivers,
             )
+            SkipAnimationsCard(homeCatalog, iniValues, ::saveUpdates)
             Spacer(Modifier.height(6.dp))
             LaunchButton(::launch)
             Spacer(Modifier.height(12.dp))
@@ -248,69 +251,48 @@ internal fun HomeScreen(
             // gow3port: LSFG 运行时能力已废除（Bionic 迁移，见 openspec change
             // migrate-android-runtime-to-bionic）。「Steam 下载 LSFG / 导入 LSFG」入口保留
             // 代码、仅隐藏（不删除文件、不产生帧生成行为），供未来插帧方案复用。恢复时打开。
-            if (false) {
-                HiddenFrameGenerationCard(losslessDlls, dllState, notice, onGetFromSteam, ::refreshDll, ::toast, context)
-            }
+            FrameGenerationSection(losslessDlls, dllState, iniValues, context) { iniValues = loadIni(context) }
             Spacer(Modifier.height(20.dp))
         }
     }
 }
 
 /**
- * 隐藏的 LSFG 卡片（`if (false)` 不可达代码）：保留原调用契约，恢复帧生成入口时把
- * 调用点打开即可。原实现内的提示文案与刷新行为原样保留，不做任何语义改动。
+ * FRAME GENERATION 区块（change add-native-frame-generation）：DLL 供给 + 帧生成
+ * 开关/倍率。开关与倍率写 `gow3.ini` 的 `framegen_*` 键（FrameGenSettings 整行
+ * 保留语义），下次启动游戏生效；DLL 供给行为原样保留。
  */
 @Composable
-private fun HiddenFrameGenerationCard(
+private fun FrameGenerationSection(
     losslessDlls: LosslessDllManager,
-    state: com.gow3.android.data.session.LosslessDllState,
-    notice: String?,
-    onGetFromSteam: ((Boolean, String) -> Unit) -> Unit,
-    refreshDll: () -> Unit,
-    toast: (String) -> Unit,
+    dllState: com.gow3.android.data.session.LosslessDllState,
+    iniValues: Map<String, String>,
     context: Context,
+    onIniChanged: () -> Unit,
 ) {
+    val cfg = com.gow3.android.core.settings.FrameGenSettings.read(gow3IniFile(context))
+    val dllInstalled = dllState is com.gow3.android.data.session.LosslessDllState.Installed
     FrameGenerationCard(
-        state = state,
-        notice = notice,
-        onImport = {
-            losslessDlls.launchPicker { result ->
-                when (result) {
-                    is ImportResult.Success -> {
-                        refreshDll()
-                        toast(context.getString(R.string.home_imported_fmt, LosslessDllManager.FILE_NAME, formatBytes(result.state.sizeBytes)))
-                    }
-                    ImportResult.Cancelled -> refreshDll()
-                    is ImportResult.Failed -> toast(result.message)
-                }
-            }
-        },
-        onSteam = {
-            // Steam 下载成功后（该构建不含 Steam 时则由 stub 自行提示）回到这里刷新，
-            // 让完成的下载无需重新进入页面即可显示。
-            onGetFromSteam { _, message ->
-                refreshDll()
-                toast(message)
-            }
-        },
-        onRemove = {
-            when (val result = losslessDlls.remove()) {
-                is RemoveResult.Done -> {
-                    refreshDll()
-                    toast(
-                        if (result.gameFolderRemains)
-                            context.getString(R.string.home_removed_game_folder_copy)
-                        else
-                            context.getString(R.string.home_removed_fmt, LosslessDllManager.FILE_NAME),
-                    )
-                }
-                is RemoveResult.Failed -> toast(result.message)
+        enabled = cfg.enabled,
+        dllInstalled = dllInstalled,
+        onChange = { on ->
+            // 开关只写 framegen_enabled；倍率在游戏内抽屉调。无 DLL 时开关被禁用，
+            // 不会产生运行时行为（spec「无有效 DLL 时明确不可用」）。
+            val file = gow3IniFile(context)
+            if (com.gow3.android.core.settings.FrameGenSettings.save(
+                    file, com.gow3.android.core.settings.FrameGenSettings.Config(on, cfg.multiplier, cfg.flowScale))
+            ) {
+                onIniChanged()
+            } else {
+                android.widget.Toast.makeText(
+                    context, context.getString(R.string.frame_gen_save_failed),
+                    android.widget.Toast.LENGTH_SHORT).show()
             }
         },
     )
 }
 
-/** launcher 的 gow3.ini 路径，即游戏、run-bionic.sh 和 GameActivity 读取的同一个文件。 */
+
 private fun gow3IniFile(context: Context): File = Gow3Data.config(context)
 
 private fun loadIni(context: Context): Map<String, String> = Gow3Settings.read(gow3IniFile(context))

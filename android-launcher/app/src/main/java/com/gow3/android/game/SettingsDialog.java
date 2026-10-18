@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import com.gow3.android.core.settings.FrameGenSettings;
 import com.gow3.android.core.settings.Gow3Settings;
 
 /** Graphics settings for the Thor, kept in gow3.ini (run-gow3.sh reads them at start: scene
@@ -61,10 +62,9 @@ final class SettingsDialog {
     private static final String[] UPSCALER_NAMES={"Off (render at 1280×720)","FSR 3.1"};
     private static final String[] LSFG_VALUES={"0","2","3","4"};
     private static final String[] LSFG_NAMES={"Off","2× frames","3× frames","4× frames"};
-    // flow scale 取值域照 run-gow3.sh 的白名单（0.25|0.5|0.75|1|1.0）：此前缺 0.25 这一档，这里
-    // 追加到末尾，默认值 "1.0" 的索引不变，writeLsfgProfile 原样写值、无需改动。
-    private static final String[] LSFG_FLOW_VALUES={"1.0","0.75","0.5","0.25"};
-    private static final String[] LSFG_FLOW_NAMES={"1.0 (best quality)","0.75","0.5","0.25 (fastest)"};
+    // flow scale 取值域含 0.25 档（LSFG 链支持 0.25–1.00，见 FrameGenSettings.clampFlowScale）。
+    private static final String[] LSFG_FLOW_VALUES={"0.8","1.0","0.75","0.5","0.25"};
+    private static final String[] LSFG_FLOW_NAMES={"0.8 (default)","1.0","0.75","0.5","0.25 (fastest)"};
     // FPS 上限只给运行时 FPS_LIMITS 的取值（gow3_graphics.h 的 FpsLimits：30/60/120/240/0）。
     // 原来还提供 40/45，但 ParseFpsLimit 把不在表里的值一律映射成 0（不限制），等于"看着限帧、
     // 实际无限"，因此删除；取值域与 my-docs/gow3/LAUNCHER.md §3.2 及 Home 页 LaunchParams.kt 对齐。
@@ -344,33 +344,38 @@ final class SettingsDialog {
     }
      */
 
-    /** Lossless Scaling frame generation. While the game runs with the lsfg-vk layer loaded
-     *  (run-gow3.sh wrote lsfg-vk.toml), changes go to that file and apply at once (lsfg-vk watches
+    /** Lossless Scaling frame generation (LSFG). The engine runs in the game process
+     *  (libbloodframe via gow3_lsfg.cpp); this dialog writes framegen_* keys and the live
+     *  state file (framegen.state, ~250ms watcher). Historical note: the old lsfg-vk layer watched
      *  it; off is multiplier 1). Turning it on when the layer was not loaded restarts the game.
      *  flow scale 已按 run-gow3.sh 的白名单补齐 0.25 档（见 LSFG_FLOW_VALUES）。这是本移植唯一的
      *  帧生成路径：FSR 3.1 帧生成（frame_generation=1）没有接通，shadps4 无 GOW3_FRAME_GEN 消费者，
      *  所以这里不要再加一个"FSR 帧生成"开关。 */
     void showLossless(java.util.function.BooleanSupplier gameRunning,Runnable onLiveApplied) {
         load();
-        final File live=new File(file.getParentFile(),"lsfg-vk.toml");
         LinearLayout box=new LinearLayout(activity); box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(24),dp(4),dp(24),dp(8));
         heading(box,"Frames");
-        final RadioGroup lsfg=choices(box,LSFG_NAMES,indexOf(LSFG_VALUES,get("lsfg_multiplier","0"),0));
+        // 初值迁移：新键缺失时读旧 lsfg_multiplier（FrameGenSettings 兼容读取同规则）。
+        String onInitial=get("framegen_enabled",
+            "1".equals(get("lsfg_multiplier","0")) ? "1" : "0");
+        String multInitial=get("framegen_multiplier",
+            "0".equals(onInitial) ? "2" : get("framegen_multiplier",
+                "0".equals(get("lsfg_multiplier","0")) ? "2" : get("lsfg_multiplier","2")));
+        final RadioGroup lsfg=choices(box,LSFG_NAMES,indexOf(LSFG_VALUES,
+            "1".equals(onInitial) ? multInitial : "0", indexOf(LSFG_VALUES,"2",0)));
         heading(box,"Flow scale");
-        final RadioGroup lsfgFlow=choices(box,LSFG_FLOW_NAMES,indexOf(LSFG_FLOW_VALUES,get("lsfg_flow_scale","1.0"),0));
-        final Switch lsfgPerformance=toggle(box,"Performance mode","1".equals(get("lsfg_performance","0")));
+        final RadioGroup lsfgFlow=choices(box,LSFG_FLOW_NAMES,
+            indexOf(LSFG_FLOW_VALUES,get("framegen_flow_scale",
+                get("lsfg_flow_scale","0.8")),0));
         TextView lsfgNote=new TextView(activity); lsfgNote.setTextSize(13); lsfgNote.setAlpha(0.7f);
-        lsfgNote.setText("Needs Lossless.dll from your own Lossless Scaling (Steam) next to the game "
-            +"folder. Works with any upscaler and replaces FSR 3.1 frame generation. "
-            +"It sees only finished frames, so fast motion and the HUD show more artifacts. Lower flow "
-            +"scale and performance mode are faster. Changes apply while you play; only turning it on "
-            +"after starting without it restarts the game.");
+        lsfgNote.setText("It sees only finished frames, so fast motion and the HUD show more "
+            +"artifacts. Lower flow scale is faster. Changes apply while you play (state file, "
+            +"no restart).");
         box.addView(lsfgNote);
         RadioGroup.OnCheckedChangeListener lossless=(g,id) -> {
             boolean on=checkedIndex(lsfg)>0;
             for (int i=0;i<lsfgFlow.getChildCount();++i) lsfgFlow.getChildAt(i).setEnabled(on);
-            lsfgPerformance.setEnabled(on);
         };
         lsfg.setOnCheckedChangeListener(lossless); lossless.onCheckedChanged(lsfg,0);
 
@@ -378,44 +383,39 @@ final class SettingsDialog {
         new AlertDialog.Builder(activity).setTitle("Lossless Scaling frame generation").setView(scroll)
             .setNegativeButton("Cancel",null)
             .setPositiveButton("Apply",(d,w) -> {
-                Map<String,String> changed=new LinkedHashMap<>();
                 String multiplier=LSFG_VALUES[Math.max(0,checkedIndex(lsfg))];
-                changed.put("lsfg_multiplier",multiplier);
-                changed.put("lsfg_flow_scale",LSFG_FLOW_VALUES[Math.max(0,checkedIndex(lsfgFlow))]);
-                changed.put("lsfg_performance",lsfgPerformance.isChecked() ? "1" : "0");
-                if (gameRunning.getAsBoolean() && live.isFile()) {
-                    boolean ok=Gow3Settings.update(file, changed) && writeLsfgProfile(live,"0".equals(multiplier) ? "1" : multiplier,
-                        changed.get("lsfg_flow_scale"),lsfgPerformance.isChecked());
-                    android.widget.Toast.makeText(activity,ok ? "Lossless Scaling: applied"
-                        : "Lossless Scaling: could not apply",android.widget.Toast.LENGTH_SHORT).show();
-                    // layer 已按新倍率热更新 toml；这里同步重选设备显示模式，否则层参数和刷新率会
-                    // 分叉（4.3 复评）。
-                    if (ok && onLiveApplied!=null) onLiveApplied.run();
-                } else if (!"0".equals(multiplier) && gameRunning.getAsBoolean()) {
-                    apply(changed); // the layer loads at start only
-                } else if (!Gow3Settings.update(file, changed)) {
+                String flow=LSFG_FLOW_VALUES[Math.max(0,checkedIndex(lsfgFlow))];
+                boolean on=!"0".equals(multiplier);
+                Map<String,String> changed=new LinkedHashMap<>();
+                changed.put("framegen_enabled",on ? "1" : "0");
+                changed.put("framegen_multiplier",on ? multiplier : "2");
+                changed.put("framegen_flow_scale",flow);
+                // FIFO 前提：游戏侧 multiplier≥2 时自行强制 FIFO（协议 MODE），这里同步
+                // 写 vsync=1 保持配置一致（design D6）。
+                if (on && !"1".equals(get("vsync","1"))) changed.put("vsync","1");
+                if (!Gow3Settings.update(file, changed)) {
                     new AlertDialog.Builder(activity).setMessage("The settings could not be saved.").setPositiveButton("OK",null).show();
+                    return;
                 }
+                // 运行期通道：重写状态文件（gow3_lsfg_state watcher ~250ms 热应用，不重启）。
+                // 未运行时下次启动由 run-bionic.sh 从 ini 播种同名状态文件。
+                java.io.File state=new java.io.File(file.getParentFile(),"framegen.state");
+                java.io.File tmp=new java.io.File(file.getParentFile(),"framegen.state.tmp");
+                try (java.io.Writer wr=new java.io.OutputStreamWriter(
+                        new java.io.FileOutputStream(tmp),"UTF-8")) {
+                    wr.write("multiplier="+(on ? multiplier : "0")+"\n");
+                    wr.write("flow="+flow+"\n");
+                    wr.write("performance=1\nfp16=1\n");
+                } catch (Exception ex) {
+                    android.util.Log.e("God of War III","framegen state: "+ex);
+                }
+                boolean ok=tmp.renameTo(state);
+                android.widget.Toast.makeText(activity,
+                    ok ? "Lossless Scaling: applied" : "Lossless Scaling: could not apply",
+                    android.widget.Toast.LENGTH_SHORT).show();
+                if (ok && on && onLiveApplied!=null) onLiveApplied.run();
             }).show();
     }
 
-    /** Rewrites the profile values of the running layer's config (written whole, then renamed:
-     *  lsfg-vk reloads on the rename). */
-    private static boolean writeLsfgProfile(File config,String multiplier,String flowScale,boolean performance) {
-        List<String> out=new ArrayList<>();
-        try (BufferedReader r=new BufferedReader(new InputStreamReader(new FileInputStream(config),"UTF-8"))) {
-            for (String line; (line=r.readLine())!=null;) {
-                String t=line.trim();
-                if (t.startsWith("multiplier")) line="multiplier = "+multiplier;
-                else if (t.startsWith("flow_scale")) line="flow_scale = "+flowScale;
-                else if (t.startsWith("performance_mode")) line="performance_mode = "+performance;
-                out.add(line);
-            }
-        } catch (Exception ex) { android.util.Log.e("God of War III","lsfg config: "+ex); return false; }
-        File temporary=new File(config.getPath()+".tmp");
-        try (Writer w=new OutputStreamWriter(new FileOutputStream(temporary),"UTF-8")) {
-            for (String line:out) w.write(line+"\n");
-        } catch (Exception ex) { android.util.Log.e("God of War III","lsfg config: "+ex); return false; }
-        return temporary.renameTo(config);
-    }
+
 }

@@ -36,6 +36,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import com.gow3.android.core.settings.FrameGenSettings;
 import com.gow3.android.core.settings.GamePrefs;
 import com.gow3.android.core.settings.Gow3Settings;
 import com.gow3.android.Gow3App;
@@ -264,13 +265,26 @@ public final class GameActivity extends Activity {
         // Tuning only. Supplying Lossless.dll is the launcher Home page's job;
         // the drawer's row reports the multiplier, never where the DLL came from. LSFG 是唯一帧生成
         // 路径，FSR 3.1 帧生成未接通，不要在这里再加 FSR 帧生成入口。
-        losslessItem=menuItem("ic_frames","Lossless Scaling","",() -> {
+        // 帧生成调参入口（change add-native-frame-generation）：未导入 Lossless.dll 时禁用
+        // （灰显 + 指引文案），供给入口在设置页常规分类。DLL 查找与 run-bionic 一致：
+        // 游戏目录同级 → 应用私有 gow3port/。
+        File lsfgDll=new File(BASE,"Lossless.dll");
+        try {
+            String gd=new GamePrefs(this).gameDir();
+            if (gd!=null) {
+                File beside=new File(new File(gd).getParentFile(),"Lossless.dll");
+                if (beside.isFile()) lsfgDll=beside;
+            }
+        } catch (Exception ignored) { }
+        boolean dllReady=lsfgDll.isFile();
+        losslessItem=menuItem("ic_frames","Lossless Scaling",
+            dllReady ? "" : getString(com.gow3.android.R.string.frame_gen_drawer_need_dll), () -> {
+            if (!dllReady) return;
             closeDrawer();
-            new SettingsDialog(this,new File(DATA,"gow3.ini"),this::restartGame)
-                // 运行中改倍率时 layer 会热更新 toml，但设备显示模式不会自动跟着变：让对话框在
-                // 生效后回调这里重选 display mode（4.3 复评）。
+            new SettingsDialog(this,new File(DATA,"gow3.ini"),null)
                 .showLossless(() -> { Process p=game; return p!=null && p.isAlive(); }, this::pickRefreshRate);
         });
+        if (!dllReady) losslessItem.setAlpha(0.4f);
         // 性能 HUD 开关行：launcher 侧悬浮层，即时生效（不重启游戏进程、不重建 Surface），
         // 交互模式与「On-screen controller」一致——点击切换、写 prefs、收起抽屉。
         perfHudItem=menuItem("ic_tune","Performance HUD","",() -> {
@@ -840,6 +854,9 @@ public final class GameActivity extends Activity {
         hadError=false;
         // display_stretch 每次启动从 gow3.ini 读取（launcher 的「拉伸铺满屏幕」开关）。
         displayStretch="1".equals(Gow3Settings.read(configIni(), "display_stretch"));
+        // 帧生成 FIFO 前提联动（change add-native-frame-generation）：enabled 且 vsync≠1
+        // 时写 vsync=1；状态文件由 run-bionic.sh 从 ini 播种（env 传路径）。
+        FrameGenSettings.ensureVsyncForFrameGen(configIni());
         screen.post(() -> fitSurface(screen.getWidth(), screen.getHeight()));
         // 清掉上一轮的回退标记，并重置「LSFG 已被回退关闭」状态；刷新率按当前 launchability 选。
         lsfgFallbackOff=false;

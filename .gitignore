@@ -38,3 +38,4 @@ local.properties
 .DS_Store
 .agents/
 .opencode/
+.kotlin

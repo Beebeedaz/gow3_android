@@ -1,6 +1,8 @@
 package com.gow3.android.game;
 
 import android.content.Context;
+
+import com.gow3.android.core.settings.FrameGenSettings;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -50,6 +52,8 @@ final class PerfHudOverlay extends View {
 
     // ---- 采样快照：采样线程写、主线程读，volatile 保证可见性（design D6，不持锁绘制） ----
     private volatile int snapFps = 0;
+    // 帧生成双帧率段（null = 未生效，显示单一帧率）。
+    private volatile String snapFpsSegment;
     private volatile String snapGpu, snapCpu; // null = N/A（首轮差分或计数不可读）
 
     // ---- 采样状态（仅采样线程访问） ----
@@ -75,8 +79,11 @@ final class PerfHudOverlay extends View {
     private String[] gpuStaticPaths = PerfHudMetrics.DEFAULT_GPU_PATHS;
     private String[] gpuScanRoots = PerfHudMetrics.SCAN_ROOTS;
 
+    private final Context context;
+
     PerfHudOverlay(Context context, GamePrefs prefs) {
         super(context);
+        this.context = context;
         this.prefs = prefs;
         float density = context.getResources().getDisplayMetrics().density;
         marginPx = MARGIN_DP * density;
@@ -133,10 +140,29 @@ final class PerfHudOverlay extends View {
         }
     }
 
-    /** FPS：呈现帧计数器 1 秒窗口差分；present 桥未启动时计数恒为 0，自然显示 0。 */
+    /** 帧率段文本：帧生成生效时为「源→上屏 LSFG Nx」，否则单一帧率。 */
+    private String fpsText() {
+        String seg = snapFpsSegment;
+        return seg != null ? "FPS " + seg : "FPS " + snapFps;
+    }
+
+    /** FPS：呈现帧计数器 1 秒窗口差分；帧生成生效时改用游戏侧遥测文件
+     *  （framegen.stats：源/上屏双帧率 + LSFG 倍率，presenter 每秒原子写，
+     *  change add-native-frame-generation）。文件缺失/未生效时回退直通语义。 */
     private void sampleFps() {
+        java.io.File stats = new java.io.File(
+                new java.io.File(context.getFilesDir(), "gow3data"), "framegen.stats");
+        FrameGenSettings.Stats fg = FrameGenSettings.readStats(stats);
+        if (fg != null) {
+            int src = Math.round(fg.sourceFps), pres = Math.round(fg.presentedFps);
+            snapFps = pres;
+            snapFpsSegment = PerfHudMetrics.fpsSegment(src, pres, fg.multiplier);
+            lastFrames = Gow3Present.framesIfLoaded(); // 保持直通计数器基准新鲜
+            return;
+        }
         long now = Gow3Present.framesIfLoaded();
         snapFps = PerfHudMetrics.diffFrames(lastFrames, now);
+        snapFpsSegment = null;
         lastFrames = now;
     }
 
@@ -269,7 +295,7 @@ final class PerfHudOverlay extends View {
 
     private float[] segmentWidths() {
         return new float[]{
-            pText.measureText("FPS " + snapFps),
+            pText.measureText(fpsText()),
             pText.measureText("GPU " + (snapGpu != null ? snapGpu : "N/A")),
             pText.measureText("CPU " + (snapCpu != null ? snapCpu : "N/A")),
         };
@@ -296,7 +322,7 @@ final class PerfHudOverlay extends View {
         float x = padPx;
         float[] widths = segmentWidths();
         pText.setColor(0xff76ff03);
-        c.drawText("FPS " + snapFps, x, baseline, pText); x += widths[0];
+        c.drawText(fpsText(), x, baseline, pText); x += widths[0];
         pSep.setColor(0xff8e9097); c.drawText(" · ", x, baseline, pSep); x += sepW;
         pText.setColor(0xffe040fb);
         c.drawText("GPU " + (snapGpu != null ? snapGpu : "N/A"), x, baseline, pText); x += widths[1];

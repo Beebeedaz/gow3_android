@@ -13,16 +13,27 @@ class LaunchParamsTest {
     }
 
     @Test fun `categories follow a stable order and every param belongs to exactly one`() {
-        // STORAGE 由 redesign-android-launcher-home 追加（承载目录行的功能卡 slot，
-        // 本身没有参数），声明顺序即 Settings 分类栏顺序。
+        // GENERAL（原 STORAGE，承载目录行与语言入口的功能卡 slot，本身没有参数）
+        // 排在第一位，声明顺序即 Settings 分类栏顺序。
         assertEquals(
-            listOf(LaunchCategory.GRAPHICS, LaunchCategory.PERFORMANCE, LaunchCategory.CONTROLS, LaunchCategory.AUDIO, LaunchCategory.DRIVER, LaunchCategory.STORAGE),
+            listOf(LaunchCategory.GENERAL, LaunchCategory.GRAPHICS, LaunchCategory.PERFORMANCE, LaunchCategory.CONTROLS, LaunchCategory.AUDIO, LaunchCategory.DRIVER),
             LaunchParams.categories(),
         )
         // 每个参数都有类别，参数键不重复，且「类别+键」组合不重复（归属唯一）。
         assertTrue(LaunchParams.all.all { it.category in LaunchCategory.entries })
         assertEquals(LaunchParams.all.size, LaunchParams.all.map { it.key }.distinct().size)
         assertEquals(LaunchParams.all.size, LaunchParams.all.map { it.category to it.key }.distinct().size)
+    }
+
+    /** rememberSaveable 只存枚举名：有效名原样恢复，改名前的旧值/空值/脏值一律回落默认。 */
+    @Test fun `fromSaved resolves persisted names and falls back to the default category`() {
+        assertEquals(LaunchCategory.GENERAL, LaunchCategory.fromSaved("GENERAL"))
+        assertEquals(LaunchCategory.GRAPHICS, LaunchCategory.fromSaved("GRAPHICS"))
+        assertEquals(LaunchCategory.GENERAL, LaunchCategory.fromSaved("STORAGE"))
+        assertEquals(LaunchCategory.GENERAL, LaunchCategory.fromSaved(null))
+        assertEquals(LaunchCategory.GENERAL, LaunchCategory.fromSaved(""))
+        assertEquals(LaunchCategory.GENERAL, LaunchCategory.fromSaved("whatever"))
+        assertEquals(LaunchCategory.GENERAL, LaunchCategory.DEFAULT)
     }
 
     @Test fun `graphics category holds the image quality params`() {
@@ -44,11 +55,11 @@ class LaunchParamsTest {
         )
     }
 
-    @Test fun `audio driver and storage categories hold no inline params`() {
+    @Test fun `audio driver and general categories hold no inline params`() {
         assertTrue(LaunchParams.forCategory(LaunchCategory.AUDIO).isEmpty())
         assertTrue(LaunchParams.forCategory(LaunchCategory.DRIVER).isEmpty())
-        // 存储/驱动分类的内容由功能卡 slot 提供（SettingsEntryTest 覆盖），不占用参数轨道。
-        assertTrue(LaunchParams.forCategory(LaunchCategory.STORAGE).isEmpty())
+        // 常规/驱动分类的内容由功能卡 slot 提供（SettingsEntryTest 覆盖），不占用参数轨道。
+        assertTrue(LaunchParams.forCategory(LaunchCategory.GENERAL).isEmpty())
     }
 
     /** 配置页只收录运行链有消费方的键；死键一旦回流即测试失败。 */
