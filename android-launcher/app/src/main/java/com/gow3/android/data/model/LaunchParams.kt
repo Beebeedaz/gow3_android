@@ -10,7 +10,9 @@ import com.gow3.android.R
  *
  * 每个枚举值带标题字符串资源 id 与稳定的声明顺序；新增类别只需追加枚举值
  * （如未来 FEX 的 TRANSLATOR），新增参数只需声明 [LaunchParam.category]，
- * 均不影响 Home 页展示。音频 / 驱动为预留分类，当前没有参数，UI 显示「暂无配置」占位。
+ * 均不影响 Home 页展示。音频为预留分类，当前没有参数，UI 显示「暂无配置」占位；
+ * 驱动由 DriverManagerCard 落位；存储（change redesign-android-launcher-home）
+ * 承载游戏目录与升级补丁目录行，是首启之后目录修改的常驻位置。
  */
 internal enum class LaunchCategory(val titleRes: Int) {
     GRAPHICS(R.string.param_category_graphics),
@@ -18,6 +20,7 @@ internal enum class LaunchCategory(val titleRes: Int) {
     CONTROLS(R.string.param_category_controls),
     AUDIO(R.string.param_category_audio),
     DRIVER(R.string.param_category_driver),
+    STORAGE(R.string.param_category_storage),
 }
 
 /**

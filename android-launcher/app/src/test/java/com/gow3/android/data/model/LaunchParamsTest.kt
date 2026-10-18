@@ -13,8 +13,10 @@ class LaunchParamsTest {
     }
 
     @Test fun `categories follow a stable order and every param belongs to exactly one`() {
+        // STORAGE 由 redesign-android-launcher-home 追加（承载目录行的功能卡 slot，
+        // 本身没有参数），声明顺序即 Settings 分类栏顺序。
         assertEquals(
-            listOf(LaunchCategory.GRAPHICS, LaunchCategory.PERFORMANCE, LaunchCategory.CONTROLS, LaunchCategory.AUDIO, LaunchCategory.DRIVER),
+            listOf(LaunchCategory.GRAPHICS, LaunchCategory.PERFORMANCE, LaunchCategory.CONTROLS, LaunchCategory.AUDIO, LaunchCategory.DRIVER, LaunchCategory.STORAGE),
             LaunchParams.categories(),
         )
         // 每个参数都有类别，参数键不重复，且「类别+键」组合不重复（归属唯一）。
@@ -41,9 +43,11 @@ class LaunchParamsTest {
         )
     }
 
-    @Test fun `audio and driver categories are reserved placeholders`() {
+    @Test fun `audio driver and storage categories hold no inline params`() {
         assertTrue(LaunchParams.forCategory(LaunchCategory.AUDIO).isEmpty())
         assertTrue(LaunchParams.forCategory(LaunchCategory.DRIVER).isEmpty())
+        // 存储/驱动分类的内容由功能卡 slot 提供（SettingsEntryTest 覆盖），不占用参数轨道。
+        assertTrue(LaunchParams.forCategory(LaunchCategory.STORAGE).isEmpty())
     }
 
     /** 配置页只收录运行链有消费方的键；死键一旦回流即测试失败。 */
