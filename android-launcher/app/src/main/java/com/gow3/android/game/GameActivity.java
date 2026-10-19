@@ -111,6 +111,9 @@ public final class GameActivity extends Activity {
         if (launchOnReady) getIntent().removeExtra("action");
         pad=new PadBridge(new File(BASE,"android-pad.state"),
             prefs.swapSquareTriangle());
+        // 震动回程轮询：游戏进程写 android-pad.rumble（runtime_pad.c rumble_report），
+        // PadBridge 触发 InputDevice 振动；onPause 暂停，onResume 恢复。
+        pad.startRumble(this,new File(BASE,"android-pad.rumble"));
         audio=new AudioBridge(new File(BASE,"audio.fifo"));
         buildScreen();
         immersive();
@@ -521,11 +524,15 @@ public final class GameActivity extends Activity {
     }
     @Override protected void onPause() {
         if (controllerOverlay!=null) controllerOverlay.release();
-        if (pad!=null) pad.reset();
+        if (pad!=null) { pad.reset(); pad.stopRumble(); }
         if (audio!=null) audio.pause();
         super.onPause();
     }
-    @Override protected void onResume() { super.onResume(); if (audio!=null) audio.resume(); }
+    @Override protected void onResume() {
+        super.onResume();
+        if (pad!=null) pad.resumeRumble();
+        if (audio!=null) audio.resume();
+    }
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);

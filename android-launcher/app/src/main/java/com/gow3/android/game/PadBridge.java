@@ -1,7 +1,10 @@
 package com.gow3.android.game;
 
+import android.hardware.input.InputManager;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -128,5 +131,98 @@ final class PadBridge {
             }
             if (!temp.renameTo(state)) throw new java.io.IOException("Cannot publish controller state");
         } catch (java.io.IOException ex) { android.util.Log.e("God of War III", "Controller bridge",ex); }
+    }
+
+    // ---- 震动回程：GOW3_PAD_RUMBLE_FILE -> InputDevice 振动 ----
+    // 游戏进程里没有 SDL 手柄可开，scePadSetVibration 经 runtime_pad.c rumble_report() 把
+    // 按 vibration= 百分比缩放后的强度写此文件（"rumble <strong> <weak> <ms> <seq>"，
+    // 原子替换；相同强度 100ms 去重，持续效果每 200ms 心跳重写并递增 seq，ms=300）。
+    // 这里 40ms 轮询：行变化（首次或新心跳）才触发，振幅取 max(strong, weak)；效果停止
+    // 后 seq 不再变化，振动自然衰减，不会重放。文件缺失/损坏/无手柄设备=无震动，
+    // 不影响其余桥（契约见 change port-upstream-graphics-fixes design.md 决策 9）。
+    private static final long RUMBLE_POLL_MS=40;
+    private android.content.Context context;
+    private File rumbleFile;
+    private Runnable rumbleLoop;
+    private boolean rumblePolling;
+    private String rumbleSeen;
+    private Vibrator rumbleVibrator;
+    private long rumbleVibratorCheckedAt;
+
+    /** 开始轮询游戏侧震动请求；onCreate/onResume 调用，onPause 调 stopRumble。 */
+    void startRumble(android.content.Context context,File file) {
+        this.context=context;
+        rumbleFile=file;
+        if (rumblePolling) return;
+        rumblePolling=true;
+        rumbleLoop=this::pollRumble;
+        handler.postDelayed(rumbleLoop,RUMBLE_POLL_MS);
+    }
+
+    /** 停止轮询并取消振动；只摘轮询回调，不碰 write() 的 8ms 合并回调。 */
+    void stopRumble() {
+        rumblePolling=false;
+        if (rumbleLoop!=null) handler.removeCallbacks(rumbleLoop);
+        rumbleSeen=null;
+        if (rumbleVibrator!=null) rumbleVibrator.cancel();
+    }
+
+    /** onPause 后恢复轮询（沿用上次 startRumble 的 context 与文件）。 */
+    void resumeRumble() {
+        if (rumbleFile==null || rumblePolling) return;
+        rumblePolling=true;
+        handler.postDelayed(rumbleLoop,RUMBLE_POLL_MS);
+    }
+
+    private Vibrator gamepadVibrator() {
+        long now=android.os.SystemClock.uptimeMillis();
+        if (rumbleVibrator!=null || now-rumbleVibratorCheckedAt<2000) return rumbleVibrator;
+        rumbleVibratorCheckedAt=now;
+        if (context==null) return null;
+        InputManager im=(InputManager)context.getSystemService(android.content.Context.INPUT_SERVICE);
+        if (im==null) return null;
+        for (int id:im.getInputDeviceIds()) {
+            InputDevice dev=im.getInputDevice(id);
+            if (dev==null || (dev.getSources() & InputDevice.SOURCE_JOYSTICK)==0) continue;
+            Vibrator v=dev.getVibrator();
+            if (v!=null && v.hasVibrator()) { rumbleVibrator=v; break; }
+        }
+        return rumbleVibrator;
+    }
+
+    private static int[] parseRumble(String text) {
+        // 行格式 "rumble <strong> <weak> <ms> <seq>"；返回 {amplitude, ms}，无强度时 {0,0}。
+        String[] parts=text.trim().split("\\s+");
+        if (parts.length<4 || !parts[0].equals("rumble")) return new int[]{0,0};
+        try {
+            int strong=Integer.parseInt(parts[1]), weak=Integer.parseInt(parts[2]);
+            int ms=Math.max(1,Math.min(1000,Integer.parseInt(parts[3])));
+            return new int[]{Math.max(0,Math.min(255,Math.max(strong,weak))),ms};
+        } catch (NumberFormatException ex) { return new int[]{0,0}; }
+    }
+
+    private void pollRumble() {
+        if (!rumblePolling) return;
+        String text=null;
+        try { text=new String(java.nio.file.Files.readAllBytes(rumbleFile.toPath()),
+                              StandardCharsets.US_ASCII); } catch (Exception ignored) { }
+        // 行变化=首次命中或新的 200ms 心跳；效果结束后 seq 不再变化，振动自然衰减。
+        if (text!=null && !text.equals(rumbleSeen)) {
+            rumbleSeen=text;
+            int[] r=parseRumble(text);
+            if (r[0]>0) triggerVibration(r[0],r[1]);
+        }
+        handler.postDelayed(rumbleLoop,RUMBLE_POLL_MS);
+    }
+
+    private void triggerVibration(int amplitude,int ms) {
+        Vibrator v=gamepadVibrator();
+        if (v==null) return;
+        if (android.os.Build.VERSION.SDK_INT>=26) {
+            int a=v.hasAmplitudeControl() ? Math.max(1,amplitude) : VibrationEffect.DEFAULT_AMPLITUDE;
+            v.vibrate(VibrationEffect.createOneShot(ms,a));
+        } else {
+            v.vibrate(ms);
+        }
     }
 }
