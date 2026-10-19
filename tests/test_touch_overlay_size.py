@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GAME_PREFS = ROOT / "android-launcher/app/src/main/java/com/gow3/android/core/settings/GamePrefs.kt"
 OVERLAY = ROOT / "android-launcher/app/src/main/java/com/gow3/android/game/TouchControllerOverlay.java"
+GAME_ACTIVITY = ROOT / "android-launcher/app/src/main/java/com/gow3/android/game/GameActivity.java"
 
 
 class OverlaySizePrefsContractTest(unittest.TestCase):
@@ -67,6 +68,18 @@ class OverlaySizeEditingContractTest(unittest.TestCase):
         self.assertIn("setPositiveButton(\"Reset\"",(source))
         self.assertIn("resetLayout(); selected=null; invalidate();", source)
         self.assertIn("sizes.put(NAMES[i],1f);", source)
+
+
+class EditHidesPerfHudContractTest(unittest.TestCase):
+    """编辑虚拟按键时隐藏性能 HUD，DONE 后按设置恢复（用户反馈遮挡编辑视图）。"""
+
+    def test_edit_entry_hides_hud_and_done_restores_pref_state(self):
+        source = GAME_ACTIVITY.read_text()
+        self.assertIn("perfHud.setActive(false);", source)
+        self.assertIn("controllerOverlay.edit(() -> perfHud.setActive(perfHudEnabled()));", source)
+        # 先隐藏再进入编辑
+        self.assertLess(source.index("perfHud.setActive(false);"),
+                        source.index("controllerOverlay.edit(() ->"))
 
 
 class OverlayScalingConsistencyContractTest(unittest.TestCase):

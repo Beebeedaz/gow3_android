@@ -303,7 +303,9 @@ public final class GameActivity extends Activity {
         menuItem("ic_edit","Edit controller layout","Drag and resize the buttons",() -> {
             prefs.setControllerOverlayEnabled(true);
             closeDrawer();
-            controllerOverlay.edit(null);
+            // 编辑虚拟按键时隐藏性能 HUD（避免遮挡编辑视图），DONE 后按设置恢复。
+            perfHud.setActive(false);
+            controllerOverlay.edit(() -> perfHud.setActive(perfHudEnabled()));
         });
         menuItem("ic_restore","Reset controller layout",null,() -> {
             controllerOverlay.resetLayout();
