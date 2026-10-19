@@ -81,9 +81,10 @@ internal object LaunchParams {
             key = "upscaler", labelRes = R.string.param_upscaler, category = LaunchCategory.GRAPHICS,
             options = listOf(
                 LaunchOption("off", R.string.param_option_off),
+                LaunchOption("gsr2", R.string.param_option_gsr2),
                 LaunchOption("fsr3", R.string.param_option_fsr31),
             ),
-            defaultValue = "fsr3",
+            defaultValue = "off",
             descriptionRes = R.string.param_desc_upscaler,
         ),
         LaunchParam(

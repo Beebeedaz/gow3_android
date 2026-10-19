@@ -259,5 +259,44 @@ class PatchPlanTests(unittest.TestCase):
         self.assertEqual(writes, [(9, struct.pack('<I', 2))])
 
 
+class HalfResolutionTests(unittest.TestCase):
+    """分辨率补丁必须把 0x7f2a3c/0x7f2a40 半分辨率后处理表写成输出的一半（移植上游 PR #613）：
+    低分辨率下该表若不随输出缩放，480p 的表比映像还大，亮部过曝。按写入位点自身的特征码
+    定位以兼容各文件的地址布局；1080p/540p 豁免（输出一半分别等于表默认值与输出本身），
+    CUSA01740 01.00 缺少地区样本，半分辨率行缓交。"""
+
+    WIDTH_HEIGHT = 'bf 00 01 00 00 b9 80 07 00 00 41 b8 38 04 00 00'  # At=6 宽、At=12 高
+    HALF_WIDTH = '00 00 00 00 0a e0 f2 00 c0 03 00 00 1c 02 00 00 01 00 00 00'  # At=8
+    HALF_HEIGHT = '0a e0 f2 00 c0 03 00 00 1c 02 00 00 01 00 00 00 00 00 00 00'  # At=8
+    EXEMPT = {'Resolution Patch - 1080p', 'Resolution Patch - 540p'}
+
+    def test_every_resolution_patch_halves_the_output(self):
+        size = lambda value: int.from_bytes(bytes.fromhex(value), 'little')
+        checked = 0
+        for ids, xml, version, _ in patches.GAMES:
+            for meta in ET.parse(xml).getroot().iter('Metadata'):
+                name = meta.get('Name')
+                if not name.startswith('Resolution Patch'):
+                    continue
+                if name in self.EXEMPT or meta.get('AppVer') != version:
+                    continue
+                if next(iter(ids)) == 'CUSA01740' and version == '01.00':
+                    continue
+                lines = list(meta.iter('Line'))
+                dims = {line.get('At'): line.get('Value') for line in lines
+                        if line.get('Pattern') == self.WIDTH_HEIGHT and line.get('At') in ('6', '12')}
+                self.assertEqual(sorted(dims), ['12', '6'], name)
+                half = [(line.get('Pattern'), line.get('Value')) for line in lines
+                        if line.get('Pattern') in (self.HALF_WIDTH, self.HALF_HEIGHT)]
+                self.assertEqual(sorted(pattern for pattern, _ in half),
+                                 sorted([self.HALF_WIDTH, self.HALF_HEIGHT]), name)
+                values = dict(half)
+                width, height = size(dims['6']), size(dims['12'])
+                self.assertEqual((size(values[self.HALF_WIDTH]), size(values[self.HALF_HEIGHT])),
+                                 (width // 2, height // 2), name)
+                checked += 1
+        self.assertEqual(checked, 21)
+
+
 if __name__ == '__main__':
     unittest.main()

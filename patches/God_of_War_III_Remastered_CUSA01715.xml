@@ -22,6 +22,8 @@
             <Line Type="bytes" Address="0x5643f0" Value="56030000" Pattern="41 b9 80 07 00 00 4c 89 f9 4d 89 e0 e8 ?? ?? ?? ??" At="2" />
             <Line Type="bytes" Address="0x5ff889" Value="56030000" Pattern="bf 00 01 00 00 b9 80 07 00 00 41 b8 38 04 00 00" At="6" />
             <Line Type="bytes" Address="0x5ff88f" Value="e0010000" Pattern="bf 00 01 00 00 b9 80 07 00 00 41 b8 38 04 00 00" At="12" />
+            <Line Type="bytes" Address="0x7f2a3c" Value="ab010000" Pattern="00 00 00 00 0a e0 f2 00 c0 03 00 00 1c 02 00 00 01 00 00 00" At="8" />
+            <Line Type="bytes" Address="0x7f2a40" Value="f0000000" Pattern="0a e0 f2 00 c0 03 00 00 1c 02 00 00 01 00 00 00 00 00 00 00" At="8" />
             <Line Type="bytes" Address="0x7cd918" Value="00000090" Pattern="00 00 00 43 00 00 80 3f 00 00 00 50 00 00 00 00 00 04 00 00" At="8" />
         </PatchList>
     </Metadata>
@@ -35,6 +37,8 @@
             <Line Type="bytes" Address="0x5643f0" Value="00050000" Pattern="41 b9 80 07 00 00 4c 89 f9 4d 89 e0 e8 ?? ?? ?? ??" At="2" />
             <Line Type="bytes" Address="0x5ff889" Value="00050000" Pattern="bf 00 01 00 00 b9 80 07 00 00 41 b8 38 04 00 00" At="6" />
             <Line Type="bytes" Address="0x5ff88f" Value="d0020000" Pattern="bf 00 01 00 00 b9 80 07 00 00 41 b8 38 04 00 00" At="12" />
+            <Line Type="bytes" Address="0x7f2a3c" Value="80020000" Pattern="00 00 00 00 0a e0 f2 00 c0 03 00 00 1c 02 00 00 01 00 00 00" At="8" />
+            <Line Type="bytes" Address="0x7f2a40" Value="68010000" Pattern="0a e0 f2 00 c0 03 00 00 1c 02 00 00 01 00 00 00 00 00 00 00" At="8" />
             <Line Type="bytes" Address="0x7cd918" Value="00000090" Pattern="00 00 00 43 00 00 80 3f 00 00 00 50 00 00 00 00 00 04 00 00" At="8" />
         </PatchList>
     </Metadata>
@@ -178,6 +182,8 @@
             <Line Type="bytes" Address="0x5643f0" Value="40060000" Pattern="41 b9 80 07 00 00 4c 89 f9 4d 89 e0 e8 ?? ?? ?? ??" At="2" />
             <Line Type="bytes" Address="0x5ff889" Value="40060000" Pattern="bf 00 01 00 00 b9 80 07 00 00 41 b8 38 04 00 00" At="6" />
             <Line Type="bytes" Address="0x5ff88f" Value="84030000" Pattern="bf 00 01 00 00 b9 80 07 00 00 41 b8 38 04 00 00" At="12" />
+            <Line Type="bytes" Address="0x7f2a3c" Value="20030000" Pattern="00 00 00 00 0a e0 f2 00 c0 03 00 00 1c 02 00 00 01 00 00 00" At="8" />
+            <Line Type="bytes" Address="0x7f2a40" Value="c2010000" Pattern="0a e0 f2 00 c0 03 00 00 1c 02 00 00 01 00 00 00 00 00 00 00" At="8" />
             <Line Type="bytes" Address="0x7cd918" Value="00000090" Pattern="00 00 00 43 00 00 80 3f 00 00 00 50 00 00 00 00 00 04 00 00" At="8" />
         </PatchList>
     </Metadata>

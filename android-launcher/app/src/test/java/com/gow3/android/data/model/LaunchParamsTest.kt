@@ -69,6 +69,8 @@ class LaunchParamsTest {
             "effect_chromatic_aberration", "effect_dof", "effect_motion_blur", "effect_ssao",
             "effect_game_aa", "effect_dynamic_shadows", "effect_ssr",
             "skip_intro", "mouse_look", "debug_camera", "debug_menu", "overlay_mouse",
+            // preset 在 Android 已无消费方（change replace-android-fsr3-with-gsr2 D9）；
+            // output_res 只由游戏内抽屉的「超分输出」组写，不进设置页参数轨道。
             "preset", "output_res", "display_mode",
             // show_fps 已随引擎 FPS 显示退役（change design D7）：引擎叠加层由 launcher HUD 取代
             "show_fps",
@@ -80,7 +82,9 @@ class LaunchParamsTest {
     @Test fun `mobile optimized defaults are not regressed`() {
         val empty = emptyMap<String, String>()
         val byKey = LaunchParams.all.associateBy { it.key }
-        assertEquals("fsr3", LaunchParams.valueOf(empty, byKey.getValue("upscaler")))
+        assertEquals("off", LaunchParams.valueOf(empty, byKey.getValue("upscaler")))
+        // Android 超分取值域：off / gsr2 / fsr3（默认 off；gsr2 为 Adreno 设计的可选 provider）。
+        assertEquals(listOf("off", "gsr2", "fsr3"), byKey.getValue("upscaler").options.map { it.value })
         assertEquals("720p", LaunchParams.valueOf(empty, byKey.getValue("render_resolution")))
         assertEquals("0", LaunchParams.valueOf(empty, byKey.getValue("anisotropy")))
         assertEquals("0", LaunchParams.valueOf(empty, byKey.getValue("sharpen")))
