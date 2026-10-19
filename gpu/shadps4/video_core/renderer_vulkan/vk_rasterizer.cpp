@@ -2247,7 +2247,11 @@ Rasterizer::ImageDescCacheEntry& Rasterizer::CachedImageDescEntry(const AmdGpu::
                                                                    u64 hash) {
     std::array<u64, 4> key;
     std::memcpy(key.data(), &sharp, sizeof(key));
-    const u32 flags = u32(res.is_written) | u32(res.is_depth) << 1 | u32(res.is_array) << 2;
+    // gow3（上游 b646683）：needs_native 参与 ImageDesc 缓存键，同一 T# 的采样绑定与
+    // load 绑定不得共享一条 ImageDesc（partial height views 依赖该区分）。
+    const u32 flags =
+        u32(res.is_written) | u32(res.is_depth) << 1 | u32(res.is_array) << 2 |
+        u32(res.needs_native) << 3;
     // Two-way set associative: a frame binds a few thousand distinct T#s.
     auto* set = &image_desc_cache[(hash % (image_desc_cache.size() / 2)) * 2];
     const auto matches = [&](const ImageDescCacheEntry& e) {
