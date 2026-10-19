@@ -97,8 +97,9 @@ class GamePrefs internal constructor(private val prefs: SharedPreferences) {
 
     // ---- 性能 HUD（android-perf-hud-overlay） ----
 
-    /** 性能 HUD 开关；默认关闭，与 spec「默认关闭」一致。 */
-    fun perfHudEnabled(): Boolean = prefs.getBoolean(KEY_PERF_HUD_ENABLED, false)
+    /** 性能 HUD 开关；默认开启（用户未操作过开关时直接可见帧率/GPU/CPU），与 spec「默认开启」一致。
+     *  显式关闭过的玩家偏好已持久化，不受默认值影响。 */
+    fun perfHudEnabled(): Boolean = prefs.getBoolean(KEY_PERF_HUD_ENABLED, true)
 
     fun setPerfHudEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_PERF_HUD_ENABLED, enabled).apply()

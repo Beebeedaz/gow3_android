@@ -93,6 +93,7 @@
     <string name="param_desc_upscaler">Reconstructs the image with the selected temporal upscaler (Snapdragon GSR 2 by default, designed for Adreno GPUs; FSR 3.1 kept as an option). The game resolution is controlled separately by the resolution setting; turning the upscaler off does not disable the resolution patch.</string>
     <string name="param_desc_render_patch">Changes the game resolution through a patch; tiers are shown by their actual pixel size. Available options follow the selected game and version and stay in sync with Patches. Native disables the resolution patch. Takes effect on the next launch.</string>
     <string name="param_desc_engine_fps">60 is the game\'s original engine frame rate. Higher values require a matching game patch and only appear when available. This setting stays in sync with Patches and takes effect on the next launch.</string>
+    <string name="param_desc_fps_limit">The maximum frame rate is limited by this setting, device performance, and the engine frame rate.</string>
     <string name="home_patch_identity">Patch options for %1$s · %2$s · More switches in Patches</string>
     <string name="home_patch_unavailable">No matching patch catalog. Check the game and update folders to enable resolution and engine frame rate settings. See Patches for details.</string>
     <string name="home_patch_unavailable_value">%1$s (unavailable for this version)</string>

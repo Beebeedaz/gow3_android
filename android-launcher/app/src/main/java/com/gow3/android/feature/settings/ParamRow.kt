@@ -58,7 +58,7 @@ internal fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (St
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(context.getString(param.labelRes), color = LauncherColors.textMuted, fontSize = 13.sp)
+            Text(stringResource(param.labelRes), color = LauncherColors.textMuted, fontSize = 13.sp)
             if (param.descriptionRes != null) {
                 Text(
                     "ⓘ",
@@ -99,7 +99,7 @@ internal fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (St
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     options.forEach { option ->
                         DropdownMenuItem(
-                            text = { Text(context.getString(option.labelRes)) },
+                            text = { Text(stringResource(option.labelRes)) },
                             onClick = {
                                 expanded = false
                                 save(param.key, option.value)
@@ -112,8 +112,8 @@ internal fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (St
     }
     if (showInfo && param.descriptionRes != null) {
         ParamInfoDialog(
-            title = context.getString(param.labelRes),
-            message = context.getString(param.descriptionRes),
+            title = stringResource(param.labelRes),
+            message = stringResource(param.descriptionRes),
             onDismiss = { showInfo = false },
         )
     }

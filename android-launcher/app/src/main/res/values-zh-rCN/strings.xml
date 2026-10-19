@@ -76,6 +76,7 @@
     <string name="param_desc_upscaler">用所选的时间域超分算法重建画面（默认为骁龙 GSR 2，为 Adreno GPU 设计；保留 FSR 3.1 可选）。游戏分辨率由「分辨率」选项单独控制；关闭超分不会关闭分辨率补丁。</string>
     <string name="param_desc_render_patch">通过补丁调整游戏分辨率，档位按实际像素尺寸显示。可选档位随当前游戏及版本变化，与补丁页同步。「原生」表示关闭分辨率补丁。下次启动生效。</string>
     <string name="param_desc_engine_fps">60 是游戏原生引擎帧率。更高档位需要对应的游戏补丁，仅在当前版本有补丁时显示。与补丁页同步，下次启动生效。</string>
+    <string name="param_desc_fps_limit">最大帧率受设置/性能/引擎帧率限制</string>
     <string name="home_patch_identity">补丁选项：%1$s · %2$s · 更多开关在补丁页</string>
     <string name="home_patch_unavailable">未匹配到补丁目录。请检查游戏与升级目录后再调整分辨率和引擎帧率，具体原因可在补丁页查看。</string>
     <string name="home_patch_unavailable_value">%1$s（当前版本不可用）</string>
