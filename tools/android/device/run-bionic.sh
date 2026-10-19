@@ -61,7 +61,12 @@ setting() { sed -n "s/^$1=//p" "$GOW3_CONFIG" 2>/dev/null | tail -n 1; }
 # app 的 pad 状态文件（PadBridge.java）与文字请求（角色名：它的触屏键盘）。
 export GOW3_ANDROID_INPUT=1
 export GOW3_PAD_FILE="$base/android-pad.state" GOW3_PAD_QUIET=1
+# 震动回程：游戏把缩放后的强度写此文件(atomic rename，见 runtime_pad.c pad_vibration)，
+# PadBridge 以 40ms 轮询并驱动 InputDevice 振动；缺失=无震动，不影响其余桥。
+export GOW3_PAD_RUMBLE_FILE="$base/android-pad.rumble"
 export GOW3_IME_FILE="$base/ime.request"
+# 存档/读档/删除列表的请求文件(design: launcher 以原生对话框接管呈现,不再由 overlay 自绘)。
+export GOW3_SAVE_DIALOG_FILE="$base/save-dialog.request"
 # 渲染尺寸由 gow3.ini 的 render_resolution（分辨率补丁，准备阶段打进 eboot）决定；
 # 输出 output_res（1920x1080、1280x720 或 854x480；缺省 720p）是 UI/呈现的最终尺寸。
 output=$(setting output_res)

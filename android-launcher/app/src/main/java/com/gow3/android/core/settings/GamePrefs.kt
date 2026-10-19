@@ -78,6 +78,16 @@ class GamePrefs internal constructor(private val prefs: SharedPreferences) {
             .apply()
     }
 
+    /** 触屏按键的尺寸因子（1.0 = 默认大小）；本特性之前保存的布局没有该键，回落 1.0。 */
+    fun overlaySize(name: String, default: Float = 1f): Float =
+        prefs.getFloat(OVERLAY_KEY_PREFIX + "s_" + name, default)
+
+    /** 捏合缩放结束时持久化一个按键的尺寸因子（钳制 0.6..2.0，与编辑器一致）。 */
+    fun setOverlaySize(name: String, value: Float) {
+        val clamped = value.coerceIn(0.6f, 2f)
+        prefs.edit().putFloat(OVERLAY_KEY_PREFIX + "s_" + name, clamped).apply()
+    }
+
     /** 重置触屏布局：删除全部 `overlay_*` 键，按键回到代码内默认位置。 */
     fun clearOverlayLayout() {
         val editor = prefs.edit()

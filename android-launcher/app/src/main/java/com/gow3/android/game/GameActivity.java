@@ -42,7 +42,7 @@ import com.gow3.android.core.settings.Gow3Settings;
 import com.gow3.android.Gow3App;
 
 /** God of War III-only Android player. Keeps the game surface alive beneath its sliding drawer. */
-public final class GameActivity extends Activity {
+public final class GameActivity extends Activity implements SaveDialogHost {
     /** The app's files (application id com.gow3.android.bionic) and its gow3port runtime tree.
      *  Rootfs programs are launched through the in-tree loader when their PT_INTERP slot cannot
      *  hold the app-private path. */
@@ -89,6 +89,8 @@ public final class GameActivity extends Activity {
     private final AtomicBoolean imeAnswered=new AtomicBoolean();
     /** 文本框打开期间手柄的 Cross/Circle 要当作 OK/Cancel,需要拿到当前输入内容。 */
     private EditText imeField;
+    /** 存档/读档/删除列表的原生对话框（独立组件，见 SaveDialogBridge）。 */
+    private SaveDialogBridge saveDialog;
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
@@ -111,12 +113,25 @@ public final class GameActivity extends Activity {
         if (launchOnReady) getIntent().removeExtra("action");
         pad=new PadBridge(new File(BASE,"android-pad.state"),
             prefs.swapSquareTriangle());
+        saveDialog=new SaveDialogBridge(this,new File(BASE));
+        // 震动回程轮询：游戏进程写 android-pad.rumble（runtime_pad.c rumble_report），
+        // PadBridge 触发 InputDevice 振动；onPause 暂停，onResume 恢复。
+        pad.startRumble(this,new File(BASE,"android-pad.rumble"));
         audio=new AudioBridge(new File(BASE,"audio.fifo"));
         buildScreen();
         immersive();
     }
 
-    private int dp(float n) { return Math.round(n*getResources().getDisplayMetrics().density); }
+    /** SaveDialogHost：条目与容器的密度换算。 */
+    public int dp(float n) { return Math.round(n*getResources().getDisplayMetrics().density); }
+    /** SaveDialogHost：对话框需要 Activity 上下文来构造 View 与 AlertDialog。 */
+    public android.content.Context context() { return this; }
+    /** SaveDialogHost：对话框导航与中性化读写的同一个 PadBridge。 */
+    public PadBridge pad() { return pad; }
+    /** SaveDialogHost：对话框关闭后把焦点交还游戏画面。 */
+    public void requestFocus() { surface.requestFocus(); }
+    /** SaveDialogHost：宿主销毁后轮询应立即停止。 */
+    public boolean isHostDestroyed() { return destroyed; }
     private TextView text(String value, int size, int color) {
         TextView t=new TextView(this); t.setText(value); t.setTextSize(size); t.setTextColor(color); return t;
     }
@@ -300,7 +315,9 @@ public final class GameActivity extends Activity {
         menuItem("ic_edit","Edit controller layout","Drag and resize the buttons",() -> {
             prefs.setControllerOverlayEnabled(true);
             closeDrawer();
-            controllerOverlay.edit(null);
+            // 编辑虚拟按键时隐藏性能 HUD（避免遮挡编辑视图），DONE 后按设置恢复。
+            perfHud.setActive(false);
+            controllerOverlay.edit(() -> perfHud.setActive(perfHudEnabled()));
         });
         menuItem("ic_restore","Reset controller layout",null,() -> {
             controllerOverlay.resetLayout();
@@ -429,7 +446,8 @@ public final class GameActivity extends Activity {
         drawer.setTranslationX(-dp(320)); drawer.setVisibility(View.VISIBLE);
         drawer.animate().translationX(0).setDuration(220).start(); resume.requestFocus();
     }
-    private void closeDrawer() {
+    /** SaveDialogHost：对话框需要拉起/收起抽屉并让 Surface 重新取得输入焦点。 */
+    public void closeDrawer() {
         if (!drawerOpen) return;
         drawerOpen=false; pad.reset();
         controllerOverlay.setVisibility(controllerEnabled() ? View.VISIBLE : View.GONE);
@@ -440,7 +458,7 @@ public final class GameActivity extends Activity {
         immersive();
     }
 
-    private void immersive() {
+    public void immersive() {
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN |
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
             View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
@@ -458,7 +476,11 @@ public final class GameActivity extends Activity {
         super.onWindowFocusChanged(focus);
         if (focus) immersive(); else if (pad!=null) pad.reset();
     }
-    @Override public void onBackPressed() { if (drawerOpen) closeDrawer(); else openDrawer(); }
+    @Override public void onBackPressed() {
+        if (saveDialog!=null && saveDialog.isOpen()) saveDialog.cancel();
+        else if (drawerOpen) closeDrawer();
+        else openDrawer();
+    }
 
     @Override public boolean dispatchTouchEvent(MotionEvent e) {
         if (e.getActionMasked()==MotionEvent.ACTION_DOWN) {
@@ -521,11 +543,15 @@ public final class GameActivity extends Activity {
     }
     @Override protected void onPause() {
         if (controllerOverlay!=null) controllerOverlay.release();
-        if (pad!=null) pad.reset();
+        if (pad!=null) { pad.reset(); pad.stopRumble(); }
         if (audio!=null) audio.pause();
         super.onPause();
     }
-    @Override protected void onResume() { super.onResume(); if (audio!=null) audio.resume(); }
+    @Override protected void onResume() {
+        super.onResume();
+        if (pad!=null) pad.resumeRumble();
+        if (audio!=null) audio.resume();
+    }
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
@@ -600,6 +626,7 @@ public final class GameActivity extends Activity {
         if (launch && !displayOnly && game==null) worker.execute(() -> startGame());
         pollFrames();
         if (!imePolling) { imePolling=true; pollIme(); }
+        if (saveDialog!=null) saveDialog.start();
     }
     // ---- Game folder: the extracted retail game in shared storage ----
     /** Known retail folder names; the selected folder is still validated by eboot.bin. */
@@ -909,6 +936,7 @@ public final class GameActivity extends Activity {
     }
     @Override protected void onDestroy() {
         destroyed=true; pad.reset(); audio.stop(); main.removeCallbacksAndMessages(null);
+        if (saveDialog!=null) saveDialog.stop();
         // 性能 HUD 先于其余清理停止采样线程（spec「退出游戏停止采样」），对照 controllerOverlay.release() 先例。
         if (perfHud!=null) perfHud.release();
         worker.shutdownNow();
