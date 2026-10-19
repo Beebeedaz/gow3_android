@@ -75,7 +75,10 @@ class GameProfileTests(unittest.TestCase):
                              {'01.00', '01.02'} if title == 'CUSA01740' else {version})
             names = [m.get('Name') for m in root.iter('Metadata') if m.get('AppVer') == version]
             self.assertEqual(len(names), len(set(names)))
-            self.assertEqual(len(names), 14 if title == 'CUSA01740' else 20)
+            # 16:10 档位（1280x800/1440x900）已实施后因真机显示异常回退隐藏，见
+            # change add-16x10-resolution-tiers；重新上架时恢复 16/22 与 checked 29。
+            expected = ((14 if version == '01.00' else 14) if title == 'CUSA01740' else 20)
+            self.assertEqual(len(names), expected)
             for m in root.iter('Metadata'):
                 self.assertIsNotNone(m.get('Validation'))
                 if m.get('Name').startswith('Disable ') or m.get('Name') in {
