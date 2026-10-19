@@ -46,6 +46,7 @@
 
     <!-- 启动参数：选项名 -->
     <string name="param_option_off_720p">关闭（以 1280×720 渲染）</string>
+    <string name="param_option_gsr2">骁龙 GSR 2</string>
     <string name="param_option_fsr31">FSR 3.1</string>
     <string name="param_option_native">原生</string>
     <string name="param_option_480p">480p</string>
@@ -70,7 +71,7 @@
     <string name="param_option_frames_2">2</string>
 
     <!-- 启动参数：说明 -->
-    <string name="param_desc_upscaler">使用 FSR 3.1 重建画面。游戏分辨率由「分辨率」选项单独控制；关闭 FSR 不会关闭分辨率补丁。</string>
+    <string name="param_desc_upscaler">用所选的时间域超分算法重建画面（默认为骁龙 GSR 2，为 Adreno GPU 设计；保留 FSR 3.1 可选）。游戏分辨率由「分辨率」选项单独控制；关闭超分不会关闭分辨率补丁。</string>
     <string name="param_desc_render_patch">通过补丁调整游戏分辨率。可选档位随当前游戏及版本变化，与补丁页同步。「原生」表示关闭分辨率补丁。下次启动生效。</string>
     <string name="param_desc_engine_fps">60 是游戏原生引擎帧率。更高档位需要对应的游戏补丁，仅在当前版本有补丁时显示。与补丁页同步，下次启动生效。</string>
     <string name="home_patch_identity">补丁选项：%1$s · %2$s · 更多开关在补丁页</string>
@@ -133,7 +134,7 @@
     <string name="param_desc_frames_queued">游戏在屏幕上显示之前预先准备多少帧。数值越低越能降低输入延迟；数值越高在较弱的硬件上可能更流畅。</string>
     <string name="param_desc_anisotropy">让斜视角下的地板与墙面纹理更清晰。数值越高可能多占用一点 GPU 带宽。下次启动生效。</string>
     <string name="param_desc_vibration">按比例调节手柄振动强度，0% 表示关闭振动。游戏运行时立即生效。</string>
-    <string name="param_desc_sharpen">在 FSR 升采样之后追加 RCAS 锐化。升采样器为 OFF 时无效果。</string>
+    <string name="param_desc_sharpen">锐化升采样后的画面（全部强度档位对所有超分算法生效）。超分为 OFF 时无效果。</string>
     <string name="param_desc_sharpness">锐化强度（0.00–2.00）。仅在锐化开启时生效。</string>
     <string name="param_desc_display_stretch">把画面拉伸铺满整个屏幕（不保持宽高比，消除宽屏下的左右黑边，画面会变形）。下次启动生效。</string>
     <string name="param_skip_animations">跳过动画</string>

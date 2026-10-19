@@ -46,6 +46,7 @@
 
     <!-- 启动参数：选项名 -->
     <string name="param_option_off_720p">Off (render at 1280×720)</string>
+    <string name="param_option_gsr2">Snapdragon GSR 2</string>
     <string name="param_option_fsr31">FSR 3.1</string>
     <string name="param_option_native">Native</string>
     <string name="param_option_480p">480p</string>
@@ -86,7 +87,7 @@
     <string name="param_option_sharpness_200">2.00</string>
 
     <!-- 启动参数：说明 -->
-    <string name="param_desc_upscaler">Uses FSR 3.1 to reconstruct the image. The game resolution is controlled separately by the resolution setting; turning FSR off does not disable the resolution patch.</string>
+    <string name="param_desc_upscaler">Reconstructs the image with the selected temporal upscaler (Snapdragon GSR 2 by default, designed for Adreno GPUs; FSR 3.1 kept as an option). The game resolution is controlled separately by the resolution setting; turning the upscaler off does not disable the resolution patch.</string>
     <string name="param_desc_render_patch">Changes the game resolution through a patch. Available options follow the selected game and version and stay in sync with Patches. Native disables the resolution patch. Takes effect on the next launch.</string>
     <string name="param_desc_engine_fps">60 is the game\'s original engine frame rate. Higher values require a matching game patch and only appear when available. This setting stays in sync with Patches and takes effect on the next launch.</string>
     <string name="home_patch_identity">Patch options for %1$s · %2$s · More switches in Patches</string>
@@ -149,7 +150,7 @@
     <string name="param_desc_frames_queued">How many frames the game prepares ahead of what the screen shows. Lower numbers cut input lag; higher numbers can improve smoothness on weaker hardware.</string>
     <string name="param_desc_anisotropy">Sharpens floors and walls viewed at an angle. Higher values may use a little more GPU bandwidth. Takes effect on the next launch.</string>
     <string name="param_desc_vibration">Scales the gamepad vibration strength. 0% disables vibration. Takes effect immediately while the game is running.</string>
-    <string name="param_desc_sharpen">Applies an RCAS sharpening pass after FSR upscaling. Has no effect while the upscaler is OFF.</string>
+    <string name="param_desc_sharpen">Sharpens the upscaled image (the full strength range applies to every upscaler). Has no effect while the upscaler is OFF.</string>
     <string name="param_desc_sharpness">Strength of the sharpening pass (0.00–2.00). Only used when sharpening is ON.</string>
     <string name="param_desc_display_stretch">Stretches the picture to fill the whole screen, ignoring the aspect ratio (removes the side black bars on wide screens). The image will look horizontally stretched. Takes effect on the next launch.</string>
     <string name="param_skip_animations">Skip animations</string>
