@@ -87,7 +87,6 @@ internal object LaunchParams {
                 LaunchOption("480p", R.string.param_option_480p),
                 LaunchOption("540p", R.string.param_option_540p),
                 LaunchOption("720p", R.string.param_option_720p),
-                LaunchOption("800p", R.string.param_option_800p),
                 LaunchOption("900p", R.string.param_option_900p),
                 LaunchOption("1080p", R.string.param_option_1080p),
                 LaunchOption("1440p", R.string.param_option_1440p),
