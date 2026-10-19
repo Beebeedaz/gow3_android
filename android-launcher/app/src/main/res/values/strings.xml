@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Gow3Launcher</string>
+    <!-- 桌面名称（Manifest android:label）。debug 变体经 src/debug 资源覆盖加 Debug 标识。 -->
+    <string name="app_name">God of War III</string>
 
     <!-- 品牌与关键动作按钮：双语同值，不翻译 -->
     <string name="title_god_of_war_iii">GOD OF WAR III</string>

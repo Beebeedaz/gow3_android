@@ -49,6 +49,10 @@ android {
     ndkVersion = "29.0.14206865"
 
     buildTypes {
+        debug {
+            // debug 与 release 共存：包名加 .debug 后缀（RuntimeInstaller 校验时容忍该后缀）。
+            applicationIdSuffix = ".debug"
+        }
         release {
             optimization {
                 enable = false
