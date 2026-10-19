@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -27,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +39,7 @@ import com.gow3.android.R
 import com.gow3.android.data.driver.DriverEntry
 import com.gow3.android.data.driver.DriverManager
 import com.gow3.android.data.model.GameIdentityState
+import com.gow3.android.data.model.LaunchParams
 import com.gow3.android.data.model.MobilePreset
 import com.gow3.android.data.model.MobilePresets
 import com.gow3.android.ui.components.LauncherColors
@@ -257,6 +261,51 @@ private fun DriverOption(title: String, meta: String?, selected: Boolean, onPick
         }
         if (selected) {
             Text("✓", color = LauncherColors.gold, fontSize = 14.sp)
+        }
+    }
+}
+
+/**
+ * 帧率上限快捷下拉（change preset-resolution-only-fps-independent）：Home GPU 驱动选择下方
+ * 就地编辑 `fps_limit`。档位按当前 `engine_fps` 约束（上限不超过引擎帧率，0=不限除外），
+ * 与 Settings 配置页同一套取值域；写回 `gow3.ini` 的 `fps_limit=` 键，下次启动生效。
+ */
+@Composable
+internal fun FpsLimitRow(ini: Map<String, String>, save: (String) -> Unit) {
+    val context = LocalContext.current
+    val param = LaunchParams.all.first { it.key == "fps_limit" }
+    val options = LaunchParams.effectiveOptions(param, ini)
+    var expanded by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel(stringResource(R.string.param_fps_limit))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(LauncherColors.navSurface)
+                .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)), RoundedCornerShape(8.dp))
+                .clickable { expanded = true }
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val current = LaunchParams.selectedOption(ini, param)
+            Text(
+                current?.let { context.getString(it.labelRes) } ?: LaunchParams.valueOf(ini, param),
+                modifier = Modifier.weight(1f),
+                color = LauncherColors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            )
+            Text("▾", color = LauncherColors.textMuted)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(context.getString(option.labelRes)) },
+                    onClick = {
+                        expanded = false
+                        save(option.value)
+                    },
+                )
+            }
         }
     }
 }

@@ -221,6 +221,7 @@ internal fun HomeScreen(
                     },
                     onManageDrivers,
                 )
+                FpsLimitRow(iniValues) { saveUpdates(mapOf("fps_limit" to it)) }
                 SkipAnimationsCard(homeCatalog, iniValues, ::saveUpdates)
                 // gow3port: LSFG 运行时能力已废除（Bionic 迁移，见 openspec change
                 // migrate-android-runtime-to-bionic）。「Steam 下载 LSFG / 导入 LSFG」入口
@@ -243,6 +244,7 @@ internal fun HomeScreen(
                 },
                 onManageDrivers,
             )
+            FpsLimitRow(iniValues) { saveUpdates(mapOf("fps_limit" to it)) }
             SkipAnimationsCard(homeCatalog, iniValues, ::saveUpdates)
             Spacer(Modifier.height(6.dp))
             LaunchButton(::launch)

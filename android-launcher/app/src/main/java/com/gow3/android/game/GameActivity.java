@@ -251,40 +251,28 @@ public final class GameActivity extends Activity {
             .setNegativeButton("Cancel",null).setPositiveButton("Restart",(dialog,which) -> restartGame()).show());
 
         section("Graphics");
-        // Graphics 入口只保留运行时真正消费的那几项：upscaler / preset / sharpen / sharpness /
-        // fps_limit。show_fps（引擎 FPS 叠加层）已退役——帧率显示由本 Activity 的性能 HUD
-        // （PerfHudOverlay）提供，历史残留的 show_fps=1 由 Gow3Data.prepare 归零。原来的 CPU
-        // 核心（thor_cpus）、特效（effect_*）、模型细节
-        // （model_lod）在本仓库启动链路没有消费方，已在 SettingsDialog.show() 里注释掉。
-        // fps_limit 的摘要取值域与 SettingsDialog.FPS_VALUES 和运行时 FPS_LIMITS
-        // （30/60/120/240/0）对齐。
-        graphicsItem=menuItem("ic_tune","Graphics settings","",() -> {
+        // Graphics settings 入口已隐藏（change replace-android-fsr3-with-gsr2 收尾）：时间域
+        // 超分路径在 Android 尚未接通，提供入口只会让玩家切到不工作的功能。设置页超分行同步
+        // 移除，run-bionic.sh 硬性 upscaler=off 兜底。接通后取消注释即可。
+        /* graphicsItem=menuItem("ic_tune","Graphics settings","",() -> {
             closeDrawer();
             new SettingsDialog(this,new File(DATA,"gow3.ini"),this::restartGame).show();
         });
+         */
         // Tuning only. Supplying Lossless.dll is the launcher Home page's job;
         // the drawer's row reports the multiplier, never where the DLL came from. LSFG 是唯一帧生成
         // 路径，FSR 3.1 帧生成未接通，不要在这里再加 FSR 帧生成入口。
         // 帧生成调参入口（change add-native-frame-generation）：未导入 Lossless.dll 时禁用
-        // （灰显 + 指引文案），供给入口在设置页常规分类。DLL 查找与 run-bionic 一致：
-        // 游戏目录同级 → 应用私有 gow3port/。
-        File lsfgDll=new File(BASE,"Lossless.dll");
-        try {
-            String gd=new GamePrefs(this).gameDir();
-            if (gd!=null) {
-                File beside=new File(new File(gd).getParentFile(),"Lossless.dll");
-                if (beside.isFile()) lsfgDll=beside;
-            }
-        } catch (Exception ignored) { }
-        boolean dllReady=lsfgDll.isFile();
+        // （灰显 + 指引文案），供给入口在 Home 页与设置页常规分类。DLL 门禁统一走
+        // hasFrameGenDll()（游戏目录同级 → 应用私有 gow3data，与 LosslessDllManager 导入落点一致），
+        // 不再在构造期对旧 gow3port/ 位置求值；灰显/可点由 refreshDrawer 每次打开重算，onClick 实时再判。
         losslessItem=menuItem("ic_frames","Lossless Scaling",
-            dllReady ? "" : getString(com.gow3.android.R.string.frame_gen_drawer_need_dll), () -> {
-            if (!dllReady) return;
+            hasFrameGenDll() ? "" : getString(com.gow3.android.R.string.frame_gen_drawer_need_dll), () -> {
+            if (!hasFrameGenDll()) return;
             closeDrawer();
             new SettingsDialog(this,new File(DATA,"gow3.ini"),null)
                 .showLossless(() -> { Process p=game; return p!=null && p.isAlive(); }, this::pickRefreshRate);
         });
-        if (!dllReady) losslessItem.setAlpha(0.4f);
         // 性能 HUD 开关行：launcher 侧悬浮层，即时生效（不重启游戏进程、不重建 Surface），
         // 交互模式与「On-screen controller」一致——点击切换、写 prefs、收起抽屉。
         perfHudItem=menuItem("ic_tune","Performance HUD","",() -> {
@@ -407,22 +395,24 @@ public final class GameActivity extends Activity {
         if ("1".equals(setting("cheat_item"))) cheats.add("infinite items");
         setDetail(cheatsItem,cheats.isEmpty() ? "Off" : String.join(" · ",cheats));
          */
+        /* graphicsItem 的摘要随入口一起隐藏（接回来时一起放开）。
         String upscaler="off".equals(Gow3Settings.read(configIni(), "upscaler")) ? "No upscaling" : "FSR 3.1";
         String limit=Gow3Settings.read(configIni(), "fps_limit");
         // 取值域与 SettingsDialog.FPS_VALUES 一致：只有 30/60/120/240 会按原值显示，0 是"不限制"，
         // 其余（键缺失、旧版遗留的 40/45）运行时 ParseFpsLimit 都当 0，所以回退显示 30。
         setDetail(graphicsItem,upscaler+" · "+("0".equals(limit) ? "no FPS limit"
             : (limit==null || !limit.matches("30|60|120|240") ? "30" : limit)+" FPS limit"));
-        String lsfg=Gow3Settings.read(configIni(), "lsfg_multiplier");
-        boolean lsfgOn="2".equals(lsfg) || "3".equals(lsfg) || "4".equals(lsfg);
-        // 没导入 Lossless.dll 就开不了插帧：lsfg-vk 只加载玩家自带的 DLL，run-gow3.sh 的
-        //  preflight 找不到它时会静默不开 layer（只剩 30 FPS），玩家看不出是自己漏了导入。
-        //  所以直接把这一行置灰不可点，并说明去 Home 页导入，而不是让它"看着能开却不生效"。
+         */
+        // 帧生成调参行摘要（change fix-framegen-state-reporting）：按运行期配置求值。
+        // 之前读旧 lsfg_multiplier 键（已不再写入）导致开启插帧后仍显示 Off。
+        FrameGenSettings.Config fg=FrameGenSettings.read(configIni());
+        // 没导入 Lossless.dll 就开不了插帧：引擎只加载玩家自带的 DLL，直接把这一行置灰
+        // 不可点，并说明去 Home/设置页导入，而不是让它"看着能开却不生效"。
         boolean dllPresent=hasFrameGenDll();
         setRowEnabled(losslessItem,dllPresent);
         setDetail(losslessItem,!dllPresent ? "Import Lossless.dll on the Home page first"
-            : lsfgOn ? lsfg+"× frames · flow "
-            +(Gow3Settings.read(configIni(), "lsfg_flow_scale")==null ? "1.0" : Gow3Settings.read(configIni(), "lsfg_flow_scale")) : "Off");
+            : fg.enabled ? fg.multiplier+"× frames · flow "
+            +String.valueOf(fg.flowScale) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
         setDetail(swapFaceItem,swapFaceEnabled() ? "On" : "Off");
         setDetail(perfHudItem,perfHudEnabled() ? "On" : "Off");
@@ -770,30 +760,31 @@ public final class GameActivity extends Activity {
      *  else the fastest one (at the system's 60 Hz generated frames were dropped). Without frame
      *  generation, the system's choice. FSR 3.1 frame generation is not wired on this tree
      *  (shadps4 has no GOW3_FRAME_GEN consumer), so the multiplier is LSFG-only. */
-    /** LSFG 是否**真的**会在本次启动启用——与 run-gow3.sh 的 preflight 用同一套规则：倍率 2-4、
-     *  运行时的 layer（manifest + liblsfg-vk.so）都在、玩家的 Lossless.dll 在两处查找位置之一。
-     *  刷新率必须依此判断，而不是只看 gow3.ini 的 lsfg_multiplier（4.2 复评）。 */
+    /** LSFG 是否**真的**会在本次启动启用——与 run-bionic.sh 的 preflight 同一套规则
+     *  （change fix-framegen-state-reporting）：enabled 且倍率 2-4、vsync=1（FIFO 前提）、
+     *  新引擎 libbloodframe.so 在位、玩家的 Lossless.dll 在查找位置之一。旧 lsfg-vk 层文件
+     *  （arm64/lsfg/...）已随 Bionic 迁移废除，不再检查。刷新率必须依此判断，而不是只看
+     *  gow3.ini 的 framegen_multiplier。 */
     private boolean lsfgLaunchable() {
-        String lsfg=Gow3Settings.read(configIni(), "lsfg_multiplier");
-        if (!"2".equals(lsfg) && !"3".equals(lsfg) && !"4".equals(lsfg)) return false;
-        if (!new File(BASE,"arm64/lsfg/VkLayer_LS_frame_generation.json").isFile()) return false;
-        if (!new File(BASE,"arm64/lsfg/liblsfg-vk.so").isFile()) return false;
+        FrameGenSettings.Config fg=FrameGenSettings.read(configIni());
+        if (!fg.enabled || fg.multiplier<2 || fg.multiplier>4) return false;
+        if (!"1".equals(Gow3Settings.read(configIni(), "vsync"))) return false;
+        if (!new File(BASE,"bionic/lib/libbloodframe.so").isFile()) return false;
         return hasFrameGenDll();
     }
     /** 玩家是否已经导入 Lossless.dll——只是给菜单项/刷新率用的只读闸门，不导入、不删除、
-     *  也不持有 DLL 状态（那些都在 Home 页的 LosslessDllManager 里）。查找顺序与运行时一致：
-     *  游戏目录旁的同名副本优先，其次应用私有的 gow3port 副本（LosslessDllManager.appCopy()
-     *  写入的位置），和 run-gow3.sh 的 preflight 是同一套规则。这里不查第三个位置，因为
-     *  run-gow3.sh 也不查。 */
+     *  也不持有 DLL 状态（那些都在 Home 页的 LosslessDllManager 里）。查找顺序与导入/移除
+     *  流程（LosslessDllManager.resolve()）一致：游戏目录旁的同名副本优先，其次应用私有的
+     *  gow3data 副本（LosslessDllManager.appCopy() 写入的位置）。 */
     private boolean hasFrameGenDll() {
         File parent=gameDir!=null ? new File(gameDir).getParentFile() : null;
         if (parent!=null && new File(parent,"Lossless.dll").isFile()) return true;
         return new File(DATA,"Lossless.dll").isFile();
     }
     private void pickRefreshRate() {
-        String lsfg=Gow3Settings.read(configIni(), "lsfg_multiplier");
+        FrameGenSettings.Config fg=FrameGenSettings.read(configIni());
         boolean lsfgOn=lsfgLaunchable() && !lsfgFallbackOff;
-        int frames=lsfgOn ? Integer.parseInt(lsfg) : 1;
+        int frames=lsfgOn ? fg.multiplier : 1;
         String limit=Gow3Settings.read(configIni(), "fps_limit"); // 同 SettingsDialog.FPS_VALUES / 运行时 FPS_LIMITS
         final float target=frames*("30".equals(limit) || "60".equals(limit) || "120".equals(limit)
             || "240".equals(limit) ? Integer.parseInt(limit) : "0".equals(limit) ? 1000 : 30);
@@ -863,6 +854,9 @@ public final class GameActivity extends Activity {
         new File(BASE,"lsfg-fallback.marker").delete();
         pickRefreshRate();
         new File(BASE,"ime.request").delete(); new File(BASE,"ime.request.result").delete();
+        // 帧生成遥测（framegen.stats）是会话态文件：启动兜底删除，防止上一会话残留被
+        // 性能 HUD 当成实时插帧遥测（显示「LSFG Nx」）；游戏侧 presenter 也会在引擎不活跃时清除。
+        new File(DATA,"framegen.stats").delete();
         if (!prepareBionicGame()) return;
         // 上一轮日志保留一代：写新的 android-game.log 前把旧的轮转为 android-game.prev.log，
         // 使崩溃日志在重启后不丢，并随日志导出一起打包。轮转失败时忽略，照常写新日志。
