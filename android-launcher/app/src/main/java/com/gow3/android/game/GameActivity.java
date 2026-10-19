@@ -80,8 +80,17 @@ public final class GameActivity extends Activity implements SaveDialogHost {
     /** Bionic 下 app 侧 present socket（run-bionic.sh 的 GOW3_PRESENT_SOCKET 同一个）。 */
     private String presentSocket() { return FILES+"/gow3present.sock"; }
     private boolean drawerOpen, displayOnly, startingX, hadError, swipeConsumed;
-    /** gow3.ini 的 display_stretch：开启时 Surface 铺满整屏（画面拉伸，不留 16:9 黑边）。 */
+    /** gow3.ini 的 display_stretch（0 等比适配 / 1 拉伸铺满 / 2 裁切铺满）：非 0 时 Surface 铺满整屏。 */
     private boolean displayStretch;
+    /** 读取显示几何模式：键缺失/空值/非法值一律回落 0（等比适配），与 native 侧兜底一致。 */
+    private int displayMode() {
+        String v = Gow3Settings.read(configIni(), "display_stretch");
+        if (v == null) return 0;
+        int mode;
+        try { mode = Integer.parseInt(v.trim()); }
+        catch (NumberFormatException e) { return 0; }
+        return (mode >= 0 && mode <= 2) ? mode : 0;
+    }
     /** 主页 LAUNCH 传入的单次启动踢动标记：消费一次后即失效（防 Surface 重建静默重启）。 */
     private boolean launchOnReady;
     private float touchX, touchY;
@@ -140,7 +149,8 @@ public final class GameActivity extends Activity implements SaveDialogHost {
     }
     private void fitSurface(int width,int height) {
         if (width<=0 || height<=0) return;
-        // display_stretch=1：跳过 16:9 适配，Surface 铺满整屏（缓冲被拉伸，消除左右黑边）。
+        // display_stretch 模式 1/2（拉伸/裁切铺满）：跳过 16:9 适配，Surface 铺满整屏
+        //（几何由 native 侧 show_frame 按模式处理；0 保持 16:9 居中适配，留黑边）。
         if (displayStretch) {
             FrameLayout.LayoutParams full=(FrameLayout.LayoutParams)surface.getLayoutParams();
             if (full.width==-1 && full.height==-1) return;
@@ -617,8 +627,9 @@ public final class GameActivity extends Activity implements SaveDialogHost {
     private void attach(SurfaceHolder holder, boolean launch) {
         if (destroyed || !holder.getSurface().isValid()) return;
         // Frames reach the Surface through the present socket and Gow3Present (AHardwareBuffer).
-        // display_stretch=1 时把画面拉伸铺满 SurfaceView（配置页显示选项），其余值都按保持宽高比处理。
-        String result=Gow3Present.start(holder, presentSocket(), "1".equals(Gow3Settings.read(configIni(), "display_stretch")));
+        // display_stretch 三档：0=等比适配（黑边），1=拉伸铺满（变形），2=裁切铺满（等比覆盖裁切溢出）。
+        int mode = displayMode();
+        String result = Gow3Present.start(holder, presentSocket(), mode);
         android.util.Log.i("God of War III",result);
         if (!result.startsWith("bridge running:")) { error(result); return; }
         shmid=1; // present 已连接
@@ -870,8 +881,8 @@ public final class GameActivity extends Activity implements SaveDialogHost {
     private void startGame() {
         if (destroyed) return;
         hadError=false;
-        // display_stretch 每次启动从 gow3.ini 读取（launcher 的「拉伸铺满屏幕」开关）。
-        displayStretch="1".equals(Gow3Settings.read(configIni(), "display_stretch"));
+        // 显示几何每次启动从 gow3.ini 读取（launcher 的「画面铺满」三档选项）。
+        displayStretch = displayMode() != 0;
         // 帧生成 FIFO 前提联动（change add-native-frame-generation）：enabled 且 vsync≠1
         // 时写 vsync=1；状态文件由 run-bionic.sh 从 ini 播种（env 传路径）。
         FrameGenSettings.ensureVsyncForFrameGen(configIni());

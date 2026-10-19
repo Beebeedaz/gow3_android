@@ -138,12 +138,13 @@ internal object LaunchParams {
             descriptionRes = R.string.param_desc_sharpness,
         ),
         LaunchParam(
-            // 显示拉伸全屏：应用侧显示桥（GameActivity 启动 Gow3Present 时读取）消费；
-            // 关=保持宽高比居中适配（默认），开=把帧拉伸铺满 SurfaceView。
+            // 显示几何（应用侧显示桥 GameActivity 启动 Gow3Present 时读取）三档：
+            // 0=等比适配（留黑边，默认），1=拉伸铺满（不保持比例），2=裁切铺满（等比覆盖、裁掉溢出）。
             key = "display_stretch", labelRes = R.string.param_display_stretch, category = LaunchCategory.GRAPHICS,
             options = listOf(
-                LaunchOption("0", R.string.param_option_off),
-                LaunchOption("1", R.string.param_option_on),
+                LaunchOption("0", R.string.param_option_display_fit),
+                LaunchOption("1", R.string.param_option_display_stretch),
+                LaunchOption("2", R.string.param_option_display_crop),
             ),
             defaultValue = "0",
             descriptionRes = R.string.param_desc_display_stretch,
