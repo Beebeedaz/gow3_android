@@ -25,11 +25,44 @@ final class PadBridge {
     private int virtualLx=128, virtualLy=128, virtualRx=128, virtualRy=128, virtualL2, virtualR2;
     private boolean virtualLeftActive, virtualRightActive;
     private boolean queued;
+    /** 原生对话框打开期间置 true:key()/virtual()/motion() 只更新内存状态、不写 pad 文件,
+     *  使游戏侧始终读到中性状态;对话框导航由 currentButtons() 读内存完成。 */
+    private boolean dialogActive;
 
     PadBridge(File state, boolean swapFaceButtons) { this.state=state; this.swapFaceButtons=swapFaceButtons; reset(); }
 
     /** 抽屉里即时切换方块/三角互换;下一次按键即生效,无需重建。 */
     void setSwapFaceButtons(boolean on) { swapFaceButtons=on; }
+
+    /** 对话框导航读它而不是文件:它包含物理手柄(keys)与屏幕手柄(virtualKeys)的并集。 */
+    java.util.Set<String> currentButtons() {
+        java.util.Set<String> all=new LinkedHashSet<>(keys); all.addAll(virtualKeys);
+        return all;
+    }
+
+    /** 读当前 pad 文件内容,作为对话框关闭后要恢复的打开前快照。 */
+    String snapshot() {
+        try { return new String(java.nio.file.Files.readAllBytes(state.toPath()),StandardCharsets.US_ASCII); }
+        catch (Exception ex) { return null; }
+    }
+
+    /** 对话框关闭后把快照写回,同时清掉对话框期间的按键(仍按住的那个键不会变成新的按下)。 */
+    void restore(String snapshot) {
+        keys.clear(); lx=ly=rx=ry=128; l2=r2=hatX=hatY=0;
+        virtualKeys.clear(); virtualLx=virtualLy=virtualRx=virtualRy=128;
+        virtualL2=virtualR2=0; virtualLeftActive=virtualRightActive=false;
+        if (snapshot==null) { write(); return; }
+        File temp=new File(state.getPath()+".tmp");
+        try {
+            state.getParentFile().mkdirs();
+            try (FileOutputStream out=new FileOutputStream(temp)) {
+                out.write(snapshot.getBytes(StandardCharsets.US_ASCII));
+            }
+            if (!temp.renameTo(state)) throw new java.io.IOException("Cannot restore controller state");
+        } catch (java.io.IOException ex) { android.util.Log.e("God of War III","Controller bridge restore",ex); }
+    }
+
+    void setDialogActive(boolean on) { dialogActive=on; }
 
     private String name(KeyEvent e) {
         // Thor's Linux scancodes were verified against its printed Nintendo positions.
@@ -71,7 +104,8 @@ final class PadBridge {
         if (e.getAction()==KeyEvent.ACTION_DOWN) keys.add(name);
         else if (e.getAction()==KeyEvent.ACTION_UP) keys.remove(name);
         // Publish button transitions immediately; the runtime samples at 20 ms intervals.
-        write();
+        // 对话框打开期间不写文件(保持对游戏中性),状态只留在内存供对话框导航。
+        if (!dialogActive) write();
         return true;
     }
 
@@ -85,7 +119,7 @@ final class PadBridge {
         r2=trigger(Math.max(e.getAxisValue(MotionEvent.AXIS_RTRIGGER),e.getAxisValue(MotionEvent.AXIS_GAS)));
         hatX=Math.round(e.getAxisValue(MotionEvent.AXIS_HAT_X));
         hatY=Math.round(e.getAxisValue(MotionEvent.AXIS_HAT_Y));
-        if (!queued) { queued=true; handler.postDelayed(() -> { queued=false; write(); },8); }
+        if (!dialogActive && !queued) { queued=true; handler.postDelayed(() -> { queued=false; write(); },8); }
         return true;
     }
 
@@ -98,7 +132,7 @@ final class PadBridge {
         virtualLx=leftX; virtualLy=leftY; virtualRx=rightX; virtualRy=rightY;
         virtualLeftActive=leftActive; virtualRightActive=rightActive;
         virtualL2=leftTrigger; virtualR2=rightTrigger;
-        write();
+        if (!dialogActive) write();
     }
 
     void reset() {
