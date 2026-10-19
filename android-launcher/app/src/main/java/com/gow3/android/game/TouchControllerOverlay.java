@@ -36,10 +36,10 @@ final class TouchControllerOverlay extends View {
     private final SparseArray<PointF> positions=new SparseArray<>();
     private final Set<String> pressed=new LinkedHashSet<>();
     private boolean editing;
-    // Editor: the finger dragging `dragged`, and a second finger pinching it to resize.
-    private int editPointer=-1, pinchPointer=-1;
-    private float pinchDistance, pinchSize;
-    private String dragged;
+    // Editor: the finger dragging `dragged` (moves and selects it), and the bar's −/+ resizing
+    // of `selected`（参考 Bloodborne-Android：按钮步进缩放，不用双指捏合）。
+    private int editPointer=-1;
+    private String dragged, selected;
     private Runnable onEditDone;
 
     /** 布局持久化由 GameActivity 经容器注入（design D4），本控件不自建实例。 */
@@ -54,12 +54,29 @@ final class TouchControllerOverlay extends View {
         setContentDescription("On-screen PlayStation controller");
     }
     private PointF center(String name) { return centers.get(name); }
-    /** A control's size: a factor of its default geometry (Bloodborne-Android 同款边界与语义)。 */
-    private static final float MIN_SIZE=0.6f, MAX_SIZE=2f;
+    /** A control's size: a factor of its default geometry（参考 Bloodborne-Android 同款边界与语义）。 */
+    private static final float MIN_SIZE=0.6f, MAX_SIZE=2f, SIZE_STEP=1.1f;
     private float size(String name) { Float s=sizes.get(name); return s==null ? 1f : s; }
     private static float clampSize(float s) { return Math.max(MIN_SIZE,Math.min(MAX_SIZE,s)); }
     /** The d-pad's size: the mean of its four buttons'. */
     private float dpadSize() { return (size("up")+size("left")+size("right")+size("down"))/4f; }
+    /** 步进缩放选中控件并立即持久化（−/+ 按钮调用）。 */
+    private void resize(String name,float factor) {
+        sizes.put(name,clampSize(size(name)*factor));
+        prefs.setOverlaySize(name,size(name));
+        invalidate();
+    }
+
+    // The editor's bar at the top: RESET (asks first), − (smaller), DONE, + (larger).
+    private static final float BAR_TOP=9, BAR_BOTTOM=62;
+    private static final float[] RESET={358,458}, MINUS={468,538}, DONE={548,732}, PLUS={742,812};
+    private static boolean in(float[] box,float x,float y) { return x>box[0] && x<box[1] && y<BAR_BOTTOM+10; }
+    private void confirmReset() {
+        new android.app.AlertDialog.Builder(getContext()).setTitle("Reset controller layout?")
+            .setMessage("All buttons go back to their default places and sizes.")
+            .setNegativeButton("Cancel",null)
+            .setPositiveButton("Reset",(d,w) -> { resetLayout(); selected=null; invalidate(); }).show();
+    }
     // The 1280x720 layout drawn at one scale in the centred 16:9 area, as the game (MainActivity):
     // round on any screen shape. Controls may be dragged into the bars around it.
     private float scale() { return Math.max(1e-3f,Math.min(getWidth()/1280f,getHeight()/720f)); }
@@ -67,13 +84,6 @@ final class TouchControllerOverlay extends View {
     private float offsetY() { return (getHeight()-720f*scale())/2f; }
     private float layoutX(MotionEvent e,int index) { return (e.getX(index)-offsetX())/scale(); }
     private float layoutY(MotionEvent e,int index) { return (e.getY(index)-offsetY())/scale(); }
-    /** 编辑态两指（拖拽指与捏合指）的当前距离，供捏合缩放计算比例。 */
-    private float pinchDistance(MotionEvent e) {
-        int a=e.findPointerIndex(editPointer),b=e.findPointerIndex(pinchPointer);
-        if (a<0 || b<0) return pinchDistance;
-        float dx=e.getX(a)-e.getX(b),dy=e.getY(a)-e.getY(b);
-        return (float)Math.hypot(dx,dy);
-    }
     private static float distance(float x,float y,PointF p) { return (float)Math.hypot(x-p.x,y-p.y); }
     private static boolean stick(String name) { return name.equals("leftstick") || name.equals("rightstick"); }
     private static boolean rectangle(String name) {
@@ -133,9 +143,9 @@ final class TouchControllerOverlay extends View {
         invalidate();
     }
     void release() { controls.clear(); positions.clear(); publish(); }
-    void edit(Runnable done) { release(); editing=true; pinchPointer=-1; dragged=null; onEditDone=done; invalidate(); }
+    void edit(Runnable done) { release(); editing=true; dragged=null; selected=null; onEditDone=done; invalidate(); }
     private void finishEdit() {
-        editPointer=-1; pinchPointer=-1; dragged=null; editing=false; invalidate();
+        editPointer=-1; dragged=null; selected=null; editing=false; invalidate();
         if (onEditDone!=null) onEditDone.run();
         onEditDone=null;
     }
@@ -151,38 +161,31 @@ final class TouchControllerOverlay extends View {
     @Override public boolean onTouchEvent(MotionEvent e) {
         int action=e.getActionMasked(),at=e.getActionIndex(),id=e.getPointerId(at);
         if (editing) {
-            if (action==MotionEvent.ACTION_CANCEL) { editPointer=-1; pinchPointer=-1; dragged=null; return true; }
+            if (action==MotionEvent.ACTION_CANCEL) { editPointer=-1; dragged=null; return true; }
             if (action==MotionEvent.ACTION_DOWN) {
                 float x=layoutX(e,at),y=layoutY(e,at);
-                if (x>548 && x<732 && y<72) { finishEdit(); return true; }
+                if (in(DONE,x,y)) { finishEdit(); return true; }
+                if (in(RESET,x,y)) { confirmReset(); return true; }
+                if (in(MINUS,x,y) || in(PLUS,x,y)) {
+                    if (selected!=null) resize(selected,in(PLUS,x,y) ? SIZE_STEP : 1f/SIZE_STEP);
+                    return true;
+                }
                 dragged=hit(x,y); editPointer=dragged==null ? -1 : id;
-            } else if (action==MotionEvent.ACTION_POINTER_DOWN && dragged!=null && pinchPointer<0 &&
-                       id!=editPointer) {
-                // 第二根手指按在屏幕任意处即开始捏合缩放被拖住的控件。
-                pinchPointer=id;
-                pinchDistance=pinchDistance(e); pinchSize=size(dragged);
-            } else if (action==MotionEvent.ACTION_POINTER_UP && id==pinchPointer) {
-                pinchPointer=-1;
+                if (dragged!=null) selected=dragged;
+                invalidate();
             } else if (action==MotionEvent.ACTION_MOVE && editPointer>=0 && dragged!=null) {
                 int index=e.findPointerIndex(editPointer);
                 float barX=offsetX()/scale(),barY=offsetY()/scale();
                 if (index>=0) center(dragged).set(
                     Math.max(36-barX,Math.min(1244+barX,layoutX(e,index))),
                     Math.max(36-barY,Math.min(684+barY,layoutY(e,index))));
-                if (pinchPointer>=0) {
-                    int pi=e.findPointerIndex(pinchPointer);
-                    if (index>=0 && pi>=0 && pinchDistance>1f) {
-                        float d=pinchDistance(e);
-                        sizes.put(dragged,clampSize(pinchSize*d/pinchDistance));
-                    }
-                }
                 invalidate();
         } else if ((action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_POINTER_UP)
                    && id==editPointer && dragged!=null) {
             PointF p=center(dragged);
             prefs.setOverlayPosition(dragged,p.x,p.y);
             prefs.setOverlaySize(dragged,size(dragged));
-            editPointer=-1; pinchPointer=-1; dragged=null;
+            editPointer=-1; dragged=null;
         }
             return true;
         }
@@ -271,14 +274,25 @@ final class TouchControllerOverlay extends View {
         drawStick(c,"leftstick"); drawStick(c,"rightstick");
         circle(c,"l3",29,"L3",0xffa0aec0); circle(c,"r3",29,"R3",0xffa0aec0);
         if (editing) {
-            paint.setStyle(Paint.Style.FILL); paint.setColor(0xcc15171d);
-            c.drawRoundRect(548,9,732,62,13,13,paint);
-            paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(2); paint.setColor(0xffc6ad76);
-            c.drawRoundRect(548,9,732,62,13,13,paint);
-            paint.setStyle(Paint.Style.FILL); paint.setTextSize(20);
+            barButton(c,RESET,"RESET",true); barButton(c,MINUS,"−",selected!=null);
+            barButton(c,DONE,"DONE",true); barButton(c,PLUS,"+",selected!=null);
+            paint.setStyle(Paint.Style.FILL); paint.setTextSize(17); paint.setColor(0xffe8dfc9);
             paint.setTextAlign(Paint.Align.CENTER);
-            c.drawText("DONE",640,36-(paint.ascent()+paint.descent())/2,paint);
+            c.drawText(selected==null ? "Drag a button to move and select it" :
+                       "Drag to move · −/+ to resize ("+NAMES.length+" buttons, tap DONE when finished)",
+                       640,BAR_BOTTOM+110,paint);
         }
         c.restore();
+    }
+    /** 编辑条按钮：enabled=false 时描边置灰（−/+ 未选中控件时不可用）。 */
+    private void barButton(Canvas c,float[] box,String label,boolean enabled) {
+        paint.setStyle(Paint.Style.FILL); paint.setColor(0xcc15171d);
+        c.drawRoundRect(box[0],BAR_TOP,box[1],BAR_BOTTOM,13,13,paint);
+        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(2);
+        paint.setColor(enabled ? 0xffc6ad76 : 0x66c6ad76);
+        c.drawRoundRect(box[0],BAR_TOP,box[1],BAR_BOTTOM,13,13,paint);
+        paint.setStyle(Paint.Style.FILL); paint.setTextSize(label.length()>1 ? 20 : 30);
+        paint.setTextAlign(Paint.Align.CENTER);
+        c.drawText(label,(box[0]+box[1])/2,(BAR_TOP+BAR_BOTTOM)/2-(paint.ascent()+paint.descent())/2,paint);
     }
 }

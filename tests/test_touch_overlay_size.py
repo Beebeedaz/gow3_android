@@ -26,7 +26,7 @@ class OverlaySizePrefsContractTest(unittest.TestCase):
 
 
 class OverlaySizeEditingContractTest(unittest.TestCase):
-    """编辑态双指捏合缩放（拖住控件 + 第二指捏合，参考 Bloodborne-Android 实现）。"""
+    """编辑态按钮缩放（参考 Bloodborne-Android：RESET | − | DONE | + 工具条，不用捏合）。"""
 
     def test_sizes_loaded_from_prefs_in_constructor(self):
         source = OVERLAY.read_text()
@@ -34,23 +34,38 @@ class OverlaySizeEditingContractTest(unittest.TestCase):
         self.assertIn("private float size(String name)", source)
         self.assertIn("private static float clampSize(float s)", source)
         self.assertIn("Math.max(MIN_SIZE,Math.min(MAX_SIZE,s))", source)
-        self.assertIn("MIN_SIZE=0.6f, MAX_SIZE=2f;", source)
+        self.assertIn("MIN_SIZE=0.6f, MAX_SIZE=2f, SIZE_STEP=1.1f;", source)
 
-    def test_pinch_lifecycle_and_scaling(self):
+    def test_bar_buttons_layout_and_hit(self):
+        """工具条四按钮与命中：RESET | − | DONE | +，y 边界 BAR_BOTTOM+10。"""
         source = OVERLAY.read_text()
-        # 第二指按下进入捏合；松开捏合指退出；拖拽指松开时持久化尺寸
-        self.assertIn("ACTION_POINTER_DOWN && dragged!=null && pinchPointer<0", source)
-        self.assertIn("pinchDistance=pinchDistance(e); pinchSize=size(dragged);", source)
-        self.assertIn("sizes.put(dragged,clampSize(pinchSize*d/pinchDistance));", source)
-        self.assertIn("ACTION_POINTER_UP && id==pinchPointer", source)
-        self.assertIn("prefs.setOverlaySize(dragged,size(dragged));", source)
-        # 除零防护
-        self.assertIn("pinchDistance>1f", source)
+        self.assertIn('RESET={358,458}, MINUS={468,538}, DONE={548,732}, PLUS={742,812};', source)
+        self.assertIn("x>box[0] && x<box[1] && y<BAR_BOTTOM+10", source)
+        self.assertIn("if (in(DONE,x,y)) { finishEdit(); return true; }", source)
+        self.assertIn("if (in(RESET,x,y)) { confirmReset(); return true; }", source)
+        self.assertIn("resize(selected,in(PLUS,x,y) ? SIZE_STEP : 1f/SIZE_STEP);", source)
 
-    def test_pinch_cleanup_on_finish_cancel_and_reset(self):
+    def test_resize_steps_and_persists_immediately(self):
         source = OVERLAY.read_text()
-        self.assertIn("editPointer=-1; pinchPointer=-1; dragged=null; editing=false;", source)
-        self.assertIn("ACTION_CANCEL) { editPointer=-1; pinchPointer=-1; dragged=null;", source)
+        self.assertIn("private void resize(String name,float factor)", source)
+        self.assertIn("sizes.put(name,clampSize(size(name)*factor));", source)
+        self.assertIn("prefs.setOverlaySize(name,size(name));", source)
+        # 未选中时 −/+ 不动作
+        self.assertIn("if (selected!=null) resize(", source)
+
+    def test_selection_by_tap_and_hint_text(self):
+        source = OVERLAY.read_text()
+        self.assertIn("if (dragged!=null) selected=dragged;", source)
+        self.assertIn("barButton(c,MINUS,\"−\",selected!=null)", source)
+        self.assertIn("barButton(c,PLUS,\"+\",selected!=null)", source)
+        # 无捏合残留
+        self.assertNotIn("pinch", source)
+
+    def test_reset_asks_then_restores(self):
+        source = OVERLAY.read_text()
+        self.assertIn("AlertDialog.Builder(getContext())", source)
+        self.assertIn("setPositiveButton(\"Reset\"",(source))
+        self.assertIn("resetLayout(); selected=null; invalidate();", source)
         self.assertIn("sizes.put(NAMES[i],1f);", source)
 
 
@@ -81,9 +96,9 @@ class OverlayScalingConsistencyContractTest(unittest.TestCase):
         self.assertIn("c.drawCircle(knobX,knobY,28*s,paint);", source)
 
     def test_non_size_behaviors_unchanged(self):
-        """DONE 条命中区、touchpad→touchpad_right 语义不被本变更影响。"""
+        """DONE 命中区改走 in(DONE)；touchpad→touchpad_right 语义不被本变更影响。"""
         source = OVERLAY.read_text()
-        self.assertIn("x>548 && x<732 && y<72", source)
+        self.assertIn("if (in(DONE,x,y)) { finishEdit(); return true; }", source)
         self.assertIn('pressed.add("touchpad_right")', source)
 
 
