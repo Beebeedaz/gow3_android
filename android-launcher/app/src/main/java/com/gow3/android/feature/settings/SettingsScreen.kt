@@ -182,6 +182,10 @@ internal fun SettingsScreen(
                             if (entry.slotId == "language") {
                                 LanguageCard(onChangeLanguage)
                             }
+                            // 按键映射（add-pad-button-mapping）：入口卡，列表在 PadMappingActivity。
+                            if (entry.slotId == "pad_mapping") {
+                                PadMappingCard()
+                            }
                         }
                     }
                 }

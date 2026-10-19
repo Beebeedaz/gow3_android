@@ -148,6 +148,34 @@
     <string name="param_category_graphics">图形</string>
     <string name="param_category_performance">性能</string>
     <string name="param_category_controls">操作</string>
+
+    <!-- 按键映射卡片与页面（add-pad-button-mapping；PS 按钮名符号用 Unicode） -->
+    <string name="pad_mapping_title">按键映射</string>
+    <string name="pad_mapping_desc">自定义物理手柄按键到游戏按钮的绑定，下次进入游戏时生效。</string>
+    <string name="pad_mapping_custom">自定义</string>
+    <string name="pad_mapping_hint_idle">点选一个游戏按钮，再按下手柄按键或扳机完成绑定。点此可取消。</string>
+    <string name="pad_mapping_hint_capture">按下手柄按键或扳机…点此取消</string>
+    <string name="pad_mapping_restore">恢复默认</string>
+    <string name="pad_mapping_done">完成</string>
+    <string name="pad_mapping_restored">按键映射已恢复默认</string>
+    <string name="pad_mapping_default_fmt">默认：%1$s</string>
+    <string name="pad_mapping_unbound">未绑定</string>
+    <string name="pad_button_cross">✕ 叉</string>
+    <string name="pad_button_circle">○ 圈</string>
+    <string name="pad_button_square">□ 方块</string>
+    <string name="pad_button_triangle">△ 三角</string>
+    <string name="pad_button_l1">L1</string>
+    <string name="pad_button_r1">R1</string>
+    <string name="pad_button_l2">L2</string>
+    <string name="pad_button_r2">R2</string>
+    <string name="pad_button_l3">L3</string>
+    <string name="pad_button_r3">R3</string>
+    <string name="pad_button_options">OPTIONS</string>
+    <string name="pad_button_touchpad">触摸板</string>
+    <string name="pad_button_up">十字键 上</string>
+    <string name="pad_button_down">十字键 下</string>
+    <string name="pad_button_left">十字键 左</string>
+    <string name="pad_button_right">十字键 右</string>
     <string name="param_category_audio">音频</string>
     <string name="param_category_driver">驱动</string>
 
