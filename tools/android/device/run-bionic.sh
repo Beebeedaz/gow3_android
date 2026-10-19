@@ -63,14 +63,12 @@ export GOW3_ANDROID_INPUT=1
 export GOW3_PAD_FILE="$base/android-pad.state" GOW3_PAD_QUIET=1
 export GOW3_IME_FILE="$base/ime.request"
 # 渲染尺寸由 gow3.ini 的 render_resolution（分辨率补丁，准备阶段打进 eboot）决定；
-# 这里只定输出：output_res（1920x1080、1280x720 或 854x480；缺省 720p）是超分输出与
-# UI 的最终尺寸，超分 provider 把补丁后的场景升到它。
-upscaler=$(setting upscaler); output=$(setting output_res)
-# Android 只提供 off / gsr2 / fsr3；缺省（含空值）一律 off，其余值如实置 off 并说明。
-case $upscaler in gsr2|fsr3) ;; ""|off) upscaler=off ;; *)
-    echo "Upscaler '$upscaler' is not available on Android: off" >&2
-    upscaler=off ;;
-esac
+# 输出 output_res（1920x1080、1280x720 或 854x480；缺省 720p）是 UI/呈现的最终尺寸。
+output=$(setting output_res)
+# 超分硬关闭（change replace-android-fsr3-with-gsr2 收尾决定）：时间域路径在 Android 尚未
+# 接通（UI 合成钩子未验证），ini 的 upscaler 取值一律忽略。ini 默认与一次性迁移均为 off，
+# 这里的硬关闭保证任何来源的取值都不会启用超分。接通后恢复白名单透传 off|gsr2|fsr3。
+upscaler=off
 case $output in 1920x1080|1280x720|854x480) ;; *) output=1280x720 ;; esac
 export GOW3_FULLSCREEN=1 GOW3_UPSCALER=$upscaler
 # GOW3_RENDER_RES 必须描述【真实补丁场景尺寸】（render_resolution 分辨率补丁打进 eboot 的

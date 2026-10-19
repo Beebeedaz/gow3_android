@@ -1039,8 +1039,11 @@ void Presenter::WriteLsfgStats() {
         std::fclose(f);
         std::rename(tmp.c_str(), path.c_str());
         lsfg_stats_active = true;
-    } else if (lsfg_stats_active) {
-        // 关闭/引擎失败：清零一次，HUD 回单一帧率（spec 语义）。
+        lsfg_stats_cleared = false; // 引擎激活：下次关闭需再清一次
+    } else if (!lsfg_stats_cleared) {
+        // 关闭/引擎失败/从未激活：清零一次，HUD 回单一帧率（spec 语义）。不依赖本会话
+        // 是否曾激活——上一会话残留的 framegen.stats（倍率≥2）也必须在此被清掉，
+        // 否则 HUD 会把它当成实时插帧遥测显示「LSFG Nx」。
         std::string path = state_path;
         path = path.substr(0, path.rfind('/') + 1) + "framegen.stats";
         std::string tmp = path + ".tmp";
@@ -1050,6 +1053,7 @@ void Presenter::WriteLsfgStats() {
         std::fclose(f);
         std::rename(tmp.c_str(), path.c_str());
         lsfg_stats_active = false;
+        lsfg_stats_cleared = true; // 本会话只清一次：之后每帧只有布尔判断，无 I/O
     }
 }
 

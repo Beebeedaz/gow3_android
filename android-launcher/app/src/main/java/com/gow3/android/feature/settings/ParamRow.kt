@@ -80,7 +80,9 @@ internal fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (St
                 colors = SwitchDefaults.colors(checkedTrackColor = LauncherColors.crimson, checkedThumbColor = LauncherColors.gold),
             )
         } else {
-            var expanded by remember(param.options, param.enabled) { mutableStateOf(false) }
+            // 生效档位：fps_limit 受当前 engine_fps 约束（上限不超过引擎帧率，0=不限除外）。
+            val options = LaunchParams.effectiveOptions(param, values)
+            var expanded by remember(options, param.enabled) { mutableStateOf(false) }
             Box {
                 Text(
                     selectedLabel(context, values, param) + "  ▾",
@@ -95,7 +97,7 @@ internal fun ParamRow(param: LaunchParam, values: Map<String, String>, save: (St
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 )
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    param.options.forEach { option ->
+                    options.forEach { option ->
                         DropdownMenuItem(
                             text = { Text(context.getString(option.labelRes)) },
                             onClick = {
