@@ -64,7 +64,7 @@ public final class GameActivity extends Activity implements SaveDialogHost {
     private LinearLayout drawerItems;
     private TextView status;
     private View resume;
-    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem, swapFaceItem, perfHudItem;
+    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem, perfHudItem;
     private TouchControllerOverlay controllerOverlay;
     private PerfHudOverlay perfHud;
     private PadBridge pad;
@@ -120,8 +120,9 @@ public final class GameActivity extends Activity implements SaveDialogHost {
         // Activity 重建（旋转/翻盖）存活——重建后 surfaceCreated 不得静默重启游戏。
         launchOnReady=!displayOnly && "launch".equals(getIntent().getStringExtra("action"));
         if (launchOnReady) getIntent().removeExtra("action");
+        // 按键映射在构造时读入(add-pad-button-mapping):会话内不热更,下次启动生效。
         pad=new PadBridge(new File(BASE,"android-pad.state"),
-            prefs.swapSquareTriangle());
+            prefs.padMapping());
         saveDialog=new SaveDialogBridge(this,new File(BASE));
         // 震动回程轮询：游戏进程写 android-pad.rumble（runtime_pad.c rumble_report），
         // PadBridge 触发 InputDevice 振动；onPause 暂停，onResume 恢复。
@@ -314,14 +315,8 @@ public final class GameActivity extends Activity implements SaveDialogHost {
             controllerOverlay.release();
             closeDrawer();
         });
-        // 部分物理手柄按印刷标签上报 X/Y 轴,方块/三角与常见手柄相反;这一行即时切换交换,
-        // 只影响物理手柄,不影响触屏虚拟按键。
-        swapFaceItem=menuItem("ic_gamepad","Swap Square/Triangle (some gamepads)","",() -> {
-            boolean on=!swapFaceEnabled();
-            prefs.setSwapSquareTriangle(on);
-            if (pad!=null) pad.setSwapFaceButtons(on);
-            closeDrawer();
-        });
+        // 「Swap Square/Triangle」行已删除(add-pad-button-mapping):该特例开关被完整的
+        // 按键映射取代,需要修正印刷标签的玩家在设置 → 操作里自行绑定方块/三角。
         menuItem("ic_edit","Edit controller layout","Drag and resize the buttons",() -> {
             prefs.setControllerOverlayEnabled(true);
             closeDrawer();
@@ -441,7 +436,6 @@ public final class GameActivity extends Activity implements SaveDialogHost {
             : fg.enabled ? fg.multiplier+"× frames · flow "
             +String.valueOf(fg.flowScale) : "Off");
         setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
-        setDetail(swapFaceItem,swapFaceEnabled() ? "On" : "Off");
         setDetail(perfHudItem,perfHudEnabled() ? "On" : "Off");
     }
 
@@ -544,9 +538,6 @@ public final class GameActivity extends Activity implements SaveDialogHost {
     }
     private boolean controllerEnabled() {
         return prefs.controllerOverlayEnabled();
-    }
-    private boolean swapFaceEnabled() {
-        return prefs.swapSquareTriangle();
     }
     private boolean perfHudEnabled() {
         return prefs.perfHudEnabled();

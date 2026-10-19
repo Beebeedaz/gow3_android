@@ -29,7 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +41,7 @@ import com.gow3.android.data.model.GameIdentityState
 import com.gow3.android.data.model.LaunchParams
 import com.gow3.android.data.model.MobilePreset
 import com.gow3.android.data.model.MobilePresets
+import com.gow3.android.feature.settings.ParamInfoDialog
 import com.gow3.android.ui.components.LauncherColors
 import com.gow3.android.ui.components.SectionLabel
 
@@ -71,7 +71,10 @@ internal fun PresetSegmented(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
                         .background(LauncherColors.navSurface)
-                        .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)), RoundedCornerShape(10.dp)),
+                        .border(
+                            BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)),
+                            RoundedCornerShape(10.dp)
+                        ),
                 ) {
                     presets.forEachIndexed { index, preset ->
                         val active = preset == selected
@@ -104,7 +107,9 @@ internal fun PresetSegmented(
                         selected != null -> stringResource(selected.labelRes)
                         else -> stringResource(R.string.preset_caption_custom)
                     },
-                    color = if (selected != null) LauncherColors.textMuted else LauncherColors.gold.copy(alpha = 0.8f),
+                    color = if (selected != null) LauncherColors.textMuted else LauncherColors.gold.copy(
+                        alpha = 0.8f
+                    ),
                     fontSize = 11.sp,
                     lineHeight = 16.sp,
                 )
@@ -122,7 +127,10 @@ private fun DisabledBar(text: String) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(LauncherColors.navSurface)
-            .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.2f)), RoundedCornerShape(8.dp))
+            .border(
+                BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.2f)),
+                RoundedCornerShape(8.dp)
+            )
             .padding(horizontal = 12.dp, vertical = 12.dp),
     )
 }
@@ -156,16 +164,22 @@ internal fun DriverSelector(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
                 .background(LauncherColors.navSurface)
-                .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)), RoundedCornerShape(8.dp))
+                .border(
+                    BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)),
+                    RoundedCornerShape(8.dp)
+                )
                 .clickable(enabled = enabled) { sheetOpen = true }
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val current = selectedEntry?.let { it.name + if (it.version.isBlank()) "" else "  ·  ${it.version}" }
-                ?: stringResource(R.string.driver_card_system)
-            Text(current, modifier = Modifier.weight(1f),
+            val current =
+                selectedEntry?.let { it.name + if (it.version.isBlank()) "" else "  ·  ${it.version}" }
+                    ?: stringResource(R.string.driver_card_system)
+            Text(
+                current, modifier = Modifier.weight(1f),
                 color = if (enabled) LauncherColors.textPrimary else LauncherColors.textMuted,
-                fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+            )
             Text("▾", color = LauncherColors.textMuted)
         }
         Text(
@@ -180,7 +194,9 @@ internal fun DriverSelector(
             containerColor = LauncherColors.surface,
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 SectionLabel(stringResource(R.string.driver_sheet_title))
@@ -254,7 +270,12 @@ private fun DriverOption(title: String, meta: String?, selected: Boolean, onPick
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = LauncherColors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                title,
+                color = LauncherColors.textPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
+            )
             if (meta != null) {
                 Text(meta, color = LauncherColors.textMuted, fontSize = 11.sp, lineHeight = 15.sp)
             }
@@ -272,40 +293,68 @@ private fun DriverOption(title: String, meta: String?, selected: Boolean, onPick
  */
 @Composable
 internal fun FpsLimitRow(ini: Map<String, String>, save: (String) -> Unit) {
-    val context = LocalContext.current
     val param = LaunchParams.all.first { it.key == "fps_limit" }
     val options = LaunchParams.effectiveOptions(param, ini)
     var expanded by remember { mutableStateOf(false) }
+    var showInfo by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionLabel(stringResource(R.string.param_fps_limit))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            SectionLabel(stringResource(R.string.param_fps_limit))
+            Text(
+                "ⓘ",
+                color = LauncherColors.gold,
+                fontSize = 13.sp,
+                lineHeight = 13.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable { showInfo = true }
+                    .padding(2.dp),
+            )
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
                 .background(LauncherColors.navSurface)
-                .border(BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)), RoundedCornerShape(8.dp))
+                .border(
+                    BorderStroke(1.dp, LauncherColors.gold.copy(alpha = 0.35f)),
+                    RoundedCornerShape(8.dp)
+                )
                 .clickable { expanded = true }
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val current = LaunchParams.selectedOption(ini, param)
             Text(
-                current?.let { context.getString(it.labelRes) } ?: LaunchParams.valueOf(ini, param),
+                current?.let { stringResource(it.labelRes) } ?: LaunchParams.valueOf(ini, param),
                 modifier = Modifier.weight(1f),
-                color = LauncherColors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                color = LauncherColors.textPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
             )
             Text("▾", color = LauncherColors.textMuted)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { option ->
                 DropdownMenuItem(
-                    text = { Text(context.getString(option.labelRes)) },
+                    text = { Text(stringResource(option.labelRes)) },
                     onClick = {
                         expanded = false
                         save(option.value)
                     },
                 )
             }
+        }
+
+        if (showInfo) {
+            ParamInfoDialog(
+                title = stringResource(R.string.param_fps_limit),
+                message = stringResource(R.string.param_desc_fps_limit),
+                onDismiss = { showInfo = false },
+            )
         }
     }
 }

@@ -93,6 +93,7 @@
     <string name="param_desc_upscaler">Reconstructs the image with the selected temporal upscaler (Snapdragon GSR 2 by default, designed for Adreno GPUs; FSR 3.1 kept as an option). The game resolution is controlled separately by the resolution setting; turning the upscaler off does not disable the resolution patch.</string>
     <string name="param_desc_render_patch">Changes the game resolution through a patch; tiers are shown by their actual pixel size. Available options follow the selected game and version and stay in sync with Patches. Native disables the resolution patch. Takes effect on the next launch.</string>
     <string name="param_desc_engine_fps">60 is the game\'s original engine frame rate. Higher values require a matching game patch and only appear when available. This setting stays in sync with Patches and takes effect on the next launch.</string>
+    <string name="param_desc_fps_limit">The maximum frame rate is limited by this setting, device performance, and the engine frame rate.</string>
     <string name="home_patch_identity">Patch options for %1$s · %2$s · More switches in Patches</string>
     <string name="home_patch_unavailable">No matching patch catalog. Check the game and update folders to enable resolution and engine frame rate settings. See Patches for details.</string>
     <string name="home_patch_unavailable_value">%1$s (unavailable for this version)</string>
@@ -169,6 +170,34 @@
     <string name="param_category_graphics">GRAPHICS</string>
     <string name="param_category_performance">PERFORMANCE</string>
     <string name="param_category_controls">CONTROLS</string>
+
+    <!-- 按键映射卡片与页面（add-pad-button-mapping；PS 按钮名符号用 Unicode） -->
+    <string name="pad_mapping_title">Button Mapping</string>
+    <string name="pad_mapping_desc">Remap the physical gamepad buttons to game buttons. Bindings apply when the next game session starts.</string>
+    <string name="pad_mapping_custom">CUSTOMIZE</string>
+    <string name="pad_mapping_hint_idle">Tap a game button, then press a pad button or trigger to bind. Tap here to cancel.</string>
+    <string name="pad_mapping_hint_capture">Press a pad button or trigger… tap here to cancel</string>
+    <string name="pad_mapping_restore">Restore defaults</string>
+    <string name="pad_mapping_done">Done</string>
+    <string name="pad_mapping_restored">Button mapping restored to defaults</string>
+    <string name="pad_mapping_default_fmt">Default: %1$s</string>
+    <string name="pad_mapping_unbound">Unbound</string>
+    <string name="pad_button_cross">✕ Cross</string>
+    <string name="pad_button_circle">○ Circle</string>
+    <string name="pad_button_square">□ Square</string>
+    <string name="pad_button_triangle">△ Triangle</string>
+    <string name="pad_button_l1">L1</string>
+    <string name="pad_button_r1">R1</string>
+    <string name="pad_button_l2">L2</string>
+    <string name="pad_button_r2">R2</string>
+    <string name="pad_button_l3">L3</string>
+    <string name="pad_button_r3">R3</string>
+    <string name="pad_button_options">OPTIONS</string>
+    <string name="pad_button_touchpad">Touchpad</string>
+    <string name="pad_button_up">D-Pad Up</string>
+    <string name="pad_button_down">D-Pad Down</string>
+    <string name="pad_button_left">D-Pad Left</string>
+    <string name="pad_button_right">D-Pad Right</string>
     <string name="param_category_audio">AUDIO</string>
     <string name="param_category_driver">DRIVER</string>
 
