@@ -1,7 +1,6 @@
 # Changelog
 
-Linux support on top of the upstream Windows-focused port. See `docs/LINUX.md` for the details
-and the commits for the exact changes.
+Linux support on top of the upstream Windows-focused port.
 
 ## Android
 

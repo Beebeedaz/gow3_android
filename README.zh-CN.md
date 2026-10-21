@@ -13,10 +13,9 @@
 </p>
 
 <p align="center">
-  <a href="docs/QUICKSTART.md">快速开始</a> ·
+  <a href="#快速开始">快速开始</a> ·
   <a href="#系统要求">系统要求</a> ·
-  <a href="#工作原理">工作原理</a> ·
-  <a href="docs/gow3/ROADMAP.md">路线图</a>
+  <a href="#工作原理">工作原理</a>
 </p>
 
 <p align="center">
@@ -76,8 +75,9 @@ fork 自 [R-V-L 移植版](https://github.com/R-V-L/gow3_pc)，后者基于
 
 ## 快速开始
 
-从拿到项目到跑起 debug 的完整教程（Android 移植，macOS Apple Silicon 主机）见
-**[docs/QUICKSTART.md](docs/QUICKSTART.md)**。
+构建入口是 `tools/android/build_bionic_deps.sh`（第三方依赖）与
+`tools/android/build_bionic.sh`（Bionic runtime）；debug APK 由
+`cd android-launcher && ./gradlew :app:assembleDebug` 产出。
 
 ## 性能表现
 
@@ -100,7 +100,7 @@ Android 端仍在真机验证中，暂无稳定的性能数据。
   下载包中不包含任何游戏文件。
 
 构建 Android 端需要一台宿主机（当前流程基于 macOS Apple Silicon），依赖与步骤见
-[docs/QUICKSTART.md](docs/QUICKSTART.md)。
+`tools/android/build_bionic_deps.sh` 与 `tools/android/build_bionic.sh`。
 
 ## 工作原理
 
@@ -114,16 +114,14 @@ Android 端仍在真机验证中，暂无稳定的性能数据。
 | 补丁 | `patches/God_of_War_III_Remastered.xml`、`scripts/patches.py` | 启动时在内存中应用，不修改游戏文件 |
 | 启动 | `android-launcher/` | Android 端由 launcher 准备镜像、启动 `gow3-probe` |
 
-更多文档：[模组](docs/MODS.md)、[帧图与放大器](docs/upscaler.md)、[GPU 并行工作](docs/parallel_gpu.md)
-与[路线图](docs/gow3/ROADMAP.md)。
+更多文档：[帧图与放大器](docs/upscaler.md)与[GPU 并行工作](docs/parallel_gpu.md)。
 
 ## 赞助
 
-如果你喜欢这个项目，欢迎通过 [Ko-fi](https://ko-fi.com/zfitness) 赞助支持我，或用支付宝扫码收款：
+如果你喜欢这个项目，欢迎通过 [Ko-fi](https://ko-fi.com/zfitness) 赞助支持我：
 
 <p align="center">
   <a href="https://ko-fi.com/zfitness"><img src="https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=kofi&logoColor=white" alt="在 Ko-fi 上支持我" /></a>
-  <img src="Downloads/收款.jpg" alt="支付宝收款码" width="200" />
 </p>
 
 感谢每一位赞助者的支持！

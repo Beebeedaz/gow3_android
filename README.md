@@ -13,10 +13,9 @@
 </p>
 
 <p align="center">
-  <a href="docs/QUICKSTART.md">Quickstart</a> ·
+  <a href="#quickstart">Quickstart</a> ·
   <a href="#system-requirements">System requirements</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="docs/gow3/ROADMAP.md">Roadmap</a>
+  <a href="#how-it-works">How it works</a>
 </p>
 
 <p align="center">
@@ -96,8 +95,9 @@ The project also uses parts of the Android / FEX-related implementation from
 
 ## Quickstart
 
-The full tutorial from getting the project to running debug (Android port, macOS Apple Silicon
-host) is in **[docs/QUICKSTART.md](docs/QUICKSTART.md)**.
+The build entry points are `tools/android/build_bionic_deps.sh` (third-party dependencies) and
+`tools/android/build_bionic.sh` (Bionic runtime); the debug APK is produced by
+`cd android-launcher && ./gradlew :app:assembleDebug`.
 
 ## Performance
 
@@ -123,7 +123,8 @@ available yet.
   `eboot.bin`, `sce_module`, and `sce_sys`). No game files are included in the downloads.
 
 Building the Android side requires a host machine (the current flow is based on macOS Apple
-Silicon); dependencies and steps are in [docs/QUICKSTART.md](docs/QUICKSTART.md).
+Silicon); dependencies and steps are in `tools/android/build_bionic_deps.sh` and
+`tools/android/build_bionic.sh`.
 
 ## How it works
 
@@ -137,17 +138,15 @@ Silicon); dependencies and steps are in [docs/QUICKSTART.md](docs/QUICKSTART.md)
 | Patches | `patches/God_of_War_III_Remastered.xml`, `scripts/patches.py` | Applied in memory at startup; game files are never modified |
 | Launch | `android-launcher/` | The Android launcher prepares the image and starts `gow3-probe` |
 
-More docs: [Mods](docs/MODS.md), [Upscaler & frame generation](docs/upscaler.md),
-[Parallel GPU work](docs/parallel_gpu.md), and the [Roadmap](docs/gow3/ROADMAP.md).
+More docs: [Upscaler & frame generation](docs/upscaler.md) and
+[Parallel GPU work](docs/parallel_gpu.md).
 
 ## Sponsors
 
-If you like this project, you can support me on [Ko-fi](https://ko-fi.com/zfitness), or send an
-Alipay payment by scanning the QR code:
+If you like this project, you can support me on [Ko-fi](https://ko-fi.com/zfitness):
 
 <p align="center">
   <a href="https://ko-fi.com/zfitness"><img src="https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=kofi&logoColor=white" alt="Support on Ko-fi" /></a>
-  <img src="Downloads/收款.jpg" alt="Alipay payment QR code" width="200" />
 </p>
 
 Thank you to everyone who supports this project!

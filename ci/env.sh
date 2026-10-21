@@ -4,7 +4,7 @@
 #
 # CI uses it too. The compilers are the conda-forge ones (the binaries are prefixed, so CC/CXX
 # are set explicitly). GOW3_LTO=OFF: conda-forge GCC 16's LTO miscompiles
-# Vulkan::Instance::CreateDevice() (see docs/LINUX.md).
+# Vulkan::Instance::CreateDevice().
 prefix="${CONDA_PREFIX:-$PWD/.deps/env}"
 export PATH="$prefix/bin:$PATH"
 export CC="$prefix/bin/x86_64-conda-linux-gnu-gcc"
