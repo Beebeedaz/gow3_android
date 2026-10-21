@@ -224,9 +224,18 @@ jobs:
       - name: Build and sign the release APK
         run: |
           bash tools/android/apk/build_release_apk.sh
-          apk=out/release/*.apk
-          test -e $apk || { echo 'No APK was produced' >&2; exit 1; }
-          sha256sum $apk > "$apk.sha256"
+          # APK 文件名含空格（"God of War III-bionic-<ver>.apk"），必须用 nullglob + 数组取产物：
+          #   - 把 glob 存进变量再未加引号展开会按空格分词，判断与求值都失真；
+          #   - 重定向目标加引号则不展开 glob，会生成一个名叫 "*.apk.sha256" 的字面量文件，
+          #     upload-artifact 打包时它在 zip 内的路径含 '*'，会被 artifact 路径校验拒绝。
+          shopt -s nullglob
+          apks=(out/release/*.apk)
+          if (( ${#apks[@]} != 1 )); then
+            echo "expected exactly one APK in out/release, got ${#apks[@]}" >&2
+            exit 1
+          fi
+          apk=${apks[0]}
+          sha256sum "$apk" > "$apk.sha256"
           echo "APK=$apk" >> "$GITHUB_ENV"
           echo "APK_SHA256=$(cut -d' ' -f1 "$apk.sha256")" >> "$GITHUB_ENV"
 
