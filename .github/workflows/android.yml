@@ -136,11 +136,15 @@ jobs:
         shell: bash -el {0}
         run: |
           set -euo pipefail
+          # build_bionic.sh 期望的布局：robin-map / VMA 在 share/cmake，Boost 在 lib/cmake。
+          share_dir="$CONDA_PREFIX/share/cmake"
           cmake_dir="$CONDA_PREFIX/lib/cmake"
-          echo "== Host CMake packages in $cmake_dir =="
+          echo "== $cmake_dir =="
           ls -1 "$cmake_dir"
-          [[ -d "$cmake_dir/tsl-robin-map" ]] || {
-            echo "ERROR: tsl-robin-map not found; run ci/setup-deps.sh" >&2
+          echo "== $share_dir (tsl-robin-map / VulkanMemoryAllocator) =="
+          ls -1 "$share_dir" 2>/dev/null || true
+          [[ -d "$share_dir/tsl-robin-map" ]] || {
+            echo "ERROR: tsl-robin-map not found in $share_dir; run ci/setup-deps.sh" >&2
             exit 1
           }
           boost_dir=$(compgen -G "$cmake_dir/Boost-*/BoostConfig.cmake" | head -1 | xargs dirname || true)
