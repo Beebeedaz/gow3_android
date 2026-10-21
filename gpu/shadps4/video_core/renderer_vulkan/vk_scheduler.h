@@ -25,6 +25,8 @@
 #include "video_core/amdgpu/regs_color.h"
 #include "video_core/amdgpu/regs_primitive.h"
 #include "video_core/renderer_vulkan/vk_breadcrumbs.h"
+#include "video_core/renderer_vulkan/vk_recording_observer.h"
+#include "video_core/renderer_vulkan/vk_render_pass_pairing.h"
 #include "video_core/renderer_vulkan/vk_resource_pool.h"
 #include "video_core/renderer_vulkan/vk_semaphore.h"
 
@@ -735,6 +737,12 @@ public:
     /// KickRecording() or submission.
     [[gnu::noinline]] vk::CommandBuffer CommandBuffer() {
         if (recording_threaded && !direct_mode) {
+            // 进 direct 前收口：Begin 已入队（或已执行）而 End 尚未入队的窗口里，并发提交换
+            // 代会让 End 落进下一代（跨代错位）。这里先收口并把续接标记给下一个 BeginRendering。
+            if (is_rendering) {
+                EndRendering();
+                resume_rendering = true;
+            }
             SyncRecording();
             direct_mode = true;
             direct_recordings.fetch_add(1, std::memory_order_relaxed);
@@ -750,6 +758,7 @@ public:
     /// everything it uses (capture by value): it may run later on the recording thread.
     template <typename Func>
     void Record(Func&& func) {
+        const auto producer = ObserveProducer("Record");
         if (!recording_threaded || direct_mode) {
             func(current_cmdbuf);
             return;
@@ -961,6 +970,15 @@ private:
     std::jthread priority_pending_ops_thread;
     RenderState render_state;
     bool is_rendering = false;
+    // gow3: 切流收口后由下一个 BeginRendering 用 LOAD 续接附件（对齐 Bloodborne resume_rendering）。
+    // 只由录制侧单线程读写；换代（SubmitExecution 持 submit_mutex）与 direct 切换在同一线程完成。
+    bool resume_rendering = false;
+    // gow3: 配对护栏：按 command buffer 代计数的渲染深度（生产路径复用 vk_render_pass_pairing.h，
+    // 宿主行为测试用同一实现）。BeginRendering 递增、EndRendering 递减，换代（AllocateWorkerCommandBuffers）
+    // 重置为 0。EndRendering 在深度为 0 时说明记录侧没有对应 Begin（跨代错位），此时告警并跳过该命令，
+    // 不让驱动解引用空 subpass。深度只统计"确实会录制的 Begin"，同 state 续接不重复递增；护栏在并发下
+    // 是保守下界，只拦确定非法的 End，不误伤合法配对。
+    RenderPassPairing render_pass_pairing;
     // gow3: threaded recording
     std::unique_ptr<RecordChunk> record_chunk;
     std::vector<std::unique_ptr<RecordChunk>> full_chunks;
