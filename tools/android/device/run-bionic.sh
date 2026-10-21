@@ -86,13 +86,28 @@ case $(setting render_resolution) in
     900p) render_res=1600x900 ;; 1080p) render_res=1920x1080 ;; 1440p) render_res=2560x1440 ;;
     1800p) render_res=3200x1800 ;; 4K) render_res=3840x2160 ;;
 esac
+# 有效上屏面（GOW3_SCREEN_W/H 与 GOW3_OUTPUT_RES）：超分开启且 output_res 两方向都不小于
+# 场景尺寸时取 output_res（超分放大输出），否则回落场景尺寸 1:1。上屏面不得小于场景——
+# 「场景 > 上屏面」的降采样/重定向合成路径在 Android 未验证（1080p 黑屏，
+# change android-present-surface-follows-render-resolution）。
+ge_size() { # $1=a $2=b；a 的宽高都不小于 b 时返回 0
+    [ "${1%x*}" -ge "${2%x*}" ] && [ "${1#*x}" -ge "${2#*x}" ]
+}
+screen=$render_res
+case $upscaler in
+    gsr2|fsr3)
+        if ge_size "$output" "$render_res"; then
+            case $output in 1920x1080|1280x720|854x480) screen=$output ;; esac
+        fi
+        ;;
+esac
 # 运行期调试通道：`preset [output [upscaler]]` 每秒轮询热切换（OnFrameStart 消费）；
 # 开关位掩码 250ms 轮询热生效（位含义见 gpu/shim/gow3_toggles.h）。
 # 都放 GOW3_DATA_DIR（gow3data，玩家数据目录）：runtime 升级重展开 gow3port 不会清掉。
 export GOW3_PRESET_FILE="$data_root/gow3.preset"
 export GOW3_TOGGLE_FILE="$data_root/gow3.toggles"
-export GOW3_WINDOW_SIZE=$output
-export GOW3_OUTPUT_RES=$output GOW3_LIVE_RES=0
+export GOW3_WINDOW_SIZE=$screen
+export GOW3_OUTPUT_RES=$screen GOW3_LIVE_RES=0
 # scaled_session 标记 + camera 常量就绪前的场景尺寸回退（真实值见上方 render_res 映射）。
 # 桌面 live 路径在 Android 不可达（本脚本恒导出 GOW3_RENDER_RES）。
 export GOW3_RENDER_RES=$render_res
@@ -178,7 +193,7 @@ else
     exit 12
 fi
 export GOW3_PRESENT_SOCKET="$files/gow3present.sock"
-export GOW3_SCREEN_W="${GOW3_SCREEN_W:-1280}" GOW3_SCREEN_H="${GOW3_SCREEN_H:-720}"
+export GOW3_SCREEN_W="${GOW3_SCREEN_W:-${screen%x*}}" GOW3_SCREEN_H="${GOW3_SCREEN_H:-${screen#*x}}"
 # libgow3gpu：驱动拒绝的 pipeline 的 SPIR-V 写在这里（vk_shader_util.cpp）。
 export GOW3_FAILED_SHADER_DIR="$GOW3_LOG_DIR/failed-shaders"
 cp "$base/fex-compatible.json" "$HOME/.fex-emu/Config.json"
