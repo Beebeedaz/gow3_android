@@ -31,21 +31,19 @@ inputs=(
     "$out/lib/libgow3gpu.so"
     "$out/lib/libbloodframe.so"
     "$out/lib/libc++_shared.so"
+    # libSDL3.so 是 Android 必需项：游戏进程用 SDL 音频子系统（disk 驱动）把 PCM 写进
+    # app 的 FIFO（run-bionic.sh 设 SDL_AUDIO_DRIVER=disk，AudioBridge.java 消费）。
+    # 缺了它构建期就该失败——否则设备上 gow3-probe 会因找不到 libSDL3.so 而加载失败。
+    "$out/lib/libSDL3.so"
     tools/android/device/run-bionic.sh
     tools/android/config/gow3-fex-compatible.json
     tools/android/config/gow3-default.ini
     tools/android/config/gow3-gamecontrollerdb.txt
     tools/android/runtime/runtime-manifest.bionic.json
 )
-# 可选输入：libSDL3.so 只有在 probe 真的链接 SDL3 时才存在（runtime_pad.c 的 SDL gamepad
-# 路径；Android 上该路径被 GOW3_ANDROID_INPUT=1 在运行时关闭）。缺失不算失败，存在则进
-# payload 并参与指纹。
-optional_inputs=(
-    "$out/lib/libSDL3.so"
-)
 fingerprint() {
     local f
-    for f in "${inputs[@]}" "${optional_inputs[@]}"; do
+    for f in "${inputs[@]}"; do
         if [[ -f $f ]]; then
             printf '%s  %s\n' "$(shasum -a 256 "$f" | awk '{print $1}')" "$f"
         else
@@ -73,10 +71,7 @@ if [[ $stale == 1 ]]; then
     mkdir -p "$staging/bionic/bin" "$staging/bionic/lib" "$staging/home/gow3port" "$bionic_tree/home/gow3port"
     cp -f "$out/bin/gow3-probe" "$out/bin/kgsl-chip-id" "$staging/bionic/bin/"
     cp -f "$out/lib/libgow3cpu.so" "$out/lib/libgow3gpu.so" "$out/lib/libbloodframe.so" \
-          "$out/lib/libc++_shared.so" "$staging/bionic/lib/"
-    for f in "${optional_inputs[@]}"; do
-        [[ -f $f ]] && cp -f "$f" "$staging/bionic/lib/"
-    done
+          "$out/lib/libc++_shared.so" "$out/lib/libSDL3.so" "$staging/bionic/lib/"
     cp -f tools/android/device/run-bionic.sh "$staging/run-bionic.sh"
     # 默认设置与 FEX Config 输入（run-bionic.sh 从 gow3port/ 读取），与 glibc 打包同名。
     cp -f tools/android/config/gow3-fex-compatible.json "$staging/fex-compatible.json"
