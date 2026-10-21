@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -24,7 +22,6 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.io.BufferedReader;
 import java.io.File;
@@ -34,15 +31,16 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import com.gow3.android.core.settings.FrameGenSettings;
 import com.gow3.android.core.settings.GamePrefs;
 import com.gow3.android.core.settings.Gow3Settings;
 import com.gow3.android.Gow3App;
+import com.gow3.android.game.drawer.GameDrawer;
+import com.gow3.android.game.drawer.GameDrawerCallbacks;
 
 /** God of War III-only Android player. Keeps the game surface alive beneath its sliding drawer. */
-public final class GameActivity extends Activity implements SaveDialogHost {
+public final class GameActivity extends Activity
+        implements SaveDialogHost, GameDrawerCallbacks, GameDrawer.Listener {
     /** The app's files (application id com.gow3.android.bionic) and its gow3port runtime tree.
      *  Rootfs programs are launched through the in-tree loader when their PT_INTERP slot cannot
      *  hold the app-private path. */
@@ -59,12 +57,9 @@ public final class GameActivity extends Activity implements SaveDialogHost {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private FrameLayout screen;
     private SurfaceView surface;
-    private View scrim, handle;
-    private LinearLayout drawer;
-    private LinearLayout drawerItems;
     private TextView status;
-    private View resume;
-    private LinearLayout gameSettingsItem, cheatsItem, graphicsItem, losslessItem, controllerItem, perfHudItem;
+    /** 游戏内抽屉（独立组件，见 com.gow3.android.game.drawer）。 */
+    private GameDrawer drawer;
     private TouchControllerOverlay controllerOverlay;
     private PerfHudOverlay perfHud;
     private PadBridge pad;
@@ -79,7 +74,7 @@ public final class GameActivity extends Activity implements SaveDialogHost {
      *  帧走 GOW3_PRESENT_SOCKET（Gow3Present）。 */
     /** Bionic 下 app 侧 present socket（run-bionic.sh 的 GOW3_PRESENT_SOCKET 同一个）。 */
     private String presentSocket() { return FILES+"/gow3present.sock"; }
-    private boolean drawerOpen, displayOnly, startingX, hadError, swipeConsumed;
+    private boolean displayOnly, startingX, hadError, swipeConsumed;
     /** gow3.ini 的 display_stretch（0 等比适配 / 1 拉伸铺满 / 2 裁切铺满）：非 0 时 Surface 铺满整屏。 */
     private boolean displayStretch;
     /** 读取显示几何模式：键缺失/空值/非法值一律回落 0（等比适配），与 native 侧兜底一致。 */
@@ -100,6 +95,27 @@ public final class GameActivity extends Activity implements SaveDialogHost {
     private EditText imeField;
     /** 存档/读档/删除列表的原生对话框（独立组件，见 SaveDialogBridge）。 */
     private SaveDialogBridge saveDialog;
+
+    /** 语言覆盖注入：与 MainActivity/PadMappingActivity 同模式，使抽屉等资源文案跟随
+     *  launcher 的语言设置。LanguageManager 是 Kotlin internal（字节码改名，Java 无法
+     *  直接引用其 resolve），这里经公共的 GamePrefs 读取语言覆盖并按同一映射解析 Locale。 */
+    @Override protected void attachBaseContext(android.content.Context newBase) {
+        super.attachBaseContext(applyLanguage(newBase));
+    }
+    private android.content.Context applyLanguage(android.content.Context base) {
+        android.content.res.Configuration config =
+            new android.content.res.Configuration(base.getResources().getConfiguration());
+        config.setLocale(languageLocale(base));
+        return base.createConfigurationContext(config);
+    }
+    private java.util.Locale languageLocale(android.content.Context base) {
+        String lang;
+        try { lang = new GamePrefs(base).language(); }
+        catch (Exception ex) { return java.util.Locale.getDefault(); }
+        if ("zh".equals(lang)) return new java.util.Locale("zh","CN");
+        if ("en".equals(lang)) return java.util.Locale.ENGLISH;
+        return java.util.Locale.getDefault();
+    }
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
@@ -226,121 +242,14 @@ public final class GameActivity extends Activity implements SaveDialogHost {
         perfHud.setActive(perfHudEnabled());
         screen.addView(perfHud,frame(-1,-1,Gravity.CENTER));
 
-        handle=new View(this);
-        GradientDrawable grip=new GradientDrawable(); grip.setColor(0x80c6ad76); grip.setCornerRadius(dp(4));
-        handle.setBackground(grip); handle.setContentDescription("Open game menu");
-        screen.addView(handle,frame(dp(4),dp(44),Gravity.LEFT|Gravity.CENTER_VERTICAL));
-        handle.setOnClickListener(v -> openDrawer());
-
-        scrim=new View(this); scrim.setBackgroundColor(0x99000000);
-        scrim.setVisibility(View.GONE); scrim.setOnClickListener(v -> closeDrawer());
-        screen.addView(scrim,frame(-1,-1,Gravity.FILL));
-
-        drawer=new LinearLayout(this); drawer.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable panel=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-            new int[]{0xff1b1d24,0xff121318});
-        drawer.setBackground(panel);
-        drawer.setElevation(dp(16)); drawer.setVisibility(View.GONE);
-        drawerItems=new LinearLayout(this); drawerItems.setOrientation(LinearLayout.VERTICAL);
-        drawerItems.setPadding(dp(14),dp(20),dp(14),dp(16));
-        android.widget.ScrollView drawerScroll=new android.widget.ScrollView(this);
-        drawerScroll.setFillViewport(false);
-        drawerScroll.addView(drawerItems);
-        // A thin gold edge on the game side.
-        LinearLayout body=new LinearLayout(this);
-        body.addView(drawerScroll,new LinearLayout.LayoutParams(0,-1,1));
-        View edge=new View(this); edge.setBackgroundColor(0x55c6ad76);
-        body.addView(edge,new LinearLayout.LayoutParams(dp(1),-1));
-        drawer.addView(body,new LinearLayout.LayoutParams(-1,0,1));
-
-        TextView hint=text("Swipe left or press A to return",12,0xff8e9097);
-        hint.setPadding(dp(10),dp(2),0,dp(6));
-        drawerItems.addView(hint,new LinearLayout.LayoutParams(-1,-2));
-
-        section("Game");
-        resume=menuItem("ic_play","Resume game",null,() -> closeDrawer());
-        /* Game settings 与 Cheats 两个入口已隐藏（对应 SettingsDialog.showGame()/showCheats() 也已
-         * 注释掉）：它们写的 ini 键在本仓库的启动链路里没有消费方，作弊更是根本没装 hook——Android
-         * 走 FEXCore JIT，probe.c 的 install_cheats() 被 `#if defined(GUEST_CPU_NATIVE)` 编译掉了。
-         * 留着入口只会让玩家以为改了有用。接通后把下面两段取消注释即可。
-        gameSettingsItem=menuItem("ic_settings","Game settings","",() -> {
-            closeDrawer();
-            new SettingsDialog(this,new File(DATA,"gow3.ini"),this::restartGame).showGame();
-        });
-        cheatsItem=menuItem("ic_cheats","Cheats","",() -> {
-            closeDrawer();
-            new SettingsDialog(this,new File(DATA,"gow3.ini"),this::restartGame).showCheats();
-        });
-         */
-        menuItem("ic_refresh","Restart game","Unsaved progress is lost",() -> new AlertDialog.Builder(this)
-            .setTitle("Restart God of War III?").setMessage("Any unsaved progress will be lost.")
-            .setNegativeButton("Cancel",null).setPositiveButton("Restart",(dialog,which) -> restartGame()).show());
-
-        section("Graphics");
-        // Graphics settings 入口已隐藏（change replace-android-fsr3-with-gsr2 收尾）：时间域
-        // 超分路径在 Android 尚未接通，提供入口只会让玩家切到不工作的功能。设置页超分行同步
-        // 移除，run-bionic.sh 硬性 upscaler=off 兜底。接通后取消注释即可。
-        /* graphicsItem=menuItem("ic_tune","Graphics settings","",() -> {
-            closeDrawer();
-            new SettingsDialog(this,new File(DATA,"gow3.ini"),this::restartGame).show();
-        });
-         */
-        // Tuning only. Supplying Lossless.dll is the launcher Home page's job;
-        // the drawer's row reports the multiplier, never where the DLL came from. LSFG 是唯一帧生成
-        // 路径，FSR 3.1 帧生成未接通，不要在这里再加 FSR 帧生成入口。
-        // 帧生成调参入口（change add-native-frame-generation）：未导入 Lossless.dll 时禁用
-        // （灰显 + 指引文案），供给入口在 Home 页与设置页常规分类。DLL 门禁统一走
-        // hasFrameGenDll()（游戏目录同级 → 应用私有 gow3data，与 LosslessDllManager 导入落点一致），
-        // 不再在构造期对旧 gow3port/ 位置求值；灰显/可点由 refreshDrawer 每次打开重算，onClick 实时再判。
-        losslessItem=menuItem("ic_frames","Lossless Scaling",
-            hasFrameGenDll() ? "" : getString(com.gow3.android.R.string.frame_gen_drawer_need_dll), () -> {
-            if (!hasFrameGenDll()) return;
-            closeDrawer();
-            new SettingsDialog(this,new File(DATA,"gow3.ini"),null)
-                .showLossless(() -> { Process p=game; return p!=null && p.isAlive(); }, this::pickRefreshRate);
-        });
-        // 性能 HUD 开关行：launcher 侧悬浮层，即时生效（不重启游戏进程、不重建 Surface），
-        // 交互模式与「On-screen controller」一致——点击切换、写 prefs、收起抽屉。
-        perfHudItem=menuItem("ic_tune","Performance HUD","",() -> {
-            boolean on=!perfHudEnabled();
-            prefs.setPerfHudEnabled(on);
-            perfHud.setActive(on);
-            closeDrawer();
-        });
-
-        section("Controls");
-        controllerItem=menuItem("ic_gamepad","On-screen controller","",() -> {
-            boolean enabled=!controllerEnabled();
-            prefs.setControllerOverlayEnabled(enabled);
-            controllerOverlay.release();
-            closeDrawer();
-        });
-        // 「Swap Square/Triangle」行已删除(add-pad-button-mapping):该特例开关被完整的
-        // 按键映射取代,需要修正印刷标签的玩家在设置 → 操作里自行绑定方块/三角。
-        menuItem("ic_edit","Edit controller layout","Drag and resize the buttons",() -> {
-            prefs.setControllerOverlayEnabled(true);
-            closeDrawer();
-            // 编辑虚拟按键时隐藏性能 HUD（避免遮挡编辑视图），DONE 后按设置恢复。
-            perfHud.setActive(false);
-            controllerOverlay.edit(() -> perfHud.setActive(perfHudEnabled()));
-        });
-        menuItem("ic_restore","Reset controller layout",null,() -> {
-            controllerOverlay.resetLayout();
-            closeDrawer();
-        });
-
-        menuItem("ic_exit","Quit game",null,() -> new AlertDialog.Builder(this)
-            .setTitle("Quit God of War III?").setMessage("Any unsaved progress will be lost.")
-            .setNegativeButton("Cancel",null).setPositiveButton("Quit",(dialog,which) -> finish()).show());
-
-        // The version, pinned under the scrolling menu.
-        String version="";
-        try { version=" "+getPackageManager().getPackageInfo(getPackageName(),0).versionName; }
-        catch (Exception ignored) {}
-        TextView about=text("God of War III for Android"+version,12,0xff8e9097);
-        about.setPadding(dp(24),dp(8),dp(14),dp(14));
-        drawer.addView(about,new LinearLayout.LayoutParams(-1,-2));
-        screen.addView(drawer,frame(dp(320),-1,Gravity.LEFT));
+        // 游戏内抽屉（refactor-game-drawer）：结构、tab、动画、scrim 全部封装在 GameDrawer，
+        // Activity 只负责把三个视图挂入 screen 并委托 open/close。
+        // 隐藏入口（Game settings / Cheats / Graphics settings 对话框）仍按各自 spec 保持隐藏，
+        // 本次抽屉重构不恢复它们；接通时在对应 pane 里补行即可。
+        drawer=new GameDrawer(this,this,this);
+        screen.addView(drawer.handle(),frame(dp(4),dp(44),Gravity.LEFT|Gravity.CENTER_VERTICAL));
+        screen.addView(drawer.scrim(),frame(-1,-1,Gravity.FILL));
+        screen.addView(drawer.view(),frame(dp(320),-1,Gravity.LEFT));
         setContentView(screen);
     }
 
@@ -349,116 +258,88 @@ public final class GameActivity extends Activity implements SaveDialogHost {
         worker.execute(() -> { stopGame(); startGame(); });
     }
 
-    /** A small gold heading above a group of menu rows. */
-    private void section(String name) {
-        TextView t=text(name.toUpperCase(java.util.Locale.ROOT),11,0xffc6ad76);
-        t.setLetterSpacing(0.15f); t.setTypeface(Typeface.DEFAULT_BOLD);
-        t.setPadding(dp(10),dp(16),0,dp(6));
-        drawerItems.addView(t,new LinearLayout.LayoutParams(-1,-2));
+    // ---- GameDrawerCallbacks：抽屉面板经此接口触发动作与读取当前值 ----
+
+    @Override public void resumeGame() { closeDrawer(); }
+
+    @Override public void requestRestart() { restartGame(); }
+
+    @Override public void quitGame() { finish(); }
+
+    // 帧生成内联调整：写 ini + 运行期状态文件（framegen.state 热应用，不重启）+ 刷新率。
+    @Override public void setFrameGenEnabled(boolean enabled) {
+        applyFrameGen(enabled, frameGenConfig().multiplier, frameGenConfig().flowScale);
     }
 
-    /** A menu row: icon, title and an optional second line (null: none; "" filled by refreshDrawer).
-     *  Focusable for the gamepad, with a gold highlight when focused or pressed. */
-    private LinearLayout menuItem(String icon,String title,String detail,Runnable action) {
-        LinearLayout row=new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(10),dp(8),dp(10),dp(8));
-        row.setFocusable(true); row.setClickable(true); row.setTag(action); row.setOnClickListener(v -> ((Runnable)row.getTag()).run());
-        android.graphics.drawable.StateListDrawable states=new android.graphics.drawable.StateListDrawable();
-        GradientDrawable lit=new GradientDrawable(); lit.setColor(0x33c6ad76); lit.setCornerRadius(dp(10));
-        lit.setStroke(dp(1),0x99c6ad76);
-        GradientDrawable pressed=new GradientDrawable(); pressed.setColor(0x44c6ad76); pressed.setCornerRadius(dp(10));
-        states.addState(new int[]{android.R.attr.state_pressed},pressed);
-        states.addState(new int[]{android.R.attr.state_focused},lit);
-        states.addState(new int[]{},new android.graphics.drawable.ColorDrawable(0));
-        row.setBackground(states);
+    @Override public void setFrameGenMultiplier(int multiplier) {
+        applyFrameGen(frameGenConfig().enabled, multiplier, frameGenConfig().flowScale);
+    }
 
-        android.widget.ImageView image=new android.widget.ImageView(this);
-        int id=getResources().getIdentifier(icon,"drawable",getPackageName());
-        if (id!=0) image.setImageResource(id);
-        LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(dp(24),dp(24)); ip.rightMargin=dp(14);
-        row.addView(image,ip);
+    @Override public void setFrameGenFlowScale(float flowScale) {
+        applyFrameGen(frameGenConfig().enabled, frameGenConfig().multiplier, flowScale);
+    }
 
-        LinearLayout texts=new LinearLayout(this); texts.setOrientation(LinearLayout.VERTICAL);
-        TextView name=text(title,15,0xffe8dfc9);
-        texts.addView(name);
-        if (detail!=null) {
-            TextView second=text(detail,12,0xff8e9097); second.setTag("detail");
-            texts.addView(second);
-        }
-        row.addView(texts,new LinearLayout.LayoutParams(0,-2,1));
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2); lp.bottomMargin=dp(2);
-        row.setMinimumHeight(dp(48));
-        drawerItems.addView(row,lp); return row;
+    private void applyFrameGen(boolean enabled, int multiplier, float flowScale) {
+        // 门禁已由 GraphicsPane 打开时刷新 + 点击实时再判兜底；这里仍防御一次。
+        if (!hasFrameGenDll()) return;
+        FrameGenSettings.Config config = new FrameGenSettings.Config(enabled, multiplier, flowScale);
+        FrameGenSettings.save(configIni(), config);
+        FrameGenSettings.ensureVsyncForFrameGen(configIni());
+        FrameGenSettings.writeState(new File(DATA, FrameGenSettings.STATE_FILE_NAME), config);
+        pickRefreshRate();
     }
-    private static void setDetail(LinearLayout row,String value) {
-        TextView detail=row==null ? null : (TextView)row.findViewWithTag("detail");
-        if (detail!=null) detail.setText(value);
+
+    @Override public void onTogglePerfHud() {
+        boolean on=!perfHudEnabled();
+        prefs.setPerfHudEnabled(on);
+        perfHud.setActive(on);
+        closeDrawer();
     }
-    /** 抽屉里的一行不可用时：不可点击、不可获焦（手柄/键盘导航会跳过它），并整体变灰。
-     *  action 存在 row 的 tag 里，监听器保持挂着——setClickable(false) 会让点击不再分发，
-     *  这样重新启用时不必再重挂一次监听器。 */
-    private static void setRowEnabled(LinearLayout row,boolean on) {
-        if (row==null) return;
-        row.setClickable(on);
-        row.setFocusable(on);
-        row.setAlpha(on ? 1.0f : 0.4f);
+
+    @Override public void onToggleController() {
+        boolean enabled=!controllerEnabled();
+        prefs.setControllerOverlayEnabled(enabled);
+        controllerOverlay.release();
+        closeDrawer();
     }
-    /** The rows' second lines: the current settings, read when the drawer opens. */
-    private void refreshDrawer() {
-        /* gameSettingsItem / cheatsItem 的摘要随上面两个入口一起注释掉了（接回来时一起放开）。
-        java.util.List<String> game=new java.util.ArrayList<>();
-        if (!"0".equals(setting("skip_network_choice"))) game.add("Offline start");
-        if ("1".equals(setting("skip_intro"))) game.add("no intros");
-        if ("1".equals(setting("debug_camera"))) game.add("free camera");
-        if ("1".equals(setting("debug_menu"))) game.add("debug menu");
-        setDetail(gameSettingsItem,game.isEmpty() ? "Online/offline screen shown" : String.join(" · ",game));
-        java.util.List<String> cheats=new java.util.ArrayList<>();
-        if ("1".equals(setting("cheat_health"))) cheats.add("infinite health");
-        if ("1".equals(setting("cheat_item"))) cheats.add("infinite items");
-        setDetail(cheatsItem,cheats.isEmpty() ? "Off" : String.join(" · ",cheats));
-         */
-        /* graphicsItem 的摘要随入口一起隐藏（接回来时一起放开）。
-        String upscaler="off".equals(Gow3Settings.read(configIni(), "upscaler")) ? "No upscaling" : "FSR 3.1";
-        String limit=Gow3Settings.read(configIni(), "fps_limit");
-        // 取值域与 SettingsDialog.FPS_VALUES 一致：只有 30/60/120/240 会按原值显示，0 是"不限制"，
-        // 其余（键缺失、旧版遗留的 40/45）运行时 ParseFpsLimit 都当 0，所以回退显示 30。
-        setDetail(graphicsItem,upscaler+" · "+("0".equals(limit) ? "no FPS limit"
-            : (limit==null || !limit.matches("30|60|120|240") ? "30" : limit)+" FPS limit"));
-         */
-        // 帧生成调参行摘要（change fix-framegen-state-reporting）：按运行期配置求值。
-        // 之前读旧 lsfg_multiplier 键（已不再写入）导致开启插帧后仍显示 Off。
-        FrameGenSettings.Config fg=FrameGenSettings.read(configIni());
-        // 没导入 Lossless.dll 就开不了插帧：引擎只加载玩家自带的 DLL，直接把这一行置灰
-        // 不可点，并说明去 Home/设置页导入，而不是让它"看着能开却不生效"。
-        boolean dllPresent=hasFrameGenDll();
-        setRowEnabled(losslessItem,dllPresent);
-        setDetail(losslessItem,!dllPresent ? "Import Lossless.dll on the Home page first"
-            : fg.enabled ? fg.multiplier+"× frames · flow "
-            +String.valueOf(fg.flowScale) : "Off");
-        setDetail(controllerItem,controllerEnabled() ? "On" : "Off");
-        setDetail(perfHudItem,perfHudEnabled() ? "On" : "Off");
+
+    @Override public void onEditControllerLayout() {
+        prefs.setControllerOverlayEnabled(true);
+        closeDrawer();
+        // 编辑虚拟按键时隐藏性能 HUD（避免遮挡编辑视图），DONE 后按设置恢复。
+        perfHud.setActive(false);
+        controllerOverlay.edit(() -> perfHud.setActive(perfHudEnabled()));
     }
+
+    @Override public void onResetControllerLayout() {
+        controllerOverlay.resetLayout();
+        closeDrawer();
+    }
+
+    @Override public boolean isFrameGenDllPresent() { return hasFrameGenDll(); }
+
+    @Override public FrameGenSettings.Config frameGenConfig() { return FrameGenSettings.read(configIni()); }
+
+    @Override public boolean isPerfHudEnabled() { return perfHudEnabled(); }
+
+    @Override public boolean isControllerEnabled() { return controllerEnabled(); }
+
+    // ---- GameDrawer.Listener：关闭动画结束、抽屉已隐藏 ----
+
+    @Override public void onDrawerClosed() { surface.requestFocus(); }
 
     private void openDrawer() {
-        if (drawerOpen) return;
-        drawerOpen=true; controllerOverlay.release(); pad.reset();
-        refreshDrawer();
-        controllerOverlay.setVisibility(View.GONE);
-        handle.setVisibility(View.GONE);
-        scrim.animate().cancel(); drawer.animate().cancel();
-        scrim.setAlpha(0); scrim.setVisibility(View.VISIBLE); scrim.animate().alpha(1).setDuration(200).start();
-        drawer.setTranslationX(-dp(320)); drawer.setVisibility(View.VISIBLE);
-        drawer.animate().translationX(0).setDuration(220).start(); resume.requestFocus();
+        if (drawer.isOpen()) return;
+        // 抽屉打开时释放屏幕控制器输入与手柄状态，避免抽屉打开期间误触游戏；可见性不动——
+        // scrim 全屏盖住 overlay 并拦截触摸，无需隐藏/恢复虚拟按键（修复开合抽屉后按键消失）。
+        controllerOverlay.release(); pad.reset();
+        drawer.open();
     }
     /** SaveDialogHost：对话框需要拉起/收起抽屉并让 Surface 重新取得输入焦点。 */
     public void closeDrawer() {
-        if (!drawerOpen) return;
-        drawerOpen=false; pad.reset();
-        controllerOverlay.setVisibility(controllerEnabled() ? View.VISIBLE : View.GONE);
-        scrim.animate().cancel(); drawer.animate().cancel();
-        scrim.animate().alpha(0).setDuration(180).withEndAction(() -> scrim.setVisibility(View.GONE)).start();
-        drawer.animate().translationX(-dp(320)).setDuration(200)
-            .withEndAction(() -> { drawer.setVisibility(View.GONE); handle.setVisibility(View.VISIBLE); surface.requestFocus(); }).start();
+        if (!drawer.isOpen()) return;
+        pad.reset();
+        drawer.close();
         immersive();
     }
 
@@ -482,7 +363,7 @@ public final class GameActivity extends Activity implements SaveDialogHost {
     }
     @Override public void onBackPressed() {
         if (saveDialog!=null && saveDialog.isOpen()) saveDialog.cancel();
-        else if (drawerOpen) closeDrawer();
+        else if (drawer.isOpen()) closeDrawer();
         else openDrawer();
     }
 
@@ -490,7 +371,7 @@ public final class GameActivity extends Activity implements SaveDialogHost {
         if (e.getActionMasked()==MotionEvent.ACTION_DOWN) {
             swipeConsumed=false;
             touchX=e.getX(); touchY=e.getY();
-            edgeGesture=!drawerOpen && touchX<dp(28);
+            edgeGesture=!drawer.isOpen() && touchX<dp(28);
         }
         if (swipeConsumed) return true;
         if (e.getActionMasked()==MotionEvent.ACTION_MOVE) {
@@ -498,7 +379,7 @@ public final class GameActivity extends Activity implements SaveDialogHost {
             if (edgeGesture && dx>dp(40) && Math.abs(dy)<dp(90)) {
                 openDrawer(); edgeGesture=false; swipeConsumed=true; return true;
             }
-            if (drawerOpen && dx< -dp(70) && Math.abs(dy)<dp(90)) {
+            if (drawer.isOpen() && dx< -dp(70) && Math.abs(dy)<dp(90)) {
                 MotionEvent cancel=MotionEvent.obtain(e); cancel.setAction(MotionEvent.ACTION_CANCEL);
                 super.dispatchTouchEvent(cancel); cancel.recycle();
                 closeDrawer(); swipeConsumed=true; return true;
@@ -516,7 +397,7 @@ public final class GameActivity extends Activity implements SaveDialogHost {
         if (code==KeyEvent.KEYCODE_BACK || code==KeyEvent.KEYCODE_BUTTON_MODE) {
             if (e.getAction()==KeyEvent.ACTION_UP) onBackPressed(); return true;
         }
-        if (drawerOpen) {
+        if (drawer.isOpen()) {
             if (code==KeyEvent.KEYCODE_BUTTON_B || e.getScanCode()==305) {
                 if (e.getAction()==KeyEvent.ACTION_UP) closeDrawer(); return true;
             }
@@ -533,7 +414,7 @@ public final class GameActivity extends Activity implements SaveDialogHost {
         return super.dispatchKeyEvent(e);
     }
     @Override public boolean dispatchGenericMotionEvent(MotionEvent e) {
-        if (drawerOpen && e.isFromSource(android.view.InputDevice.SOURCE_JOYSTICK)) return true;
+        if (drawer.isOpen() && e.isFromSource(android.view.InputDevice.SOURCE_JOYSTICK)) return true;
         return pad.motion(e) || super.dispatchGenericMotionEvent(e);
     }
     private boolean controllerEnabled() {

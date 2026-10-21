@@ -196,7 +196,6 @@
     <string name="frame_gen_footer">导入的文件保存在应用私有目录内，下次启动游戏时生效。没有 Steam 时同样可以「导入 .DLL」。</string>
     <string name="frame_gen_toggle_off">关闭</string>
     <string name="frame_gen_save_failed">设置保存失败。</string>
-    <string name="frame_gen_drawer_need_dll">需要 Lossless.dll（设置 → 常规 导入）</string>
     <string name="lossless_row_import">导入</string>
     <string name="lossless_row_missing">未导入——帧生成保持关闭</string>
     <string name="lossless_row_installed">已导入——帧生成可用</string>
@@ -204,6 +203,41 @@
     <string name="frame_gen_import_done">Lossless.dll 已导入</string>
     <string name="frame_gen_import_hint">需要你自备的 Lossless.dll——请前往 设置 → 常规 导入。</string>
     <string name="frame_gen_toggle_on">开启</string>
+
+    <!-- 游戏内抽屉（refactor-game-drawer）：tab 化 + 本地化 -->
+    <string name="drawer_handle_desc">打开游戏菜单</string>
+    <string name="drawer_hint_swipe">向左滑动或按 A 返回</string>
+    <string name="drawer_tab_game">游戏</string>
+    <string name="drawer_tab_graphics">图形</string>
+    <string name="drawer_tab_controls">操作</string>
+    <string name="drawer_title_resume">继续游戏</string>
+    <string name="drawer_title_restart">重启游戏</string>
+    <string name="drawer_title_quit">退出游戏</string>
+    <string name="drawer_title_lossless">Lossless Scaling</string>
+    <string name="drawer_title_frame_gen">帧生成</string>
+    <string name="drawer_title_frame_gen_multiplier">自定义倍数</string>
+    <string name="drawer_title_frame_gen_quality">质量</string>
+    <string name="drawer_quality_best">最高</string>
+    <string name="drawer_quality_high">高</string>
+    <string name="drawer_quality_balanced">均衡</string>
+    <string name="drawer_quality_fastest">最快</string>
+    <string name="drawer_note_framegen">调整即时生效，无需重启。</string>
+    <string name="drawer_title_perf_hud">性能 HUD</string>
+    <string name="drawer_title_controller">屏幕控制器</string>
+    <string name="drawer_title_edit_layout">编辑控制器布局</string>
+    <string name="drawer_title_reset_layout">重置控制器布局</string>
+    <string name="drawer_detail_restart">未保存的进度将丢失</string>
+    <string name="drawer_detail_on">开</string>
+    <string name="drawer_detail_off">关</string>
+    <string name="drawer_detail_lossless_import">请先在主页导入 Lossless.dll</string>
+    <string name="drawer_summary_framegen_fmt">%1$d× 帧 · flow %2$s</string>
+    <string name="drawer_confirm_restart_title">重启 God of War III？</string>
+    <string name="drawer_confirm_restart_message">任何未保存的进度都将丢失。</string>
+    <string name="drawer_confirm_quit_title">退出 God of War III？</string>
+    <string name="drawer_confirm_quit_message">任何未保存的进度都将丢失。</string>
+    <string name="drawer_confirm_cancel">取消</string>
+    <string name="drawer_confirm_restart_ok">重启</string>
+    <string name="drawer_confirm_quit_ok">退出</string>
 
     <!-- About 页 -->
     <string name="about_title">God of War III Android</string>

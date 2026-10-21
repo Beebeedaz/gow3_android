@@ -213,7 +213,6 @@
     <string name="frame_gen_footer">Imported files stay in the app\'s private folder and take effect the next time the game starts. IMPORT .DLL also works when Steam is unavailable.</string>
     <string name="frame_gen_toggle_off">Off</string>
     <string name="frame_gen_save_failed">Could not save the setting.</string>
-    <string name="frame_gen_drawer_need_dll">Needs Lossless.dll (Settings → General)</string>
     <string name="lossless_row_import">IMPORT</string>
     <string name="lossless_row_missing">Not imported — frame generation stays off</string>
     <string name="lossless_row_installed">Installed — frame generation ready</string>
@@ -221,6 +220,41 @@
     <string name="frame_gen_import_done">Lossless.dll imported</string>
     <string name="frame_gen_import_hint">Requires Lossless.dll from your own Lossless Scaling — import it in Settings → General.</string>
     <string name="frame_gen_toggle_on">On</string>
+
+    <!-- 游戏内抽屉（refactor-game-drawer）：tab 化 + 本地化 -->
+    <string name="drawer_handle_desc">Open game menu</string>
+    <string name="drawer_hint_swipe">Swipe left or press A to return</string>
+    <string name="drawer_tab_game">Game</string>
+    <string name="drawer_tab_graphics">Graphics</string>
+    <string name="drawer_tab_controls">Controls</string>
+    <string name="drawer_title_resume">Resume game</string>
+    <string name="drawer_title_restart">Restart game</string>
+    <string name="drawer_title_quit">Quit game</string>
+    <string name="drawer_title_lossless">Lossless Scaling</string>
+    <string name="drawer_title_frame_gen">Frame generation</string>
+    <string name="drawer_title_frame_gen_multiplier">Custom multiplier</string>
+    <string name="drawer_title_frame_gen_quality">Quality</string>
+    <string name="drawer_quality_best">Quality</string>
+    <string name="drawer_quality_high">High</string>
+    <string name="drawer_quality_balanced">Balanced</string>
+    <string name="drawer_quality_fastest">Fastest</string>
+    <string name="drawer_note_framegen">Changes apply while you play — no restart.</string>
+    <string name="drawer_title_perf_hud">Performance HUD</string>
+    <string name="drawer_title_controller">On-screen controller</string>
+    <string name="drawer_title_edit_layout">Edit controller layout</string>
+    <string name="drawer_title_reset_layout">Reset controller layout</string>
+    <string name="drawer_detail_restart">Unsaved progress is lost</string>
+    <string name="drawer_detail_on">On</string>
+    <string name="drawer_detail_off">Off</string>
+    <string name="drawer_detail_lossless_import">Import Lossless.dll on the Home page first</string>
+    <string name="drawer_summary_framegen_fmt">%1$d× frames · flow %2$s</string>
+    <string name="drawer_confirm_restart_title">Restart God of War III?</string>
+    <string name="drawer_confirm_restart_message">Any unsaved progress will be lost.</string>
+    <string name="drawer_confirm_quit_title">Quit God of War III?</string>
+    <string name="drawer_confirm_quit_message">Any unsaved progress will be lost.</string>
+    <string name="drawer_confirm_cancel">Cancel</string>
+    <string name="drawer_confirm_restart_ok">Restart</string>
+    <string name="drawer_confirm_quit_ok">Quit</string>
 
     <!-- About 页 -->
     <string name="about_title">God of War III for Android</string>
