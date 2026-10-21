@@ -17,8 +17,6 @@ permissions:
 env:
   ANDROID_PLATFORM: '35'
   ANDROID_BUILD_TOOLS: '35.0.0'
-  GOW3_BUILD_TYPE: Release
-  # These paths are intentionally outside the checkout and are never uploaded.
 
 jobs:
   source-check:
@@ -43,13 +41,14 @@ jobs:
           python -m py_compile tools/android/*.py
 
   release:
-    name: Build signed Android release
+    name: Build Android release (signed or development APK)
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
-    environment: android-release
     permissions:
       contents: read
     env:
+      # 签名双路径：配置了 4 个 secrets 时还原正式 keystore 签名；未配置时
+      # build_release_apk.sh 自动生成本地 dev key 签名（产物定位为 development APK）。
       GOW3_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       GOW3_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       GOW3_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -57,8 +56,6 @@ jobs:
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      GOW3_FEXDROID_APK_URL: ${{ vars.GOW3_FEXDROID_APK_URL }}
-      GOW3_FEXDROID_APK_SHA256: ${{ vars.GOW3_FEXDROID_APK_SHA256 }}
 
     steps:
       - name: Check out source
@@ -84,6 +81,7 @@ jobs:
             /usr/local/lib/android/sdk/platform-tools
             /usr/local/lib/android/sdk/platforms/android-${{ env.ANDROID_PLATFORM }}
             /usr/local/lib/android/sdk/build-tools/${{ env.ANDROID_BUILD_TOOLS }}
+            /usr/local/lib/android/sdk/ndk/29.0.14206865
           key: android-sdk-${{ runner.os }}-${{ env.ANDROID_PLATFORM }}-${{ env.ANDROID_BUILD_TOOLS }}
 
       - name: Set up native dependency environment
@@ -100,6 +98,7 @@ jobs:
             platform-tools
             platforms;android-${{ env.ANDROID_PLATFORM }}
             build-tools;${{ env.ANDROID_BUILD_TOOLS }}
+            ndk;29.0.14206865
 
       - name: Install Android and native build tools
         run: |
@@ -119,25 +118,44 @@ jobs:
           key: android-${{ runner.os }}-${{ hashFiles('tools/android/**', 'cpu/**', 'gpu/CMakeLists.txt', 'gpu/third_party/**', 'ci/**') }}
           restore-keys: android-${{ runner.os }}-
 
-      - name: Restore fexdroid APK cache
-        uses: actions/cache@v4
-        with:
-          path: .local-deps/android/fexdroid-legacy.apk
-          key: fexdroid-apk-${{ vars.GOW3_FEXDROID_APK_SHA256 || '21bed34092f698e39e77138589ebdab8d3498577ffc4fdc3bfef1c711b50d3bf' }}
-
       - name: Build pinned host dependencies
         shell: bash -el {0}
         run: bash ci/setup-deps.sh "$CONDA_PREFIX"
 
-      - name: Configure temporary paths
+      - name: Configure build environment
         shell: bash
         run: |
           {
             echo "GOW3_KEYSTORE=$RUNNER_TEMP/gow3-release.keystore"
-            echo "GOW3_BRIDGE_APK=$GITHUB_WORKSPACE/.local-deps/android/fexdroid-legacy.apk"
+            echo "GOW3_ARM64_HEADERS=$CONDA_PREFIX"
+            echo "GOW3_JOBS=$(nproc)"
+            echo "GOW3_BUILD_TOOLS=$ANDROID_BUILD_TOOLS"
           } >> "$GITHUB_ENV"
 
+      - name: Verify host header tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake_dir="$CONDA_PREFIX/lib/cmake"
+          echo "== Host CMake packages in $cmake_dir =="
+          ls -1 "$cmake_dir"
+          [[ -d "$cmake_dir/tsl-robin-map" ]] || {
+            echo "ERROR: tsl-robin-map not found; run ci/setup-deps.sh" >&2
+            exit 1
+          }
+          boost_dir=$(compgen -G "$cmake_dir/Boost-*/BoostConfig.cmake" | head -1 | xargs dirname || true)
+          boost_headers_dir=$(compgen -G "$cmake_dir/boost_headers-*/boost_headers-config.cmake" | head -1 | xargs dirname || true)
+          if [[ -n $boost_dir ]]; then
+            echo "GOW3_BOOST_DIR=$boost_dir" >> "$GITHUB_ENV"
+            echo "GOW3_BOOST_HEADERS_DIR=${boost_headers_dir:-$boost_dir}" >> "$GITHUB_ENV"
+            echo "Boost CMake package: $boost_dir"
+          else
+            echo "ERROR: no Boost-*/BoostConfig.cmake in $cmake_dir" >&2
+            exit 1
+          fi
+
       - name: Restore signing keystore
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
         shell: bash
         run: |
           set +x
@@ -149,6 +167,15 @@ jobs:
             printf '::add-mask::%s\n' "${!name}"
           done
           bash tools/android/inputs/prepare_signing.sh "$GOW3_KEYSTORE"
+
+      - name: Record signing mode
+        shell: bash
+        run: |
+          if [[ -n ${GOW3_KEYSTORE_PASSWORD:-} ]]; then
+            echo "SIGNING_MODE=formal release keystore" >> "$GITHUB_ENV"
+          else
+            echo "SIGNING_MODE=local development key (NOT a release signature)" >> "$GITHUB_ENV"
+          fi
 
       - name: Fetch Steam libraries
         shell: bash
@@ -164,6 +191,31 @@ jobs:
         run: |
           bash tools/android/build_bionic_deps.sh
           bash tools/android/build_bionic.sh
+
+      - name: Derive and apply release version from tag
+        if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-bionic-v')
+        shell: bash
+        run: |
+          # 版本号以触发 tag 为准（与 release_local.sh 同一套契约）：versionName = tag 去掉 v，
+          # versionCode 由上游各段数值加权 + bionic 序号推导，跨 PC 版本单调递增，
+          # 保证 APK 内版本与 tag、UpdateChecker 的解析结果一致。
+          version="${GITHUB_REF#refs/tags/}"
+          version="${version#v}"
+          upstream="${version%-bionic-v*}"
+          n="${version##*-bionic-v}"
+          IFS='.' read -r a b c <<< "$upstream"
+          a=${a:-0}; b=${b:-0}; c=${c:-0}
+          code=$((a * 1000000 + b * 10000 + c * 100 + n))
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          gradle_file=android-launcher/app/build.gradle.kts
+          sed -i.bak \
+            -e "s/versionName *= *\"[^\"]*\"/versionName = \"$version\"/" \
+            -e "s/versionCode *= *[0-9][0-9]*/versionCode = $code/" \
+            "$gradle_file"
+          rm -f "$gradle_file.bak"
+          grep -q "versionName = \"$version\"" "$gradle_file"
+          grep -q "versionCode = $code" "$gradle_file"
+          echo "Applied versionName=$version versionCode=$code from $GITHUB_REF"
 
       - name: Build and sign the release APK
         run: |
@@ -181,7 +233,9 @@ jobs:
             echo
             printf '%s\n' "- Commit: ${GITHUB_SHA}"
             printf '%s\n' "- APK: $(basename "$APK")"
+            printf '%s\n' "- Version: ${RELEASE_VERSION:-from build.gradle.kts}"
             printf '%s\n' "- SHA-256: ${APK_SHA256}"
+            printf '%s\n' "- Signing: ${SIGNING_MODE}"
             echo '- ABI: `arm64-v8a`'
             echo '- Scope: build, package, signature, and checksum verification only'
             echo '- Not verified by CI: device installation, Vulkan, Turnip/GPU compatibility, and gameplay'
@@ -206,7 +260,9 @@ jobs:
 
   publish-release:
     name: Publish Android release
-    if: startsWith(github.ref, 'refs/tags/v')
+    # 只发布 Android 形态 tag（v<pc>-bionic-v<N>），避免 PC 上游 v*-linux<N> 等 tag 被误发布；
+    # 未配置签名 secrets 的仓库只产 artifact，不创建 GitHub Release。
+    if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-bionic-v') && secrets.ANDROID_KEYSTORE_PASSWORD != ''
     needs: release
     runs-on: ubuntu-24.04
     permissions:

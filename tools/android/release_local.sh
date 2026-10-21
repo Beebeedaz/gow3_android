@@ -164,9 +164,35 @@ remotes_with_pc_tags() {
     printf '%s' "${found:-none}"
 }
 
-# Android tag 统计在目标仓库上进行：PC 上游仓库永远不含 v*-bionic-v<N>
-# bionic 管线起 tag 形态为 v<pc>-bionic-v<N>；旧形态 v<pc>-android<N> 不再生成，
-# 仅由 launcher 的 UpdateChecker 兼容识别历史 release。
+# bionic 版本号从目标仓库已有 v*-bionic-v<N> tag 延续：取最高 PC 版本（各段数值比大小），
+# 同一 PC 版本再取最大序号，下一个 tag 为 v<pc>-bionic-v<N+1>。
+# 目标仓库没有任何 bionic tag（首次发布）时返回空，由调用方回落到上游 linux tag 推导。
+# 旧形态 v<pc>-android<N> 不再生成，仅由 launcher 的 UpdateChecker 兼容识别历史 release。
+latest_bionic_tag() {
+    local target=$1 tag pc n pc_key best_pc='' best_key='' best_n=0 found=''
+    while read -r tag; do
+        [[ -n $tag ]] || continue
+        if [[ $tag =~ ^v([0-9]+(\.[0-9]+)*)-bionic-v([0-9]+)$ ]]; then
+            pc=${BASH_REMATCH[1]}
+            n=${BASH_REMATCH[3]}
+            pc_key=$(version_key "$pc")
+            if [[ -z $best_key || $pc_key > $best_key ]]; then
+                best_key=$pc_key
+                best_pc=$pc
+                best_n=$((10#$n))
+                found=1
+            elif [[ $pc_key == $best_key && $((10#$n)) -gt $best_n ]]; then
+                best_n=$((10#$n))
+                found=1
+            fi
+        fi
+    done < <(gh api "repos/$target/tags" --paginate --jq '.[].name' 2>/dev/null || true)
+    if [[ -n $found ]]; then
+        printf '%s %d' "$best_pc" "$best_n"
+    fi
+}
+
+# 首次 bionic 发布（目标仓库无 bionic tag）时回落到上游 linux tag：解析 PC 版本并计数为 v1。
 next_android_tag() {
     local pc=$1 target=$2 tag n best=0
     while read -r tag; do
@@ -254,10 +280,20 @@ check_version_file_clean() {
 }
 
 check_gh
-pc_version=$(resolve_pc_version)
 target_repo=$(resolve_repo "$repo")
-# 目标仓库先于 tag 计数解析：Android tag 计数在目标仓库上统计
-android_tag=$(next_android_tag "$pc_version" "$target_repo")
+# 版本推导优先级：目标仓库已有 bionic tag 延续 > 上游 linux tag 首次推导。
+# bionic 系列一旦发布，版本号由目标仓库自身 tag 决定，避免上游 lag（如上游停在
+# v2.1.6-linux1 而 bionic 已到 v2.1.7）导致推导出降级的 v2.1.6-bionic-v1。
+if latest_bionic=$(latest_bionic_tag "$target_repo"); then
+    read -r pc_version last_n <<< "$latest_bionic"
+    android_tag="v${pc_version}-bionic-v$((last_n + 1))"
+    version_source="target repo bionic tag $pc_version-bionic-v$last_n"
+else
+    pc_version=$(resolve_pc_version)
+    # 目标仓库先于 tag 计数解析：Android tag 计数在目标仓库上统计
+    android_tag=$(next_android_tag "$pc_version" "$target_repo")
+    version_source="upstream linux tag (first bionic release)"
+fi
 base_commit=$(git rev-parse HEAD)
 upstream_line=$(git ls-remote "$upstream_remote" HEAD 2>/dev/null | cut -f1)
 upstream_line=${upstream_line:-unknown}
@@ -276,6 +312,7 @@ fi
 check_no_tag_conflict
 
 log "release_local: PC upstream version   : $pc_version"
+log "release_local: version source        : $version_source"
 log "release_local: upstream HEAD          : $upstream_line"
 log "release_local: release tag            : $android_tag"
 log "release_local: target repository       : $target_repo"
@@ -328,10 +365,17 @@ prepare_signing() {
 # ---------- 版本同步 ----------
 
 apply_version() {
-    local current new_code
+    local current new_code upstream n a b c
     current=$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' "$gradle_file")
     [[ -n $current ]] || die "cannot read versionName from $gradle_file"
-    new_code=$(( $(sed -n 's/.*versionCode *= *\([0-9]\+\).*/\1/p' "$gradle_file") + 1 ))
+    # versionCode 由版本串推导（上游各段数值加权 + bionic 序号），与 CI
+    # （.github/workflows/android.yml 的 Derive and apply release version）完全一致，
+    # 跨 PC 版本单调递增；不再用“当前值 + 1”，避免 CI 与本地两套递增互相漂移。
+    # version 形如 2.1.7-bionic-v3：upstream=2.1.7，n=3。
+    upstream=${version%-bionic-v*}
+    n=${version##*-bionic-v}
+    IFS='.' read -r a b c <<< "$upstream"
+    new_code=$(( ${a:-0}*1000000 + ${b:-0}*10000 + ${c:-0}*100 + n ))
     restore_version=$(cat "$gradle_file")
     trap 'restore_version_file; cleanup' EXIT
     sed -i.bak \
