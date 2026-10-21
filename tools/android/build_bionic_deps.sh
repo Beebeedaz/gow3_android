@@ -114,9 +114,10 @@ if [[ ! -f $prefix/.done-ffmpeg ]]; then
     "$src/ffmpeg-7.1.5/configure" --prefix="$prefix" --enable-cross-compile --target-os=android --arch=aarch64 \
         --cc="$tc/bin/aarch64-linux-android$api-clang" --cxx="$tc/bin/aarch64-linux-android$api-clang++" \
         --ar="$tc/bin/llvm-ar" --ranlib="$tc/bin/llvm-ranlib" --strip="$tc/bin/llvm-strip" --nm="$tc/bin/llvm-nm" \
+        --sysroot="$tc/sysroot" \
         --enable-static --disable-shared --enable-pic --disable-programs --disable-doc --disable-debug \
         --disable-avdevice --disable-avfilter --disable-network --disable-autodetect --disable-mediacodec --disable-jni >"$bld/ffmpeg-configure.log" 2>&1 \
-        || { tail -30 "$bld/ffmpeg-configure.log" >&2; exit 1; }
+        || { tail -40 "$bld/ffmpeg/ffbuild/config.log" >&2 2>/dev/null || true; tail -30 "$bld/ffmpeg-configure.log" >&2; exit 1; }
     run make -j"$J" >"$bld/ffmpeg.log" 2>&1 || { tail -30 "$bld/ffmpeg.log" >&2; exit 1; }
     make install >/dev/null
     # configure 的 Android 目标会为 MediaCodec/JNI 链接 libandroid/libmediandk，这里都禁用了。
