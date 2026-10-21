@@ -112,10 +112,16 @@ mkdir -p "$out/bin" "$out/lib"
 "$llvm/bin/llvm-strip" -o "$out/lib/libgow3gpu.so" "$out/gpu/libgow3gpu.so"
 # gow3gpu 在 Android 上不再链接 SDL（AHB present 路径移除）；但 gow3-probe 的 runtime_pad.c
 # 仍链接 SDL3（探测/关闭手柄），libSDL3.so 由依赖构建链产出，随 runtime 一起分发。
-if "$llvm/bin/llvm-readelf" -d "$out/gpu/libgow3gpu.so" | grep -q 'libSDL3'; then
-    cp -f "$prefix/lib/libSDL3.so" "$out/lib/"
-fi
-if "$llvm/bin/llvm-readelf" -d "$out/bin/gow3-probe" 2>/dev/null | grep -q 'libSDL3'; then
+# 判断依赖时不能写 `readelf | grep -q`：本脚本 set -o pipefail，grep -q 匹配后立即退出会让
+# readelf 收到 SIGPIPE，管道状态变成非零 → 误判为「不需要 SDL3」而漏拷贝，
+# 设备端加载 gow3-probe 时才炸。改成先把输出收进变量再匹配。
+probe_deps=$("$llvm/bin/llvm-readelf" -d "$out/bin/gow3-probe" 2>/dev/null || true)
+gpu_deps=$("$llvm/bin/llvm-readelf" -d "$out/gpu/libgow3gpu.so" 2>/dev/null || true)
+if [[ $probe_deps == *libSDL3* || $gpu_deps == *libSDL3* ]]; then
+    [[ -f $prefix/lib/libSDL3.so ]] || {
+        echo "libSDL3.so missing in $prefix (SDL3 must be built by tools/android/build_bionic_deps.sh)" >&2
+        exit 1
+    }
     cp -f "$prefix/lib/libSDL3.so" "$out/lib/"
 fi
 cp -f "$llvm/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" "$out/lib/"
