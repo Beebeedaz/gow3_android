@@ -14,14 +14,24 @@
 # must copy android/gow3_lsfg.h over it.
 # Prerequisite: tools/android/build_bionic_deps.sh (the NDK).
 set -euo pipefail
+# 与 build_bionic.sh / build_bionic_deps.sh 一致：清空 conda-forge 编译器 activation
+# 导出的宿主环境变量，否则交叉编译会带上 x86_64 宿主的 CFLAGS/LIBRARY_PATH。
+unset CFLAGS CPPFLAGS LDFLAGS CXXFLAGS LIBRARY_PATH CPATH C_INCLUDE_PATH CXX_INCLUDE_PATH
 cd -- "$(dirname -- "$0")/../.."
 BLOODFRAME_REPO=https://github.com/ducvd89/bloodframe.git
 BLOODFRAME_COMMIT=c29027555cfa8c9fc73c20f03816230becb9f469
 root=$PWD/.local-deps/android
 src=$root/src/bloodframe
 # NDK 解析：GOW3_NDK > 本机 Android SDK（与 Gradle 同源）> BB 式 $root/sdk 布局。
-if [[ -z ${GOW3_NDK:-} ]]; then
-    for cand in "$HOME/Library/Android/sdk/ndk/29.0.14206865" "$HOME/Library/Android/sdk/ndk/"*; do
+# 必须与 build_bionic.sh / build_bionic_deps.sh 同一套候选（那里含 $ANDROID_HOME /
+# $ANDROID_SDK_ROOT），否则 Linux CI 上只会落到 $root/sdk 而找不到 NDK。
+if [[ -z ${GOW3_NDK:-} || ! -f ${GOW3_NDK}/build/cmake/android.toolchain.cmake ]]; then
+    for cand in \
+        "$root/sdk/ndk/29.0.14206865" \
+        "$ANDROID_HOME/ndk/29.0.14206865" \
+        "$ANDROID_SDK_ROOT/ndk/29.0.14206865" \
+        "$HOME/Library/Android/sdk/ndk/29.0.14206865" \
+        "$HOME/Android/Sdk/ndk/29.0.14206865"; do
         [[ -f $cand/build/cmake/android.toolchain.cmake ]] && { GOW3_NDK=$cand; break; }
     done
 fi
@@ -30,7 +40,7 @@ api=${GOW3_ANDROID_API:-30}
 J=${GOW3_JOBS:-22}
 out=$PWD/out/bionic
 build=$out/bloodframe-build
-[[ -f $ndk/build/cmake/android.toolchain.cmake ]] || { echo "No NDK: $ndk (tools/android/build_bionic_deps.sh)" >&2; exit 1; }
+[[ -f $ndk/build/cmake/android.toolchain.cmake ]] || { echo "No NDK: $ndk (tools/android/build_framegen.sh)" >&2; exit 1; }
 if [[ ! -d $src/.git ]]; then
     mkdir -p "$root/src"
     git clone -q "$BLOODFRAME_REPO" "$src" ||
