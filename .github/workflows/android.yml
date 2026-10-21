@@ -261,10 +261,13 @@ jobs:
   publish-release:
     name: Publish Android release
     # 只发布 Android 形态 tag（v<pc>-bionic-v<N>），避免 PC 上游 v*-linux<N> 等 tag 被误发布。
-    # secrets 上下文不能用于 job 级 if，是否发布（无 secrets 则不创建 Release）在 Publish 步骤判断。
+    # secrets 上下文不能用于任何 if 条件，改用 job env 把「是否配置签名密钥」算成布尔，
+    # 再在 Publish 步骤用 env 上下文判断是否创建 Release。
     if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-bionic-v')
     needs: release
     runs-on: ubuntu-24.04
+    env:
+      HAS_RELEASE_KEY: ${{ secrets.ANDROID_KEYSTORE_PASSWORD != '' }}
     permissions:
       contents: write
     steps:
@@ -274,7 +277,7 @@ jobs:
           name: gow3-android-arm64-${{ github.sha }}
 
       - name: Publish the release
-        if: secrets.ANDROID_KEYSTORE_PASSWORD != ''
+        if: env.HAS_RELEASE_KEY == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: |
