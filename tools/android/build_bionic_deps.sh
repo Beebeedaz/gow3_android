@@ -6,6 +6,11 @@
 # 归因：本脚本是对 Bloodborne-Android（BB）tools/android/build_bionic_deps.sh 的 gow3 移植版，
 #       NDK 依赖版本、构建参数与 BB 保持一致，便于逐 commit 对照。
 set -euo pipefail
+# conda-forge 编译器 activation 会导出宿主（x86_64）的 CFLAGS/CPPFLAGS/LDFLAGS
+# （-march=nocona -mtune=haswell ...），与 aarch64 交叉编译器不兼容（clang 报
+# unsupported argument 'nocona'）。cmake 侧由 android.toolchain.cmake 覆盖，但
+# ffmpeg configure 会直接读环境变量，必须先清空再交叉编译。
+unset CFLAGS CPPFLAGS LDFLAGS CXXFLAGS
 cd -- "$(dirname -- "$0")/../.."
 root=$PWD/.local-deps/android
 
