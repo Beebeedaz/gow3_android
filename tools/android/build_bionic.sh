@@ -86,12 +86,13 @@ if [[ -z $boost_headers_dir ]]; then
 fi
 [[ -n $boost_dir && -f $boost_dir/BoostConfig.cmake ]] || {
     echo "No Boost CMake package (set GOW3_BOOST_DIR or install Boost headers)" >&2; exit 1; }
+# conda 环境不能进 FIND_ROOT_PATH/PREFIX_PATH：它含 x86_64 宿主 lib/sysroot，
+# CMake find_library 会把 libm/libatomic 解析成宿主库。header-only 包
+# （robin-map/VMA/Boost）已通过下面显式 *_DIR 提供，无需搜索整个 conda 环境。
+# 注意：注释必须放在命令外，不能插在 cmake 多行参数中间（# 会截断后续参数）。
 if [[ ! -f $out/gpu/build.ninja ]]; then
     cmake -S gpu -B "$out/gpu" -G Ninja "${ndk_cmake[@]}" \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo -DGOW3_PGO=off -DGOW3_LTO=OFF \
-        # conda 环境不能进 FIND_ROOT_PATH/PREFIX_PATH：它含 x86_64 宿主 lib/sysroot，
-        # CMake find_library 会把 libm/libatomic 解析成宿主库。header-only 包
-        # （robin-map/VMA/Boost）已通过下面显式 *_DIR 提供，无需搜索整个 conda 环境。
         "-DCMAKE_FIND_ROOT_PATH=$prefix" -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH \
         -DCMAKE_PREFIX_PATH="$prefix" \
