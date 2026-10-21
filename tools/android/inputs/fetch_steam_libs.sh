@@ -11,6 +11,8 @@ set -euo pipefail
 cd -- "$(dirname -- "$0")/../../.."
 deps=$PWD/.local-deps/android
 out=$deps/steam-libs
+# fresh runner / 无构建缓存时 .local-deps/android 不存在，curl -o 会因目录缺失失败（exit 23）。
+mkdir -p "$deps"
 MAVEN_VERSION=3.9.11
 MAVEN_SHA512=bcfe4fe305c962ace56ac7b5fc7a08b87d5abd8b7e89027ab251069faebee516b0ded8961445d6d91ec1985dfe30f8153268843c89aa392733d1a3ec956c9978
 JAVASTEAM=1.8.0 XZ=1.12 ZSTD=1.5.7-6 ZXING=3.5.4 SPONGY=1.58.0.0
