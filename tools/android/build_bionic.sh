@@ -7,6 +7,11 @@
 # 静态 libc++ 出现在多个 DSO 里会让每个都有自己的 exception/RTTI/new 状态）。
 # 归因：本脚本是 Bloodborne-Android（BB）tools/android/build_bionic.sh 的 gow3 移植版。
 set -euo pipefail
+# conda-forge 编译器 activation 会导出宿主（x86_64）的编译/链接环境变量：
+# CFLAGS（-march=nocona，aarch64 clang 拒绝）、LIBRARY_PATH/CPATH（clang 会把
+# LIBRARY_PATH 转成 -L 指向 conda 宿主 sysroot，CMake 也会把这些记进隐式链接目录），
+# 导致 Android 交叉链接解析到 x86_64 宿主库（libm/libatomic/nativewindow）。必须清空。
+unset CFLAGS CPPFLAGS LDFLAGS CXXFLAGS LIBRARY_PATH CPATH C_INCLUDE_PATH CXX_INCLUDE_PATH
 cd -- "$(dirname -- "$0")/../.."
 out=out/bionic
 root=$PWD/.local-deps/android
@@ -84,9 +89,12 @@ fi
 if [[ ! -f $out/gpu/build.ninja ]]; then
     cmake -S gpu -B "$out/gpu" -G Ninja "${ndk_cmake[@]}" \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo -DGOW3_PGO=off -DGOW3_LTO=OFF \
-        "-DCMAKE_FIND_ROOT_PATH=$prefix;$headers" -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
+        # conda 环境不能进 FIND_ROOT_PATH/PREFIX_PATH：它含 x86_64 宿主 lib/sysroot，
+        # CMake find_library 会把 libm/libatomic 解析成宿主库。header-only 包
+        # （robin-map/VMA/Boost）已通过下面显式 *_DIR 提供，无需搜索整个 conda 环境。
+        "-DCMAKE_FIND_ROOT_PATH=$prefix" -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH \
-        -DCMAKE_PREFIX_PATH="$prefix;$headers" \
+        -DCMAKE_PREFIX_PATH="$prefix" \
         -Dtsl-robin-map_DIR="$headers/share/cmake/tsl-robin-map" \
         -DVulkanMemoryAllocator_DIR="$headers/share/cmake/VulkanMemoryAllocator" \
         -DBoost_DIR="$boost_dir" \
