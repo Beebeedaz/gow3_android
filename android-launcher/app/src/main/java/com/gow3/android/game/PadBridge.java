@@ -76,9 +76,20 @@ final class PadBridge {
         return PadMapping.resolveButton(mapping, e.getScanCode(), e.getKeyCode());
     }
 
+    /** 物理输入链的 token 修正:解析为 touchpad 的物理输入一律以 touchpad_right 呈现
+     *  （右侧点击打开暂停菜单,与虚拟 TOUCH 键语义统一),其余按钮名原样返回。
+     *  纯静态、无 Android 依赖,便于宿主单测;运行时 pad 文件契约零改动(change
+     *  fix-physical-touchpad-opens-pause-menu design D1)。 */
+    static String physicalToken(String psButton) {
+        return "touchpad".equals(psButton) ? "touchpad_right" : psButton;
+    }
+
     boolean key(KeyEvent e) {
         String name=name(e);
         if (name==null) return false;
+        // 物理输入链 token 修正:映射到 touchpad 的物理按键以 touchpad_right 呈现(开菜单),
+        // 仅在物理路径翻译,virtualKeys 不受影响(change fix-physical-touchpad-opens-pause-menu)。
+        name=physicalToken(name);
         if (e.getAction()==KeyEvent.ACTION_DOWN) keys.add(name);
         else if (e.getAction()==KeyEvent.ACTION_UP) keys.remove(name);
         // Publish button transitions immediately; the runtime samples at 20 ms intervals.
@@ -102,7 +113,7 @@ final class PadBridge {
         Set<String> pressed=new LinkedHashSet<>();
         for (int axis:PadMapping.CAPTURABLE_AXES) {
             String target=PadMapping.resolveAxis(mapping,axis,e.getAxisValue(axis));
-            if (target!=null) pressed.add(target);
+            if (target!=null) pressed.add(physicalToken(target));
         }
         axisKeys=pressed;
         if (!dialogActive && !queued) { queued=true; handler.postDelayed(() -> { queued=false; write(); },8); }
