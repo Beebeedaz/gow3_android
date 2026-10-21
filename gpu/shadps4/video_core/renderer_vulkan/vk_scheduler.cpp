@@ -22,6 +22,7 @@
 #include "common/thread.h"
 #include "imgui/renderer/texture_manager.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
+#include "video_core/renderer_vulkan/vk_recording_observer.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "gow3_threads.h"
 
@@ -65,9 +66,16 @@ void Scheduler::BeginRendering(const RenderState& new_state) {
     if (is_rendering && render_state == new_state) {
         return;
     }
+    // 切流收口后（CommandBuffer 进 direct / KickRecording 切流 / SubmitExecution 提交）同一 state
+    // 的重开要续接上一代附件内容：用 LOAD 而不是 CLEAR（对齐 Bloodborne resume_rendering 语义）。
+    const bool resume = resume_rendering && !is_rendering && render_state == new_state;
+    resume_rendering = false;
     EndRendering();
     is_rendering = true;
     render_state = new_state;
+    // 配对护栏：只有确实要录制 Begin 才递增；同 state 续接在上面的提前返回里已排除。
+    render_pass_pairing.OnBegin();
+    const auto producer = ObserveProducer("BeginRendering");
 
     std::array<vk::RenderingAttachmentInfo, 8> color_attachments;
     for (u32 i = 0; i < render_state.num_color_attachments; ++i) {
@@ -75,7 +83,8 @@ void Scheduler::BeginRendering(const RenderState& new_state) {
         color_attachments[i] = vk::RenderingAttachmentInfo{
             .imageView = cb.image_view,
             .imageLayout = cb.image_layout,
-            .loadOp = cb.is_clear ? vk::AttachmentLoadOp::eClear : vk::AttachmentLoadOp::eLoad,
+            .loadOp = cb.is_clear && !resume ? vk::AttachmentLoadOp::eClear
+                                             : vk::AttachmentLoadOp::eLoad,
             .storeOp = vk::AttachmentStoreOp::eStore,
             .clearValue = vk::ClearValue{.color = vk::ClearColorValue{.uint32 = cb.clear_value}},
         };
@@ -85,7 +94,8 @@ void Scheduler::BeginRendering(const RenderState& new_state) {
     const vk::RenderingAttachmentInfo depth_attachment = {
         .imageView = db.image_view,
         .imageLayout = db.image_layout,
-        .loadOp = db.depth_clear ? vk::AttachmentLoadOp::eClear : vk::AttachmentLoadOp::eLoad,
+        .loadOp = db.depth_clear && !resume ? vk::AttachmentLoadOp::eClear
+                                            : vk::AttachmentLoadOp::eLoad,
         .storeOp = vk::AttachmentStoreOp::eStore,
         .clearValue =
             vk::ClearValue{.depthStencil = vk::ClearDepthStencilValue{.depth = std::bit_cast<float>(
@@ -94,7 +104,8 @@ void Scheduler::BeginRendering(const RenderState& new_state) {
     const vk::RenderingAttachmentInfo stencil_attachment = {
         .imageView = db.image_view,
         .imageLayout = db.image_layout,
-        .loadOp = db.stencil_clear ? vk::AttachmentLoadOp::eClear : vk::AttachmentLoadOp::eLoad,
+        .loadOp = db.stencil_clear && !resume ? vk::AttachmentLoadOp::eClear
+                                              : vk::AttachmentLoadOp::eLoad,
         .storeOp = vk::AttachmentStoreOp::eStore,
         .clearValue = vk::ClearValue{.depthStencil =
                                          vk::ClearDepthStencilValue{.stencil = db.clear_value[1]}},
@@ -114,12 +125,14 @@ void Scheduler::BeginRendering(const RenderState& new_state) {
     };
 
     if (!recording_threaded) {
+        ObserveRenderBegin(current_cmdbuf, "Scheduler::BeginRendering(immediate)");
         current_cmdbuf.beginRendering(rendering_info);
         return;
     }
     // The attachment infos live on this stack frame: the recorded closure keeps copies.
     Record([info = rendering_info, color_attachments, depth_attachment,
             stencil_attachment](vk::CommandBuffer cmdbuf) mutable {
+        ObserveRenderBegin(cmdbuf, "Scheduler::BeginRendering");
         info.pColorAttachments = color_attachments.data();
         if (info.pDepthAttachment) {
             info.pDepthAttachment = &depth_attachment;
@@ -135,8 +148,21 @@ void Scheduler::EndRendering() {
     if (!is_rendering) {
         return;
     }
+    // 配对护栏：深度为 0 却要 End，说明记录侧没有对应的 Begin（跨代错位：Begin 入队后、End
+    // 入队前并发提交换代，End 落进下一代）。此时告警并放弃该命令，不让驱动解引用空 subpass；
+    // 告警代表仍有状态错配，不是已修复。
+    if (!render_pass_pairing.OnEnd()) {
+        std::printf("GPU pairing guard: EndRendering without Begin discarded (resume=%d, caller=%p); "
+                    "render pass state mismatch remains\n",
+                    resume_rendering ? 1 : 0, __builtin_return_address(0));
+        is_rendering = false;
+        return;
+    }
     is_rendering = false;
-    Record([](vk::CommandBuffer cmdbuf) { cmdbuf.endRendering(); });
+    Record([this](vk::CommandBuffer cmdbuf) {
+        ObserveRenderEnd(cmdbuf, "Scheduler::EndRendering");
+        cmdbuf.endRendering();
+    });
 }
 
 void Scheduler::TraceDirectRecording(void* caller) {
@@ -236,6 +262,13 @@ void Scheduler::KickRecording(bool force) {
         return;
     }
     std::scoped_lock kick_lock{kick_mutex};
+    const auto producer = ObserveProducer("KickRecording");
+    // 切流前收口：Begin 闭包已入队（或已执行）而 End 尚未入队时，切流交给 RecorderThread 后 End
+    // 会落进下一 command buffer 代（跨代错位）。这里先收口并把续接标记给下一个 BeginRendering。
+    if (is_rendering) {
+        EndRendering();
+        resume_rendering = true;
+    }
     // Callers kick where nobody holds the raw command buffer: deferral resumes.
     direct_mode = false;
     // Batches of tens of KiB keep the queue handoff cheap relative to the work it carries.
@@ -417,7 +450,13 @@ void Scheduler::AllocateWorkerCommandBuffers() {
         .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
     };
 
+    // 换代：新 command buffer 代的渲染深度从 0 开始。上一代若有未闭合范围，SubmitExecution
+    // 已先 EndRendering 收口；换代重置使"Begin 在旧代、孤立 End 在新代"的错位被 EndRendering
+    // 护栏拦截（深度 0 时告警并跳过）。
+    render_pass_pairing.OnSwap();
+
     current_cmdbuf = command_pool.Commit();
+    ObserveNewSequence(current_cmdbuf);
     Check(current_cmdbuf.begin(begin_info));
 
     // Invalidate dynamic state so it gets applied to the new command buffer.
@@ -435,6 +474,7 @@ void Scheduler::AllocateWorkerCommandBuffers() {
 
 void Scheduler::SubmitExecution(SubmitInfo& info) {
     std::scoped_lock lk{submit_mutex};
+    const auto producer = ObserveProducer("SubmitExecution");
     const u64 signal_value = work_semaphore.NextTick();
 
 #if TRACY_GPU_ENABLED
@@ -455,8 +495,23 @@ void Scheduler::SubmitExecution(SubmitInfo& info) {
         profiler->Mark(0x5B317ull, [] { return std::string{"(between submissions: GPU idle)"}; });
     }
     SyncRecording();
+    // 提交前收口保证：SyncRecording 之后若仍有未配对的 Begin（并发下 Begin 闭包已入队而 End 未
+    // 记录，或被护栏跳过），先强制补一个 End 再收口，避免带着未闭合的渲染范围提交；换代时深度
+    // 归 0 使下一次 Begin 重新计数。
+    if (render_pass_pairing.Depth() != 0) {
+        std::printf("GPU pairing guard: submit with open render pass closed (depth=%u, caller=%p); "
+                    "render pass state mismatch remains\n",
+                    render_pass_pairing.Depth(), __builtin_return_address(0));
+        Record([this](vk::CommandBuffer cmdbuf) {
+            ObserveRenderEnd(cmdbuf, "Scheduler::SubmitExecution(force close)");
+            cmdbuf.endRendering();
+        });
+        SyncRecording();
+        render_pass_pairing.OnSwap();
+    }
     // Guest memory copies into staging read by this submission (copy threads).
     WaitHostCopies();
+    ObserveSubmit(current_cmdbuf);
     Check(current_cmdbuf.end());
 
     const vk::Semaphore timeline = work_semaphore.Handle();
