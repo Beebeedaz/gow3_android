@@ -3,7 +3,7 @@ name: android
 on:
   pull_request:
   push:
-    branches: [main, gow3]
+    branches: [main, gow3, android]
     tags: ['v*']
   workflow_dispatch:
 
