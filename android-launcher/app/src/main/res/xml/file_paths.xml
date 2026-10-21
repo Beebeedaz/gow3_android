@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 分享日志的临时归档只落在 cacheDir/share/ 下，因此只映射该子目录：
+     logs、gow3.ini、存档等应用私有文件都不在可分享范围内。 -->
+<paths>
+    <cache-path name="shared_logs" path="share/" />
+</paths>

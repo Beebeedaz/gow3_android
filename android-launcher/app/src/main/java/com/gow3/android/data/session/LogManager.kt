@@ -9,6 +9,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.core.content.FileProvider
 import com.gow3.android.R
 import java.io.File
 import java.io.FileInputStream
@@ -30,9 +31,10 @@ internal sealed class LogResult {
 /**
  * 负责 God of War III 运行时日志：把维护者诊断 zip（`report.txt` 设备清单、`android-game.log`
  * 与 `android-game.prev.log` 尾段、`gow3.ini` 设置（去敏感键）、本应用 uid 的 `logcat.txt`）
- * 导出为玩家通过 Storage Access Framework 选择的 `.zip`。参考 Bloodborne-Android 的 LogReport
- * 内容模型；只读取 `filesDir/gow3data` 下的日志/设置与只读系统信息，运行时、runtime 安装、
- * 存档和游戏文件绝不被修改。导出是只读快照，因此导出期间运行游戏只会捕获当时已刷盘的字节。
+ * 导出为玩家通过 Storage Access Framework 选择的 `.zip`，或直接交给系统分享面板。
+ * 参考 Bloodborne-Android 的 LogReport 内容模型；只读取 `filesDir/gow3data` 下的日志/设置
+ * 与只读系统信息，运行时、runtime 安装、存档和游戏文件绝不被修改。导出是只读快照，因此
+ * 导出期间运行游戏只会捕获当时已刷盘的字节。
  */
 internal class LogManager(private val activity: Activity) {
 
@@ -40,6 +42,8 @@ internal class LogManager(private val activity: Activity) {
         /** 区别于 GameFolderManager 的 1001/1002、LosslessDllManager 的 1003 和 SaveManager 的 1004/1005。 */
         const val REQUEST_EXPORT = 1006
         private const val DEFAULT_EXPORT_NAME = "GodOfWar3-Logs"
+        /** 分享临时归档在 cache 下的子目录名；与 res/xml/file_paths.xml 的 paths 映射一致。 */
+        private const val SHARE_DIR = "share"
     }
 
     /** 由 [launchExport] 设置，由 [onActivityResult] 消费。 */
@@ -87,6 +91,68 @@ internal class LogManager(private val activity: Activity) {
             activity.runOnUiThread { callback(result) }
         }.start()
         return true
+    }
+
+    /**
+     * 把诊断 zip 直接交给系统分享面板：玩家不选保存位置，只选目标应用。归档内容与
+     * 「导出日志」完全一致（共用 [buildEntries]），因此不会产生第二套日志收集逻辑。
+     *
+     * 打包要读日志尾段与 logcat 并压缩，放在后台线程；调起 chooser 必须在主线程。
+     * 分享目标在玩家选中目标应用后才异步读取附件，因此临时归档不在本次分享结束时
+     * 删除，而是在生成新归档前清理过期的那一批（见 [LogArchive.staleArchives]）。
+     */
+    fun launchShare(onResult: (LogResult) -> Unit) {
+        if (!LogArchive.hasLogs(logsDir())) {
+            onResult(LogResult.Failed(activity.getString(R.string.log_no_logs_share)))
+            return
+        }
+        Thread {
+            var shared: Uri? = null
+            var reason: String? = null
+            try {
+                shared = prepareSharedArchive()
+            } catch (ex: Exception) {
+                reason = ex.message ?: activity.getString(R.string.unknown_error)
+            }
+            val archive = shared
+            activity.runOnUiThread {
+                if (archive == null) {
+                    onResult(LogResult.Failed(activity.getString(R.string.log_share_failed_fmt, reason ?: activity.getString(R.string.unknown_error))))
+                    return@runOnUiThread
+                }
+                try {
+                    activity.startActivity(shareIntent(archive))
+                    onResult(LogResult.Success(activity.getString(R.string.log_shared)))
+                } catch (ex: Exception) {
+                    onResult(LogResult.Failed(activity.getString(R.string.log_share_failed_fmt, ex.message ?: activity.getString(R.string.unknown_error))))
+                }
+            }
+        }.start()
+    }
+
+    /** 打包共享归档到 cache 下的 share/ 目录，并返回可分享的 content URI。 */
+    private fun prepareSharedArchive(): Uri {
+        val logs = logsDir()
+        if (!LogArchive.hasLogs(logs)) throw IOException(activity.getString(R.string.log_no_logs_share))
+        val dir = File(activity.cacheDir, SHARE_DIR)
+        dir.mkdirs()
+        // 过期归档在生成新归档前清理；保留窗口内的文件仍可能被上一次分享读取。
+        LogArchive.staleArchives(dir, System.currentTimeMillis()).forEach { it.delete() }
+        val archive = File(dir, "$DEFAULT_EXPORT_NAME-${LogArchive.stamp()}.zip")
+        LogArchive.writeZip(buildEntries(logs), archive)
+        return FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", archive)
+    }
+
+    /** 构造系统分享面板意图：附件是诊断 zip，附带一次性临时读授权。 */
+    private fun shareIntent(uri: Uri): Intent {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "application/zip"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        return Intent.createChooser(send, activity.getString(R.string.log_share_chooser)).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
     }
 
     /**

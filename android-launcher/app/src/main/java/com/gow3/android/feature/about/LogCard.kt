@@ -24,11 +24,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gow3.android.R
 
-/** 将 launcher 的 God of War III 运行时日志（例如 android-game.log）导出为 zip。 */
+/** 将 launcher 的 God of War III 运行时日志（例如 android-game.log）导出为 zip，或直接分享。 */
 @Composable
 internal fun LogCard(
     hasLogs: Boolean,
     onExport: () -> Unit,
+    onShare: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -59,6 +60,7 @@ internal fun LogCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ActionButton(stringResource(R.string.log_export), hasLogs, Modifier.weight(1f), onExport)
+            ActionButton(stringResource(R.string.log_share), hasLogs, Modifier.weight(1f), onShare)
         }
         Text(
             stringResource(R.string.log_export_footer),

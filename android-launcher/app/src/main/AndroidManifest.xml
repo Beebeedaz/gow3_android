@@ -34,6 +34,18 @@
             android:name="com.gow3.android.feature.settings.PadMappingActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|density" />
+        <!-- 分享日志：诊断 zip 位于应用 cache 目录，targetSdk 28 下不能把 file:// URI
+             交给其它应用（FileUriExposedException），因此经 FileProvider 授予一次性
+             临时读权限。paths 只映射 cache 下的 share/ 子目录，不暴露日志与设置。 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

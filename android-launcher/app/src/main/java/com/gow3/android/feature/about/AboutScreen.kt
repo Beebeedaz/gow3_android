@@ -130,6 +130,16 @@ internal fun AboutScreen(
                     }
                 }
             },
+            onShare = {
+                // 分享不需要 activity result：没有 SAF 结果要消费，调起分享面板即算成功。
+                logs.launchShare { result ->
+                    when (result) {
+                        is LogResult.Success -> toast(result.message)
+                        LogResult.Cancelled -> Unit
+                        is LogResult.Failed -> toast(result.message)
+                    }
+                }
+            },
         )
         // 第三方许可入口暂隐藏：许可页尚未实现（行内 clickable 为空占位），
         // assets 里的 THIRD_PARTY_LICENSES.txt 照常打包。做许可页时恢复本段。

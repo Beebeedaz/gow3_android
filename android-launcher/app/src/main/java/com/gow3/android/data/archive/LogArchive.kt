@@ -35,6 +35,22 @@ internal object LogArchive {
     fun hasLogs(logs: File): Boolean =
         logs.isDirectory && logs.walkTopDown().any { it.isFile }
 
+    /**
+     * 分享临时归档的保留窗口（毫秒）。分享目标在玩家选中目标应用后才异步读取附件，
+     * 因此临时归档不能在下一次分享开始时无条件清空：窗口内的文件仍可能被上一次
+     * 分享的目标应用读取，只清理更早的那一批。
+     */
+    const val SHARE_KEEP_MS = 10L * 60 * 1000
+
+    /**
+     * 挑出 [dir] 中已过期的分享临时归档（最后修改时间早于 [keepMs] 之前），供调用方
+     * 删除。不在本方法内删除，调用方决定何时清理；目录不存在或不可读时返回空列表。
+     */
+    fun staleArchives(dir: File, now: Long, keepMs: Long = SHARE_KEEP_MS): List<File> =
+        dir.listFiles()
+            ?.filter { it.isFile && now - it.lastModified() > keepMs }
+            ?: emptyList()
+
     /** `yyyyMMdd-HHmmss`，与存档导出使用相同的时间戳格式。 */
     fun stamp(now: Date = Date()): String = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(now)
 

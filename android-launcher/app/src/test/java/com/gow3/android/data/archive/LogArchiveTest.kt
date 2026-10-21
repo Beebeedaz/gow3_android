@@ -158,4 +158,37 @@ class LogArchiveTest {
     fun `stamp uses the yyyyMMdd-HHmmss layout`() {
         assertTrue(LogArchive.stamp().matches(Regex("""\d{8}-\d{6}""")))
     }
+
+    // ---- 分享临时归档的过期清理 ----
+
+    @Test
+    fun `staleArchives keeps files inside the keep window`() {
+        val dir = tempDir()
+        val fresh = File(dir, "GodOfWar3-Logs-fresh.zip").apply { writeText("fresh") }
+        val now = System.currentTimeMillis()
+        fresh.setLastModified(now - 1000L)
+
+        val stale = LogArchive.staleArchives(dir, now)
+
+        assertTrue("窗口内的归档不能被清理", stale.isEmpty())
+    }
+
+    @Test
+    fun `staleArchives reports archives older than the keep window`() {
+        val dir = tempDir()
+        val old = File(dir, "GodOfWar3-Logs-old.zip").apply { writeText("old") }
+        val now = System.currentTimeMillis()
+        old.setLastModified(now - LogArchive.SHARE_KEEP_MS - 60_000L)
+
+        val stale = LogArchive.staleArchives(dir, now)
+
+        assertEquals(1, stale.size)
+        assertEquals("GodOfWar3-Logs-old.zip", stale.first().name)
+    }
+
+    @Test
+    fun `staleArchives is empty for a missing directory`() {
+        val missing = File(tempDir(), "share")
+        assertTrue(LogArchive.staleArchives(missing, System.currentTimeMillis()).isEmpty())
+    }
 }
