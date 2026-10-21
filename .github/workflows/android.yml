@@ -123,7 +123,7 @@ jobs:
         run: bash ci/setup-deps.sh "$CONDA_PREFIX"
 
       - name: Configure build environment
-        shell: bash
+        shell: bash -el {0}
         run: |
           {
             echo "GOW3_KEYSTORE=$RUNNER_TEMP/gow3-release.keystore"
@@ -133,7 +133,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Verify host header tree
-        shell: bash
+        shell: bash -el {0}
         run: |
           set -euo pipefail
           cmake_dir="$CONDA_PREFIX/lib/cmake"
