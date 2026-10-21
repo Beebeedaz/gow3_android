@@ -110,20 +110,17 @@ mkdir -p "$out/bin" "$out/lib"
 # bundle 的 14MB 同量级）。保留编译目录的未 strip 副本供调试。
 "$llvm/bin/llvm-strip" -o "$out/lib/libgow3cpu.so" "$out/fex/libgow3cpu.so"
 "$llvm/bin/llvm-strip" -o "$out/lib/libgow3gpu.so" "$out/gpu/libgow3gpu.so"
-# gow3gpu 在 Android 上不再链接 SDL（AHB present 路径移除）；但 gow3-probe 的 runtime_pad.c
-# 仍链接 SDL3（探测/关闭手柄），libSDL3.so 由依赖构建链产出，随 runtime 一起分发。
-# 判断依赖时不能写 `readelf | grep -q`：本脚本 set -o pipefail，grep -q 匹配后立即退出会让
-# readelf 收到 SIGPIPE，管道状态变成非零 → 误判为「不需要 SDL3」而漏拷贝，
-# 设备端加载 gow3-probe 时才炸。改成先把输出收进变量再匹配。
-probe_deps=$("$llvm/bin/llvm-readelf" -d "$out/bin/gow3-probe" 2>/dev/null || true)
-gpu_deps=$("$llvm/bin/llvm-readelf" -d "$out/gpu/libgow3gpu.so" 2>/dev/null || true)
-if [[ $probe_deps == *libSDL3* || $gpu_deps == *libSDL3* ]]; then
-    [[ -f $prefix/lib/libSDL3.so ]] || {
-        echo "libSDL3.so missing in $prefix (SDL3 must be built by tools/android/build_bionic_deps.sh)" >&2
-        exit 1
-    }
-    cp -f "$prefix/lib/libSDL3.so" "$out/lib/"
-fi
+# gow3gpu 不链接 SDL（AHB present 路径移除）；但 gow3-probe 链接 SDL3：游戏进程用 SDL 音频
+# 子系统（disk 驱动）把 PCM 写进 app 的 FIFO（run-bionic.sh 设 SDL_AUDIO_DRIVER=disk，
+# AudioBridge.java 消费），因此 libSDL3.so 是 payload 的必需项，无条件拷贝。
+# 早先这里按 `readelf | grep -q` 判定是否需要：set -o pipefail 下 grep -q 提前退出会让
+# readelf 收到 SIGPIPE，管道状态非零 → 误判为「不需要」而漏拷贝，直到打包阶段才炸。
+# 现在依赖关系是既定的（音频），直接拷贝 + 断言源文件存在，不再依赖 readelf 判定。
+[[ -f $prefix/lib/libSDL3.so ]] || {
+    echo "libSDL3.so missing in $prefix (SDL3 must be built by tools/android/build_bionic_deps.sh)" >&2
+    exit 1
+}
+cp -f "$prefix/lib/libSDL3.so" "$out/lib/"
 cp -f "$llvm/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" "$out/lib/"
 
 cc=("$llvm/bin/aarch64-linux-android$api-clang" -fuse-ld=lld)

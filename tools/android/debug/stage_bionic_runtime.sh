@@ -31,6 +31,10 @@ inputs=(
     "$out/lib/libgow3gpu.so"
     "$out/lib/libbloodframe.so"
     "$out/lib/libc++_shared.so"
+    # libSDL3.so 是 Android 必需项：游戏进程用 SDL 音频子系统（disk 驱动）把 PCM 写进
+    # app 的 FIFO（run-bionic.sh 设 SDL_AUDIO_DRIVER=disk，AudioBridge.java 消费）。
+    # 缺了它构建期就该失败——否则设备上 gow3-probe 会因找不到 libSDL3.so 而加载失败。
+    "$out/lib/libSDL3.so"
     tools/android/device/run-bionic.sh
     tools/android/config/gow3-fex-compatible.json
     tools/android/config/gow3-default.ini
