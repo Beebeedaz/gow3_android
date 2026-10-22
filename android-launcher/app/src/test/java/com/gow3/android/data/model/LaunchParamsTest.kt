@@ -47,7 +47,7 @@ class LaunchParamsTest {
     @Test fun `performance and controls categories hold the remaining params`() {
         assertEquals(
             // show_fps 已随引擎 FPS 显示退役移出可编辑集（change design D7）
-            setOf("fps_limit", "engine_fps", "vsync", "frames_queued"),
+            setOf("fps_limit", "engine_fps", "vsync", "frames_queued", "worker_nice"),
             LaunchParams.forCategory(LaunchCategory.PERFORMANCE).map { it.key }.toSet(),
         )
         assertEquals(
@@ -96,6 +96,8 @@ class LaunchParamsTest {
         assertEquals("60", LaunchParams.valueOf(empty, byKey.getValue("engine_fps")))
         assertEquals("1", LaunchParams.valueOf(empty, byKey.getValue("vsync")))
         assertEquals("1", LaunchParams.valueOf(empty, byKey.getValue("frames_queued")))
+        assertEquals("0", LaunchParams.valueOf(empty, byKey.getValue("worker_nice")))
+        assertEquals(listOf("0", "5", "10"), byKey.getValue("worker_nice").options.map { it.value })
         assertEquals("100", LaunchParams.valueOf(empty, byKey.getValue("vibration")))
     }
 

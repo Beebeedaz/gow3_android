@@ -58,4 +58,23 @@ int main() {
         published_released += entry.valid && !entry.watched;  // still published, no watcher left
     });
     assert(watched == 2 && published_released == 1);
+
+    // SpartanPort 2.7.0 byte-exact rule: a neighboring image shares a page but not bytes.
+    queue.Push(0x30000c00, 256, 11, 8);
+    assert(queue.RequiredTick(0x30000000, 0xc00) == 11);
+    assert(queue.RequiredTick(0x30000000, 0xc00, true) == 0);
+    assert(queue.RequiredTick(0x30000000, 0xc01, true) == 11);
+    canceled = 0;
+    queue.Cancel(0x30000000, 0xc00, [&](auto&) { ++canceled; }, true);
+    assert(canceled == 0);
+    // An actual overlapping image must still cancel its pending copy.
+    queue.Cancel(0x30000c10, 1, [&](auto&) { ++canceled; }, true);
+    assert(canceled == 1);
+    published.clear();
+    queue.Retire([](auto) { return true; }, complete);
+    assert(published.empty());
+    queue.Push(0x30000c00, 256, 12, 9);
+    queue.Cancel(0x30000000, 0xc00, [&](auto&) { ++canceled; }, true);
+    queue.Retire([](auto) { return true; }, complete);
+    assert((published == std::vector<int>{9}));
 }

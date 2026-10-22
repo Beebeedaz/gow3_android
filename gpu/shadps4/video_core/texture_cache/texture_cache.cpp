@@ -104,6 +104,12 @@ void TextureCache::RetireReadbacks() {
 bool TextureCache::ResolveReadbacks(VAddr address, u64 size, bool assume_locks,
                                     ReadbackSource source) {
     if (!deferred_readbacks || !has_pending_readbacks.load(std::memory_order_acquire)) return false;
+    // Backport from SpartanPort 2.7.0: do not wait for copies of *neighboring* bytes
+    // on the same page when uploading or freeing exactly this image. CPU access and
+    // partial GPU writes still use the conservative page-overlap rule.
+    const bool exact = ExactReadbackWaits() &&
+        (source == ReadbackSource::ImageRefresh || source == ReadbackSource::BufferForImage ||
+         source == ReadbackSource::ImageFree);
     {
         std::scoped_lock lock{readback_mutex};
         // Stale mode, byte rule: God of War III writes every frame to the page that holds a
@@ -113,9 +119,9 @@ bool TextureCache::ResolveReadbacks(VAddr address, u64 size, bool assume_locks,
             readbacks_released += pending_readbacks.ReleaseOutside(address, size, 64_KB,
                 [this](auto& entry) { WatchReadback<false>(entry.address, entry.size); });
         }
-        if (!pending_readbacks.RequiredTick(address, size)) return false;
+        if (!pending_readbacks.RequiredTick(address, size, exact)) return false;
     }
-    const auto resolve = [this, address, size, source] {
+    const auto resolve = [this, address, size, source, exact] {
         const bool diag = Vulkan::WaitDiagnostics::Enabled();
         std::scoped_lock lock{readback_mutex};
         bool waited = false;
@@ -129,7 +135,7 @@ bool TextureCache::ResolveReadbacks(VAddr address, u64 size, bool assume_locks,
             }
         }
         Gow3Stats::Timer readback_timer{Gow3Stats::t_readback_wait};
-        if (const u64 tick = pending_readbacks.RequiredTick(address, size)) {
+        if (const u64 tick = pending_readbacks.RequiredTick(address, size, exact)) {
             ++readbacks_waited;
             waited = !scheduler.IsFree(tick);
             const auto start = diag ? std::chrono::steady_clock::now()
@@ -148,13 +154,13 @@ bool TextureCache::ResolveReadbacks(VAddr address, u64 size, bool assume_locks,
     return true;
 }
 
-void TextureCache::CancelReadbacks(VAddr address, u64 size) {
+void TextureCache::CancelReadbacks(VAddr address, u64 size, bool exact) {
     if (!deferred_readbacks) return;
     std::scoped_lock lock{readback_mutex};
     pending_readbacks.Cancel(address, size, [this](auto& entry) {
         if (entry.watched) WatchReadback<false>(entry.address, entry.size);
         ++readbacks_canceled;
-    });
+    }, exact);
 }
 
 // gow3（上游 b646683，轻量版）：GOW3_PERF_DIAG=1 时每 5 秒打印一次 partial height views
@@ -1652,7 +1658,8 @@ void TextureCache::TouchImage(const Image& image) {
 
 void TextureCache::DeleteImage(ImageId image_id) {
     Image& image = slot_images[image_id];
-    CancelReadbacks(image.info.guest_address, image.info.guest_size);
+    // Keep readbacks belonging only to neighboring images on the same page.
+    CancelReadbacks(image.info.guest_address, image.info.guest_size, true);
     ASSERT_MSG(!image.IsTracked(), "Image was not untracked");
     ASSERT_MSG(False(image.flags & ImageFlagBits::Registered), "Image was not unregistered");
 

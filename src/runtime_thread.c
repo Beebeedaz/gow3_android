@@ -21,6 +21,9 @@
 #else
 #include <sys/syscall.h>
 #include <sys/mman.h>
+#ifdef __ANDROID__
+#include <sys/resource.h>
+#endif
 #endif
 #define ERR(n) ((int32_t)(UINT32_C(0x80020000)|(n)))
 #define ATTR_MAGIC UINT32_C(0x41545452)
@@ -249,6 +252,28 @@ static void set_host_name(const char *name) {
     memcpy(host,name,strnlen(name,sizeof(host)-1));
     pthread_setname_np(pthread_self(),host);
 }
+#ifdef __ANDROID__
+/* SpartanPort #209 found that busy guest WorkerThread spinlocks can starve the GPU
+ * command thread on CPU-constrained hosts. On Android/FEX only, optionally lower
+ * those workers by a bounded nice delta; do not touch the game/driver/audio
+ * threads, FEX call boundary, or the guest-visible PS4 priority. Disabled by
+ * default: the effect is device- and scene-dependent. Linux nice is per thread. */
+static void tune_guest_worker(const char *name) {
+    static _Thread_local int applied;
+    if (applied || strncmp(name,"WorkerThread",12)) return;
+    const char *requested=getenv("GOW3_WORKER_NICE");
+    if (!requested) return;
+    int delta=0;
+    if (!strcmp(requested,"5")) delta=5;
+    else if (!strcmp(requested,"10")) delta=10;
+    if (!delta) return;
+    errno=0;
+    const int before=getpriority(PRIO_PROCESS,0);
+    if (errno) return;
+    const int after=before+delta>19 ? 19 : before+delta;
+    if (after>before && setpriority(PRIO_PROCESS,0,after)==0) applied=1;
+}
+#endif
 #ifdef _WIN32
 #define exit_setjmp(t) gow3_setjmp((t)->exit_jump)
 #define exit_longjmp(t) gow3_longjmp((t)->exit_jump,1)
@@ -260,6 +285,9 @@ static void *host_start(void *p) {
     GuestThread *t=p;
     attach(t);
     set_host_name(t->name);
+#ifdef __ANDROID__
+    tune_guest_worker(t->name);
+#endif
     /* The guest entry runs through the boundary: with the JIT the host calls guest code, which
      * may not be nested in guest code, so it runs on this thread's guest stack. */
     if (t->guest_stack) guest_cpu_thread_stack(t->guest_stack+t->guest_stack_size,t->guest_stack_size);
@@ -363,7 +391,12 @@ static ABI int32_t thread_rename(GuestThread *t,const char *name) {
     if (!find_thread(t)) return ERR(3);
     if (!name) return ERR(22);
     snprintf(t->name,sizeof(t->name),"%s",name);
-    if (t==current) set_host_name(t->name);
+    if (t==current) {
+        set_host_name(t->name);
+#ifdef __ANDROID__
+        tune_guest_worker(t->name);
+#endif
+    }
     return 0;
 }
 static ABI int32_t thread_equal(GuestThread *a,GuestThread *b) { return a==b; }

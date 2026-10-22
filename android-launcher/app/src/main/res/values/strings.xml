@@ -41,6 +41,7 @@
     <string name="param_engine_fps">Engine FPS</string>
     <string name="param_vsync">VSync</string>
     <string name="param_frames_queued">Frames queued</string>
+    <string name="param_worker_nice">Game worker scheduling (experimental)</string>
     <string name="param_sharpen">Sharpening</string>
     <string name="param_sharpness">Sharpening strength</string>
     <string name="param_display_stretch">Fullscreen picture fit</string>
@@ -73,6 +74,9 @@
     <string name="param_option_240">240</string>
     <string name="param_option_unlimited">Unlimited</string>
     <string name="param_option_engine_60">60 (the game\'s own)</string>
+    <string name="param_option_worker_normal">Normal (off)</string>
+    <string name="param_option_worker_gpu">Favor GPU (+5)</string>
+    <string name="param_option_worker_gpu_strong">Favor GPU more (+10)</string>
     <string name="param_option_on">ON</string>
     <string name="param_option_off">OFF</string>
     <string name="param_option_display_fit">Fit (black bars)</string>
@@ -152,6 +156,7 @@
     <string name="storage_update_desc">Optional: the update (patch) folder laid over the game at start.</string>
     <string name="param_desc_vsync">Syncs the game\'s frames with your screen\'s refresh rate to stop visual tearing. Leave it ON unless you see tearing or stutter.</string>
     <string name="param_desc_frames_queued">How many frames the game prepares ahead of what the screen shows. Lower numbers cut input lag; higher numbers can improve smoothness on weaker hardware.</string>
+    <string name="param_desc_worker_nice">Lowers only the game\'s guest WorkerThread CPU priority to leave time for the GPU command thread. Try +5 if that thread is CPU-starved; revert to off if game logic, audio or input gets worse. Requires a restart and a device comparison; it cannot fix GPU-bound scenes.</string>
     <string name="param_desc_anisotropy">Sharpens floors and walls viewed at an angle. Higher values may use a little more GPU bandwidth. Takes effect on the next launch.</string>
     <string name="param_desc_vibration">Scales the gamepad vibration strength. 0% disables vibration. Takes effect immediately while the game is running.</string>
     <string name="param_desc_sharpen">Sharpens the upscaled image (the full strength range applies to every upscaler). Has no effect while the upscaler is OFF.</string>

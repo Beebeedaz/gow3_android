@@ -205,6 +205,16 @@ internal object LaunchParams {
             defaultValue = "1",
             descriptionRes = R.string.param_desc_frames_queued,
         ),
+        LaunchParam(
+            key = "worker_nice", labelRes = R.string.param_worker_nice, category = LaunchCategory.PERFORMANCE,
+            options = listOf(
+                LaunchOption("0", R.string.param_option_worker_normal),
+                LaunchOption("5", R.string.param_option_worker_gpu),
+                LaunchOption("10", R.string.param_option_worker_gpu_strong),
+            ),
+            defaultValue = "0",
+            descriptionRes = R.string.param_desc_worker_nice,
+        ),
         // show_fps（引擎自带 FPS 叠加层）已退役：帧率显示统一由 launcher 侧性能 HUD
         // （PerfHudOverlay）提供，历史残留的 show_fps=1 由 Gow3Data.prepare 归零，
         // 这里不再提供参数行（change design D7）。

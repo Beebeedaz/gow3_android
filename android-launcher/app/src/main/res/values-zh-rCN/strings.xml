@@ -40,6 +40,7 @@
     <string name="param_engine_fps">引擎帧率</string>
     <string name="param_vsync">垂直同步</string>
     <string name="param_frames_queued">排队帧数</string>
+    <string name="param_worker_nice">游戏工作线程调度（实验性）</string>
     <string name="param_sharpen">锐化</string>
     <string name="param_sharpness">锐化强度</string>
     <string name="param_display_stretch">画面铺满</string>
@@ -63,6 +64,9 @@
     <string name="param_option_120">120</string>
     <string name="param_option_240">240</string>
     <string name="param_option_unlimited">不限</string>
+    <string name="param_option_worker_normal">正常（关闭）</string>
+    <string name="param_option_worker_gpu">优先 GPU（+5）</string>
+    <string name="param_option_worker_gpu_strong">更优先 GPU（+10）</string>
     <string name="param_option_engine_60">60（游戏原生）</string>
     <string name="param_option_on">开</string>
     <string name="param_option_off">关</string>
@@ -135,6 +139,7 @@
     <string name="storage_update_desc">可选：启动时叠加到主游戏上的升级补丁目录。</string>
     <string name="param_desc_vsync">将游戏帧与屏幕刷新率同步，避免画面撕裂。除非出现撕裂或卡顿，否则保持开启。</string>
     <string name="param_desc_frames_queued">游戏在屏幕上显示之前预先准备多少帧。数值越低越能降低输入延迟；数值越高在较弱的硬件上可能更流畅。</string>
+    <string name="param_desc_worker_nice">仅降低游戏 WorkerThread 的 CPU 优先级，为 GPU 命令线程让出时间。CPU 线程争抢时可试 +5；如果游戏逻辑、声音或输入变差，请恢复关闭。需要重启并在设备上对比；GPU 瓶颈时无效。</string>
     <string name="param_desc_anisotropy">让斜视角下的地板与墙面纹理更清晰。数值越高可能多占用一点 GPU 带宽。下次启动生效。</string>
     <string name="param_desc_vibration">按比例调节手柄振动强度，0% 表示关闭振动。游戏运行时立即生效。</string>
     <string name="param_desc_sharpen">锐化升采样后的画面（全部强度档位对所有超分算法生效）。超分为 OFF 时无效果。</string>

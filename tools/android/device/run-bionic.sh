@@ -120,6 +120,13 @@ export GOW3_GC_BUDGET_MB=${GOW3_GC_BUDGET_MB:-4096} GOW3_VRAM_IDLE_SECONDS=${GOW
 # VSync（vsync=1）：app 每帧至少显示一个刷新周期、按序（app 里的 FIFO：libgow3gpu 在 HELLO 里
 # 声明，gow3_present_proto.h）；0：显示最新帧，一个刷新周期里完成的帧被跳过。
 if [ "$(setting vsync)" = 1 ]; then export GOW3_VSYNC=1; else export GOW3_VSYNC=0; fi
+# SpartanPort #209 adaptation: opt-in nice delta for game WorkerThread pthreads. The
+# GPU/FEX/driver/audio threads are unchanged. Invalid/absent values mean off.
+worker_nice=$(setting worker_nice)
+case $worker_nice in
+    5|10) export GOW3_WORKER_NICE=$worker_nice ;;
+    *) unset GOW3_WORKER_NICE ;;
+esac
 
 # ---- 帧生成（change add-native-frame-generation）：gow3_lsfg 引擎（libbloodframe.so）----
 # gow3.ini 的 framegen_* 键在启动期种子到 gow3data/framegen.state（游戏内 250ms watcher

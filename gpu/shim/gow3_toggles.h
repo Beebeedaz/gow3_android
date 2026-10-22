@@ -73,6 +73,7 @@ enum : std::uint64_t {
     /// 直接复用更高缓存的镜像，而不是新建并上传（texture_cache.cpp）。GOW3_PARTIAL_HEIGHT_VIEWS=0
     /// 可在启动时关闭，运行期仍可用 toggle 文件做 A/B。
     PartialHeightViews = 1ull << 58,
+    ExactReadbackWaits = 1ull << 59, ///< Disable byte-exact waits for image readbacks (A/B)
     // Bits 20-29 are used as raw debug toggles by the camera/object motion and the upscaler.
 };
 inline bool Disabled(std::uint64_t bit) {
